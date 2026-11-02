@@ -1,0 +1,18 @@
+{
+  "name": "hushd",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hushd: a private OTC desk run by AI agents.",
+  "author": "Arham Khan",
+  "license": "MIT",
+  "scripts": {
+    "dev": "pnpm --filter @hushd/app dev",
+    "build": "pnpm --filter @hushd/app build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.34.3"
+}

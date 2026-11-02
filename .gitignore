@@ -1,0 +1,57 @@
+# Private to the team: plans, notes and runbooks
+/internal/
+CLAUDE.local.md
+
+# dependencies
+node_modules
+.pnpm-store
+
+# next
+.next
+out
+build
+dist
+
+# env and secrets: never commit real keys
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+id_rsa*
+**/credentials/
+
+# rust
+target/
+contracts/**/res/
+!contracts/res/.gitkeep
+
+# circuits build output (the release artifacts are copied into app/public/circuits)
+circuits/build/
+*.ptau
+*.r1cs
+*.sym
+
+# test output
+playwright-report/
+test-results/
+coverage/
+
+# debug and os
+npm-debug.log*
+.DS_Store
+*.tmp
+
+# typescript
+next-env.d.ts
+*.tsbuildinfo
+
+# vercel
+.vercel
+
+# local editor and agent config
+/.claude/
+
+# package test builds
+.test-build/
