@@ -1,0 +1,33 @@
+{
+  "name": "@hushd/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hushd web app: the desk, the private balance, proofs and docs.",
+  "author": "Arham Khan",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev --port 3000 --webpack",
+    "build": "next build --webpack",
+    "start": "next start --port 3000",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "framer-motion": "^12.42.2",
+    "geist": "1.4.2",
+    "next": "16.4.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
