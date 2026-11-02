@@ -1,0 +1,1207 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss";
+
+/* Geist (the `geist` package, loaded through next/font in layout.tsx) is the brand typeface. */
+
+/*
+ * The Hushd system. Pure monochrome: ink and paper.
+ *
+ * Colour theory: an achromatic scheme with a cool hairline bias (greys lean a
+ * couple of degrees cool so they read as chosen, not default). Hierarchy comes
+ * from value, not hue: 60% paper, 30% ink type and graphite surfaces, 10% solid
+ * ink for the one thing that matters on each screen. The luminous field is a
+ * silver haze (light) / graphite moonlight (dark) with ONE accent, Hushd iris
+ * (#4B4BC4 light, #AEB0FF dark), used as a seasoning, never a flood: it marks
+ * private / sealed / verified, glints inside the field, and tints the soft pill.
+ * Under 5% of any screen.
+ *
+ * Light is :root. Dark applies when html[data-theme="dark"] is stamped (by the
+ * head script from the saved choice or the OS setting). `.theme-dark` scopes the
+ * dark tokens to one subtree (the footer, a code panel) in either theme;
+ * `.theme-light` does the same for the light set.
+ */
+:root,
+.theme-light {
+  color-scheme: light;
+  --ink: #0b0c0e;
+  --on-ink: #ffffff;
+  --ink-dim: #26282c; /* the primary action, pressed */
+  --grey-500: #4a4e55;
+  --grey-300: #a7abb2;
+  --grey-100: #e6e8eb;
+  --grey-50: #f2f3f5;
+  /* the private / sealed / verified signal: the iris accent. Dark enough that 12px
+     text passes AA (4.5:1) on every light surface, the soft chip and surface-2 included. */
+  --sealed: #4646bd;
+  --sealed-soft: #ececfb;
+  --accent: #4b4bc4;
+  --accent-soft: #ececfb;
+  --tint: #e7e7fa; /* soft pill ground, a breath of iris */
+  --on-tint: #2b2a7a;
+  --field-1: #c8cbd0;
+  --field-2: #e3e5e8;
+  --field-3: #f8f9fa;
+  --field-base: #f0f1f3;
+  --field-deep: #c3c2f2; /* the one iris glint inside the silver haze */
+  --f-hi: #ffffff; /* light patches in the blend */
+  --f-mid: #d2d6db; /* silver shadow */
+  --f-deep: #b4bac2; /* deepest silver in the flow */
+  --f-t1: #c0bff2; /* iris wash, deep */
+  --f-t2: #dedef9; /* iris wash, soft */
+  --f-a: #f3f4f5;
+  --f-b: #e5e7ea;
+  --f-c: #dddcf6;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-line: rgba(255, 255, 255, 0.85);
+  --text: #0b0c0e;
+  --soft: #34373c;
+  --mute: #5f636a;
+  --faint: #6b6f76;
+  --line: #e4e6e9;
+  --line-strong: #cfd2d6;
+  --panel: #ffffff;
+  --surface: #f3f4f5;
+  --surface-2: #eaebed;
+  --background: #ffffff;
+  --app-ground: #f4f4f5;
+  --foreground: #0b0c0e;
+  --danger: #b4362a;
+  --danger-soft: #fbecea;
+  --warn: #8a5a12;
+  --warn-soft: #fbf3e4;
+  --shadow-dock: 0 10px 30px -12px rgba(11, 12, 14, 0.16);
+  --shadow-card: 0 1px 2px rgba(11, 12, 14, 0.04), 0 10px 28px -16px rgba(11, 12, 14, 0.12);
+  --shadow-pop: 0 2px 6px rgba(11, 12, 14, 0.05), 0 28px 70px -24px rgba(11, 12, 14, 0.3);
+  --chart-up: #4b4bc4;
+  --chart-down: #b4362a;
+  /* Money in and out. The gray is deliberately neutral, so direction and labels carry it too. */
+  --chart-in: #4b4bc4;
+  --chart-out: #979ba2;
+}
+
+/* Native dropdown lists take their colours from the option itself on Windows,
+   Android and Linux; without this, dark mode shows light text on a light list. */
+select option,
+select optgroup {
+  background-color: var(--panel);
+  color: var(--foreground);
+}
+
+html[data-theme="dark"],
+.theme-dark {
+  color-scheme: dark;
+  --ink: #f4f5f6; /* primary action flips to a white pill */
+  --on-ink: #0b0c0e;
+  --ink-dim: #d7d9dc;
+  --grey-500: #b9bdc3;
+  --grey-300: #5d6168;
+  --grey-100: #1f2125;
+  --grey-50: #16181b;
+  --sealed: #aeb0ff;
+  --sealed-soft: rgba(174, 176, 255, 0.12);
+  --accent: #aeb0ff;
+  --accent-soft: rgba(174, 176, 255, 0.12);
+  --tint: #1b1c3a;
+  --on-tint: #cfd0ff;
+  --field-1: #26292d;
+  --field-2: #16171a;
+  --field-3: #0c0d0f;
+  --field-base: #0b0c0e;
+  --field-deep: #2d2f6b;
+  --f-hi: #24272b;
+  --f-mid: #0c0d0f;
+  --f-deep: #050506;
+  --f-t1: #26285a;
+  --f-t2: #1a1b38;
+  --f-a: #121316;
+  --f-b: #0d0e10;
+  --f-c: #18192e;
+  --glass: rgba(255, 255, 255, 0.05);
+  --glass-line: rgba(255, 255, 255, 0.1);
+  --text: #f4f5f6;
+  --soft: #cdd0d4;
+  --mute: #9b9fa6;
+  --faint: #83878e;
+  --line: #232529;
+  --line-strong: #33363b;
+  --panel: #111214;
+  --surface: #17181b;
+  --surface-2: #1e2023;
+  --background: #08090a;
+  --app-ground: #08090a;
+  --foreground: #f4f5f6;
+  --danger: #f08a7e;
+  --danger-soft: rgba(240, 138, 126, 0.12);
+  --warn: #e8b86a;
+  --warn-soft: rgba(232, 184, 106, 0.12);
+  --shadow-dock: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 30px 80px -24px rgba(0, 0, 0, 0.85);
+  --chart-up: #aeb0ff;
+  --chart-down: #f08a7e;
+  --chart-in: #7a7de0;
+  --chart-out: #6c7077;
+}
+
+/* Inside the app the ground drops to a soft neutral so cards float on it.
+   Covers body-portaled modals via hushd-app-ctx. */
+.hushd-app,
+html.hushd-app-ctx {
+  --background: var(--app-ground);
+}
+html.hushd-app-ctx body {
+  background: var(--app-ground);
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-grey-500: var(--grey-500);
+  --color-grey-300: var(--grey-300);
+  --color-grey-100: var(--grey-100);
+  --color-grey-50: var(--grey-50);
+  --color-sealed: var(--sealed);
+  --color-sealed-soft: var(--sealed-soft);
+  --color-tint: var(--tint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-tint: var(--on-tint);
+  --color-tint: var(--tint);
+  --color-soft: var(--soft);
+  --color-mute: var(--mute);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-display: var(--font-geist-sans), system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01" 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--grey-500);
+    outline-offset: 3px;
+  }
+}
+
+::selection {
+  background: var(--grey-100);
+  color: var(--foreground);
+}
+
+.font-display {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+@layer components {
+/* ---------- Type scale ---------- */
+.t-display-xl {
+  font-weight: 300;
+  font-size: clamp(42px, 5.2vw, 76px);
+  line-height: 1.02;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+.t-display-l {
+  font-weight: 300;
+  font-size: clamp(32px, 3.4vw, 48px);
+  line-height: 1.06;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.t-display-m {
+  font-weight: 300;
+  font-size: clamp(26px, 2.6vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+.t-title {
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.t-label {
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+/* The small line over a heading in the app (a dialog's kind, a card's status):
+   sentence case in the mute ink. Caps (t-label) stay for table column heads. */
+.t-eyebrow {
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--mute);
+}
+
+/* ---------- Buttons: pills ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  padding: 0 1.25rem;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-sm {
+  height: 2.25rem;
+  padding: 0 1rem;
+  font-size: 13px;
+}
+.btn-lg {
+  height: 3rem;
+  padding: 0 1.5rem;
+  font-size: 15px;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-ink {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.btn-ink:hover:not(:disabled) {
+  background: var(--ink-dim);
+}
+.btn-accent,
+.btn-tint {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+.btn-accent:hover:not(:disabled),
+.btn-tint:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tint) 85%, var(--ink));
+}
+.btn-ghost {
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  color: var(--foreground);
+  border-color: var(--line-strong);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--foreground);
+  background: var(--panel);
+}
+.btn-quiet {
+  background: transparent;
+  color: var(--foreground);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+}
+.btn-quiet:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+/* A quiet next step beside a button or under a block: sentence case in ink,
+   with its arrow sliding a touch on hover. One style for every such link on
+   the site; the accent stays for what is private, so it never takes the accent. */
+.hd-arrowlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--foreground);
+}
+.hd-arrowlink > [aria-hidden],
+.hd-arrowlink > svg {
+  transition: transform 0.2s var(--ease-out);
+}
+.hd-arrowlink:hover > [aria-hidden],
+.hd-arrowlink:hover > svg {
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hd-arrowlink:hover > [aria-hidden],
+  .hd-arrowlink:hover > svg {
+    transform: none;
+  }
+}
+
+/* A small link keeps its size on a phone and still takes a 40px tap: the tap
+   box grows around it and nothing beside it moves. In the components layer so a
+   utility such as `absolute` on the same element still wins. */
+@layer components {
+  @media (max-width: 639px) {
+    .hd-tap,
+    .hd-arrowlink,
+    .btn-sm,
+    .hushd-app footer a {
+      position: relative;
+    }
+    .hd-tap::after,
+    .hd-arrowlink::after,
+    .btn-sm::after,
+    .hushd-app footer a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 40px;
+      min-width: 40px;
+      transform: translateY(-50%);
+    }
+  }
+}
+
+/* The first Tab stop on every page, hidden until it is reached. */
+.hd-skip {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 14px;
+  font-weight: 500;
+  transform: translateY(-200%);
+}
+.hd-skip:focus {
+  transform: none;
+}
+main:focus {
+  outline: none;
+}
+
+/* ---------- Surfaces ---------- */
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+.shadow-pop {
+  box-shadow: var(--shadow-pop);
+}
+.hd-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  isolation: isolate;
+}
+.hd-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+.hd-tile {
+  background: var(--surface);
+  border-radius: 18px;
+}
+/* The glass rim around a panel: 8px of glass (p-2) around a 12px panel, so the
+   outer corner is 12 + 8 and the two curves stay concentric. */
+.hd-glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: 20px;
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* The sealed field: the one luminous glow. Lives inside a .hd-panel. */
+.hd-field {
+  position: absolute;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(48px);
+  background:
+    radial-gradient(62% 72% at 86% 104%, var(--f-t1) 0%, transparent 70%),
+    radial-gradient(48% 62% at 102% 42%, var(--f-t2) 0%, transparent 72%),
+    radial-gradient(60% 40% at 40% 112%, var(--f-t2) 0%, transparent 72%),
+    radial-gradient(46% 58% at 58% 78%, var(--f-mid) 0%, transparent 70%),
+    radial-gradient(52% 62% at 18% 22%, var(--f-hi) 0%, transparent 70%),
+    radial-gradient(38% 44% at 66% 26%, var(--f-hi) 0%, transparent 70%),
+    linear-gradient(135deg, var(--f-a) 0%, var(--f-b) 55%, var(--f-c) 100%);
+}
+.hd-field-soft {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(36px);
+  background:
+    radial-gradient(42% 46% at 92% 96%, color-mix(in srgb, var(--field-1) 80%, transparent) 0%, transparent 70%),
+    radial-gradient(36% 40% at 100% 40%, color-mix(in srgb, var(--field-2) 75%, transparent) 0%, transparent 70%);
+}
+.hd-field-edge {
+  position: absolute;
+  inset: auto -10% -40% -10%;
+  height: 90%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(46px);
+  background: radial-gradient(60% 60% at 50% 100%, var(--field-1) 0%, var(--field-2) 40%, transparent 72%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hd-field.hd-drift {
+    animation: hd-drift 22s ease-in-out infinite alternate;
+  }
+  @keyframes hd-drift {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+      transform: translate3d(-2.5%, -1.5%, 0) scale(1.06);
+    }
+  }
+}
+
+/* Low-end phones (html.hd-lite, set in the head by lib/device): no backdrop
+   blur and no drifting field, the two effects that cost a weak GPU the most. */
+html.hd-lite .hd-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+html.hd-lite .hd-field.hd-drift {
+  animation: none;
+}
+
+/* Sealed amount: a row of small dots, the privacy motif. */
+.seal-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.seal-dots > i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+/* ---------- Motion: one set of curves for the whole app ---------- */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Inputs: one calm style the app can opt into. Focus eases in as a soft ring
+   instead of snapping to a hard outline. */
+.hd-input {
+  height: 3rem;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  padding: 0 1rem;
+  font-size: 15px;
+  color: var(--foreground);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.25s var(--ease-out),
+    background-color 0.2s var(--ease-out);
+}
+.hd-input::placeholder {
+  color: var(--faint);
+  transition: color 0.2s var(--ease-out);
+}
+.hd-input:hover:not(:focus):not(:disabled) {
+  border-color: color-mix(in srgb, var(--line-strong) 70%, var(--foreground));
+}
+.hd-input:focus,
+.hd-input[aria-expanded="true"] {
+  outline: none;
+  border-color: color-mix(in srgb, var(--grey-500) 65%, var(--line-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--grey-500) 12%, transparent);
+}
+.hd-input:focus::placeholder {
+  color: color-mix(in srgb, var(--faint) 60%, transparent);
+}
+
+/* A field made of parts (an input plus a suffix or a button): looks like
+   .hd-input and lights up the same way while anything inside has focus. */
+.hd-inputwrap {
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
+}
+.hd-inputwrap:hover:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--line-strong) 70%, var(--foreground));
+}
+.hd-inputwrap:focus-within {
+  border-color: color-mix(in srgb, var(--grey-500) 65%, var(--line-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--grey-500) 12%, transparent);
+}
+.hd-inputwrap :is(input, textarea, select):focus {
+  outline: none;
+}
+
+/* The big amount cards (Add, Pay, Prove): a soft surface that rises to
+   the panel colour with a gentle edge while you type in it. */
+.hd-inputcard {
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  transition:
+    background-color 0.22s var(--ease-out),
+    border-color 0.22s var(--ease-out),
+    box-shadow 0.28s var(--ease-out);
+}
+.hd-inputcard:hover:not(:focus-within) {
+  border-color: var(--line);
+}
+.hd-inputcard:focus-within {
+  background: var(--panel);
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.hd-inputcard[data-invalid="true"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.hd-inputcard[data-invalid="true"]:focus-within {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.hd-inputcard :is(input, textarea):focus {
+  outline: none;
+}
+/* Big amounts step their size down as digits grow, smoothly. */
+.hd-amount {
+  transition: font-size 0.2s var(--ease-out);
+}
+
+/* Small pill choices (25%, 50%, Max), and anything pressable. */
+.hd-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--soft);
+  transition:
+    background-color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    color 0.18s var(--ease-out),
+    transform 0.18s var(--ease-out);
+}
+.hd-chip:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--foreground);
+}
+.hd-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hd-press {
+  transition:
+    transform 0.18s var(--ease-out),
+    background-color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    box-shadow 0.2s var(--ease-out),
+    color 0.18s var(--ease-out);
+}
+.hd-chip:active:not(:disabled),
+.hd-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Values that change in place (a new quote, a new label) settle in. */
+@keyframes hd-settle {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.hd-settle {
+  animation: hd-settle 0.24s var(--ease-out) both;
+}
+.hd-settle-fast {
+  animation: hd-settle 0.16s var(--ease-out) both;
+}
+
+/* Loading placeholders: a slow sheen instead of a blink. */
+@keyframes hd-sheen {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+.hd-skeleton {
+  border-radius: 10px;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--panel) 70%, transparent) 50%, transparent 70%)
+    var(--surface-2);
+  background-size: 220% 100%;
+  animation: hd-sheen 1.3s linear infinite;
+}
+
+/* Folding sections: height and opacity ease together. */
+.hd-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s var(--ease-out),
+    opacity 0.2s var(--ease-out);
+}
+.hd-collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.hd-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* Sheets and their backdrop, in and out. */
+@keyframes hd-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+@keyframes hd-sheet-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes hd-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hd-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.hd-sheet {
+  animation: hd-sheet-in 0.26s var(--ease-out) both;
+}
+.hd-sheet[data-leaving="true"] {
+  animation: hd-sheet-out 0.17s ease-in both;
+}
+.hd-backdrop {
+  animation: hd-fade-in 0.22s var(--ease-out) both;
+}
+.hd-backdrop[data-leaving="true"] {
+  animation: hd-fade-out 0.17s ease-in both;
+}
+
+/* Dropdown lists (components/ui/Select) settle in from the button's edge. */
+@keyframes hd-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+.hd-pop {
+  transform-origin: top center;
+  animation: hd-pop-in 0.14s var(--ease-out) both;
+}
+[data-side="top"] > .hd-pop {
+  transform-origin: bottom center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hd-input,
+  .hd-input::placeholder,
+  .hd-inputwrap,
+  .hd-inputcard,
+  .hd-amount,
+  .hd-chip,
+  .hd-press,
+  .hd-collapse {
+    transition: none;
+  }
+  .hd-chip:active:not(:disabled),
+  .hd-press:active:not(:disabled) {
+    transform: none;
+  }
+  .hd-settle,
+  .hd-settle-fast,
+  .hd-skeleton,
+  .hd-sheet,
+  .hd-sheet[data-leaving="true"],
+  .hd-backdrop,
+  .hd-backdrop[data-leaving="true"],
+  .hd-pop {
+    animation: none;
+  }
+}
+}
+
+/* Docs prose: the reading column. 16/26 body, Geist throughout, theme tokens
+   only. Unlayered on purpose, so these beat utilities inside the column. */
+.docs-prose > :first-child {
+  margin-top: 0;
+}
+
+.docs-prose h2 {
+  margin-top: 3.5rem;
+  font-size: 1.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  text-wrap: balance;
+  scroll-margin-top: 8.5rem;
+}
+
+.docs-prose h3 {
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  text-wrap: balance;
+  scroll-margin-top: 8.5rem;
+}
+
+.docs-prose p,
+.docs-prose li {
+  color: var(--soft);
+  line-height: 1.625;
+}
+
+.docs-prose strong {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.docs-prose ul {
+  list-style: disc;
+  padding-left: 1.375rem;
+}
+
+.docs-prose ol {
+  list-style: decimal;
+  padding-left: 1.375rem;
+}
+
+.docs-prose li {
+  padding-left: 0.25rem;
+}
+.docs-prose li + li,
+.docs-prose li > ul,
+.docs-prose li > ol {
+  margin-top: 0.5rem;
+}
+.docs-prose li::marker {
+  color: var(--faint);
+}
+.docs-prose ol > li::marker {
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.docs-prose a {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+  transition: text-decoration-color 0.15s ease;
+}
+.docs-prose a:hover {
+  text-decoration-color: var(--foreground);
+}
+
+/* Inline code: a soft surface chip; weight carries it, Geist like the rest. */
+.docs-prose :not(pre) > code {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--surface);
+  padding: 0.12em 0.4em;
+  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.docs-prose p > code,
+.docs-prose li > code {
+  overflow-wrap: anywhere;
+}
+
+/* Code blocks. The top 44px is reserved for the label + copy strip the docs
+   add on the client, so the page never shifts when it arrives. */
+.docs-prose pre {
+  position: relative;
+  margin-top: 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 55%, var(--panel));
+  padding-top: 2.75rem;
+  font-size: 14px;
+  line-height: 1.75;
+  tab-size: 1.5em;
+  font-variant-numeric: tabular-nums;
+}
+.docs-prose pre::before {
+  content: "";
+  position: absolute;
+  inset: calc(2.75rem - 1px) 0 auto 0;
+  height: 1px;
+  background: var(--line);
+}
+.docs-prose pre > code {
+  display: block;
+  overflow-x: auto;
+  padding: 0.9rem 1.25rem 1rem;
+  background: none;
+  color: var(--soft);
+  font-size: inherit;
+  font-weight: 400;
+  white-space: pre;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.docs-prose pre > code[data-docs-src] {
+  display: none;
+}
+/* While a page copy reads innerText: original source in, injected chrome out. */
+.docs-prose.is-copying pre > code[data-docs-src] {
+  display: block;
+}
+.docs-prose.is-copying .docs-code-head,
+.docs-prose.is-copying .docs-code-hl {
+  display: none;
+}
+
+.docs-prose table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.docs-prose th,
+.docs-prose td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  vertical-align: top;
+}
+.docs-prose th {
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.docs-prose thead th:first-child {
+  border-top-left-radius: 13px;
+}
+.docs-prose thead th:last-child {
+  border-top-right-radius: 13px;
+}
+.docs-prose td {
+  border-top: 1px solid var(--line);
+  color: var(--soft);
+}
+
+@media (max-width: 767px) {
+  .docs-prose h2 {
+    margin-top: 2.75rem;
+    font-size: 1.5rem;
+  }
+  .docs-prose h3 {
+    font-size: 1.125rem;
+  }
+  .docs-prose pre {
+    border-radius: 14px;
+  }
+  .docs-prose pre > code {
+    padding-inline: 1rem;
+  }
+  .docs-prose th,
+  .docs-prose td {
+    padding: 0.6rem 0.8rem;
+  }
+}
+
+/* App sidebar / mobile bar swap: plain media queries (immune to the Tailwind
+   dev class-order bug where hidden + lg:flex loses). */
+.hd-sidebar {
+  display: none;
+}
+.hd-mobilebar {
+  display: block;
+}
+@media (min-width: 1024px) {
+  .hd-sidebar {
+    display: flex;
+  }
+  .hd-mobilebar {
+    display: none;
+  }
+}
+
+/* App tab bar: below 1024px, where there is no sidebar. It
+   sits over the safe area at the foot of a phone, and the page leaves room
+   for it so the last line is never under it. */
+.hd-tabbar {
+  display: block;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.hd-tabbar-space {
+  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+/* In the app the cookie banner sits above the tab bar, not over it. */
+@media (max-width: 1023.98px) {
+  html.hushd-app-ctx .hd-cookie {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (min-width: 1024px) {
+  .hd-tabbar {
+    display: none;
+  }
+  .hd-tabbar-space {
+    padding-bottom: 0;
+  }
+}
+
+/* App page header: title left, actions right on desktop; stacked on mobile. */
+.hd-pagehead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+@media (min-width: 640px) {
+  .hd-pagehead {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+@layer components {
+/* Legal pages, light. Overrides inline dark tokens via higher specificity. */
+.prose-legal h2 {
+  margin-top: 2rem;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+.prose-legal h3 {
+  margin-top: 1.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.prose-legal p,
+.prose-legal li {
+  color: var(--soft);
+}
+.prose-legal strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.prose-legal a {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--grey-500) 50%, transparent);
+  text-underline-offset: 3px;
+}
+.prose-legal ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-legal ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+}
+
+/* Syntax colours (lib/highlight.ts). On-brand: graphite structure, iris for
+   keywords (the one accent), warm sand strings, amber numbers. Light + dark. */
+:root,
+.theme-light {
+  --tok-kw: #4646bd;
+  --tok-str: #8a5a12;
+  --tok-num: #a1491f;
+  --tok-com: #6b6f76;
+  --tok-fn: #0b0c0e;
+  --tok-prop: #4b5059;
+  --tok-type: #2b2a7a;
+  --tok-const: #a1491f;
+  --tok-lit: #a1491f;
+  --tok-punc: #6b6f76;
+}
+html[data-theme="dark"],
+.theme-dark {
+  --tok-kw: #aeb0ff;
+  --tok-str: #e7c48d;
+  --tok-num: #f0a875;
+  --tok-com: #83878e;
+  --tok-fn: #f4f5f6;
+  --tok-prop: #c3c8cf;
+  --tok-type: #cfd0ff;
+  --tok-const: #f0a875;
+  --tok-lit: #f0a875;
+  --tok-punc: #83878e;
+}
+.tok-kw { color: var(--tok-kw); }
+.tok-str { color: var(--tok-str); }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+.tok-fn { color: var(--tok-fn); font-weight: 500; }
+.tok-prop { color: var(--tok-prop); }
+.tok-type { color: var(--tok-type); }
+.tok-const { color: var(--tok-const); }
+.tok-lit { color: var(--tok-lit); }
+.tok-punc { color: var(--tok-punc); }
+
+/* Tabular figures so money + quantities align in columns */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Clickable cards: the edge firms up on hover. Cards stay put; no lift and no
+   shadow bloom, which read as a template. */
+.lift {
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.lift:hover {
+  border-color: var(--line-strong);
+}
+
+/* Editorial entrance for app views, staggered rise */
+/* Opacity-only rise: transform on ancestors breaks position:fixed modals. */
+@keyframes hushd-rise {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.rise {
+  animation: hushd-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-1 {
+  animation-delay: 0.05s;
+}
+.rise-2 {
+  animation-delay: 0.1s;
+}
+
+/* Live status dot, soft breathing pulse */
+@keyframes hushd-livedot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+}
+.livedot {
+  animation: hushd-livedot 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .lift,
+  .lift:hover {
+    transform: none;
+    transition: none;
+  }
+  .rise {
+    animation: none;
+  }
+  .livedot {
+    animation: none;
+  }
+}
+
+/* Phones: iOS zooms the page into any text field under 16px when it is
+   focused, and leaves it zoomed. App fields are 16px there. Unlayered, so it
+   beats the smaller text-[..] sizes some fields keep on desktop. */
+@media (max-width: 639.98px) {
+  .hd-input {
+    font-size: 16px;
+  }
+}
