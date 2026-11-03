@@ -1,0 +1,17 @@
+{
+  "keys": "testnet (dev)",
+  "files": {
+    "joinsplit.wasm": "efe70166c41352b60f716227100e87d18f9f0e6a55ea71084e57a4cf5954d367",
+    "joinsplit.zkey": "568e5e848282e5cb8e7bea5e1e864536adffd3ad3649c6f24acb816183c4acf6",
+    "joinsplit.vkey.json": "f43c449518724b7575480d664189e43b6ae3805abc4fe1c5d8e5a2960621bb5d",
+    "receipt.wasm": "4756e366988f23d58e551a9cb2974bedb9b61747e4cb76c375ccde2a03fcabd5",
+    "receipt.zkey": "a10799e03366aa6af98b16014b172367e05d700e844c3cdad9ac2bbedf11217e",
+    "receipt.vkey.json": "82c85381cb7d9dad6cf412183386c43dde44393ae3ef3eb16546afeddbf7da18",
+    "funds.wasm": "c6ee389aad8b8b7f27caf3bed44c98ba0c96082b3e152a3b029d4a0f729fb745",
+    "funds.zkey": "50cbcbe569f009274d96e2070d8aef87cadfa84f285cc6461af50e197fefcf42",
+    "funds.vkey.json": "fa3eb2aedd6fd81aedfd51d5cb6f4e9470e33270ddd26448190453c61296f6c7",
+    "volume.wasm": "411a9bfa40185e033d40b22a7f62ad9cb71fd660ec88f78642ecd853eddec50f",
+    "volume.zkey": "0b0317c37e49e8e4b3fa0a318b536532d0921ed08cf9f97c32d88d23479c362f",
+    "volume.vkey.json": "34c9edc692efcea3112f5fa28415b9e79db35fb1c7738b9cade207eae4fb218a"
+  }
+}
