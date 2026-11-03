@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = ["pool", "token", "tools/gen-poseidon"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Arham Khan"]
+repository = "https://github.com/ArhamKhan117/hushd"
+
+[workspace.dependencies]
+near-sdk = "5.30"
+near-contract-standards = "5.30"
+light-poseidon = "0.5"
+ark-bn254 = { version = "0.6", default-features = false, features = ["curve"] }
+ark-ff = { version = "0.6", default-features = false }
+hex = "0.4"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
