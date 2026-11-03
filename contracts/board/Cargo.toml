@@ -1,0 +1,28 @@
+[package]
+name = "hushd-board"
+description = "Hushd board: encrypted heads-up posts that recipients page through and trial-decrypt; the poster is never recorded."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.21.1-rust-1.96.0"
+image_digest = "sha256:ccb22bb4e677ed022d8b9d1aa1b32f0af52dd0471ef1c32e48dedbf68ee6ee17"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+
+[dependencies]
+near-sdk.workspace = true
+near-contract-standards.workspace = true
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ["cfg(near)"]
