@@ -1,0 +1,13 @@
+[package]
+name = "gen-poseidon"
+description = "Writes pool/src/poseidon_constants.rs: circomlib Poseidon constants for widths 3 and 4."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+light-poseidon = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ff = { workspace = true }
