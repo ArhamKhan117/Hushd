@@ -5,7 +5,7 @@
  *
  *   leaf 0      Alice shields 100 USDC
  *   leaves 1,2  Alice pays Bob 60 privately, keeps 40 (transact)
- *   leaves 3,4  Alice cashes out 30 to alice.test, fee 1 to relayer.test, keeps 10 (transact)
+ *   leaves 3,4  Alice cashes out 30 to alice.sandbox, fee 1 to relayer.sandbox, keeps 10 (transact)
  *   leaf 5      the maker shields 5 BTC
  *   leaves 6-9  deal 7: Bob gives the maker 50 USDC, the maker gives Bob 2 BTC (settle_swap)
  *   then        reader proofs: Bob's payment in deal 7 (receipt), Bob holds at least
@@ -24,8 +24,9 @@ const root = here.endsWith("scripts") ? join(here, "..") : here;
 const out = process.argv[2] ?? join(root, "../contracts/pool/tests/fixtures.json");
 const art = (c) => ({ wasm: join(root, "build", c, `${c}_js`, `${c}.wasm`), zkey: join(root, "build", c, `${c}_final.zkey`) });
 
-const USDC = "usdc.test";
-const BTC = "btc.test";
+// Account ids under the sandbox root, so the same fixture drives unit and sandbox tests.
+const USDC = "usdc.sandbox";
+const BTC = "btc.sandbox";
 const usdc = assetField(USDC);
 const btc = assetField(BTC);
 const N = await noteScheme();
@@ -89,7 +90,7 @@ tree.insert(toBob.commitment);
 tree.insert(a1.commitment);
 
 // leaves 3,4: Alice cashes out 30 (29 to her, 1 to the relayer), keeps 10
-const cashExt = { recipient: "alice.test", relayer: "relayer.test", fee: 1n, refundInner: N.inner(alicePk, 99n), memo: null };
+const cashExt = { recipient: "alice.sandbox", relayer: "relayer.sandbox", fee: 1n, refundInner: N.inner(alicePk, 99n), memo: null };
 const a2 = N.owned(aliceSk, 14n, 10n, usdc);
 const zeroOut = N.forKey(alicePk, 15n, 0n, usdc);
 const cashOut = await joinsplit({ inputs: [a1, dummy(usdc, 2n)], outputs: [a2, zeroOut], publicAmount: 30n, publicAsset: usdc, ext: extHash(cashExt), asset: usdc });

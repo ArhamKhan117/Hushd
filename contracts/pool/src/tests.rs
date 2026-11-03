@@ -135,7 +135,7 @@ fn shield_computes_the_commitment_and_root() {
     let (pool, f) = replay(1);
     assert_eq!(pool.next_leaf_index().0, 1);
     assert_eq!(pool.get_root(), field(&f["send"]["root"]));
-    assert_eq!(pool.assets().iter().find(|a| a.token.as_str() == "usdc.test").unwrap().held.0, 100);
+    assert_eq!(pool.assets().iter().find(|a| a.token.as_str() == "usdc.sandbox").unwrap().held.0, 100);
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn private_send_verifies_and_inserts() {
 fn cash_out_verifies_and_reduces_holdings() {
     let (pool, _) = replay(3);
     assert_eq!(pool.next_leaf_index().0, 5);
-    assert_eq!(pool.assets().iter().find(|a| a.token.as_str() == "usdc.test").unwrap().held.0, 70);
+    assert_eq!(pool.assets().iter().find(|a| a.token.as_str() == "usdc.sandbox").unwrap().held.0, 70);
     assert_eq!(pool.stats().cash_outs, 1);
 }
 
@@ -253,13 +253,13 @@ fn storage_must_be_paid() {
 #[test]
 fn deposits_above_limits_or_unlisted_are_returned() {
     let mut pool = new_pool();
-    ctx("usdc.test", NearToken::from_yoctonear(0));
+    ctx("usdc.sandbox", NearToken::from_yoctonear(0));
     let back = pool.ft_on_transfer(accounts(0), U128(2_000_000), "{\"inner\":\"5\"}".into());
     assert!(matches!(back, PromiseOrValue::Value(U128(2_000_000))));
     ctx("other.test", NearToken::from_yoctonear(0));
     let back = pool.ft_on_transfer(accounts(0), U128(10), "{\"inner\":\"5\"}".into());
     assert!(matches!(back, PromiseOrValue::Value(U128(10))));
-    ctx("usdc.test", NearToken::from_yoctonear(0));
+    ctx("usdc.sandbox", NearToken::from_yoctonear(0));
     let back = pool.ft_on_transfer(accounts(0), U128(10), "not json".into());
     assert!(matches!(back, PromiseOrValue::Value(U128(10))));
     assert_eq!(pool.next_leaf_index().0, 0);
@@ -284,7 +284,7 @@ fn receipt_proof_checks_against_the_swap() {
     let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None);
     assert!(check.proof_valid && check.chain_valid, "{:?}", check.problems);
     assert_eq!(check.deal_ids, vec![Some(U64(7))]);
-    assert_eq!(check.token.unwrap().as_str(), "usdc.test");
+    assert_eq!(check.token.unwrap().as_str(), "usdc.sandbox");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["pool", "token", "tools/gen-poseidon"]
+members = ["board", "pool", "token", "tools/gen-poseidon", "desk"]
 
 [workspace.package]
 version = "0.1.0"
