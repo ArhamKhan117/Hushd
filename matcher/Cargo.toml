@@ -1,0 +1,31 @@
+[package]
+name = "hushd-matcher"
+description = "Hushd matcher enclave: an OutLayer WASI module that matches sealed RFQs and quotes inside a TEE."
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Arham Khan"]
+publish = false
+
+[[bin]]
+name = "hushd-matcher"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+borsh = { version = "1", features = ["derive"] }
+ed25519-dalek = { version = "2", default-features = false, features = ["std", "zeroize"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+sha2 = "0.10"
+hkdf = "0.12"
+chacha20poly1305 = "0.10"
+base64 = "0.22"
+hex = "0.4"
+getrandom = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
