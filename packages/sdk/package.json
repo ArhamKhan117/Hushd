@@ -1,0 +1,33 @@
+{
+  "name": "@hushd/sdk",
+  "version": "0.1.0",
+  "description": "Hushd SDK: private balances, private sends, proofs for one named reader and OTC package trading on NEAR.",
+  "author": "Arham Khan",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "circomlibjs": "0.1.7",
+    "near-kit": "0.20.2",
+    "snarkjs": "0.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
