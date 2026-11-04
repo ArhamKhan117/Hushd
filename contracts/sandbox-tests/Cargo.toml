@@ -1,0 +1,16 @@
+[package]
+name = "sandbox-tests"
+description = "Hushd integration tests: the contracts on a real local nearcore (near-sandbox), driven with near-api."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dev-dependencies]
+near-sandbox = "0.3.12"
+near-api = "0.8"
+tokio = { version = "1.12.0", features = ["full"] }
+testresult = "0.4.1"
+serde_json = "1"
