@@ -23,6 +23,7 @@
     "@hushd/sdk": "workspace:*",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
     "hono": "^4.13.16",
     "near-kit": "0.20.2",
     "pg": "^8.23.1",

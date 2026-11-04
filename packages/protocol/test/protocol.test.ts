@@ -59,7 +59,7 @@ test("the best quote gives the trader the most, inside the limit", () => {
   };
   const q = (give: bigint, maker: string): PackageQuote => ({
     v: 1, rfqId: 0, maker, give: { token: "btc", amount: give }, take: { token: "usdc", amount: 1_000_000n },
-    bond: 0n, expiresAtMs: 200_000, makerAddress: "hushd1y", signature: "",
+    bond: 0n, expiresAtMs: 200_000, makerAddress: "hushd1y", quoteKey: "ed25519:x", signature: "",
   });
   assert.equal(bestQuote(req, [q(1_400n, "a"), q(1_600n, "b"), q(1_550n, "c")], 100_000)?.maker, "b");
   assert.equal(bestQuote(req, [q(1_400n, "a")], 100_000), undefined);

@@ -73,7 +73,9 @@ export interface PackageQuote {
   expiresAtMs: number;
   /** hushd1… address the trader's note is made for. */
   makerAddress: string;
-  /** ed25519 signature (base64) over consentBytes(rfqId, termsHash(terms), bond, expiresAtMs). */
+  /** The maker's quote key ("ed25519:<base58>"), as registered on the desk. */
+  quoteKey: string;
+  /** ed25519 signature (base64) by the quote key over consentBytes(rfqId, termsHash(terms), bond, expiresAtMs). */
   signature: string;
 }
 
