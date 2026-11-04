@@ -1,6 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["board", "pool", "token", "tools/gen-poseidon", "desk"]
+members = [
+    "board",
+    "pool",
+    "token",
+    "tools/gen-poseidon",
+    "desk",
+    "sandbox-tests",
+    "sandbox-tests/doubles/outlayer",
+    "sandbox-tests/doubles/mpc",
+]
 
 [workspace.package]
 version = "0.1.0"
