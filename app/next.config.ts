@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   poweredByHeader: false,
   // The SDK and protocol packages ship TypeScript source; Next compiles them.
-  transpilePackages: ["@hushd/sdk", "@hushd/protocol"],
+  transpilePackages: ["@hushd/sdk", "@hushd/protocol", "@hushd/mcp"],
   images: {
     formats: ["image/avif", "image/webp"],
   },

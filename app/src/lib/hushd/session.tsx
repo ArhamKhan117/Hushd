@@ -17,7 +17,7 @@ import {
   seedFromSignature,
   type Identity,
   type NoteStore,
-  type StoredNote,
+  type WalletState,
 } from "@hushd/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CIRCUITS_BASE, NETWORK } from "./config";
@@ -70,12 +70,12 @@ class EncryptedLocalStore implements NoteStore {
     try {
       const bytes = b64ToBytes(raw);
       const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, this.key, bytes.slice(12));
-      return JSON.parse(new TextDecoder().decode(plain)) as { notes: StoredNote[]; boardCursor: number };
+      return JSON.parse(new TextDecoder().decode(plain)) as WalletState;
     } catch {
       return null;
     }
   }
-  async save(state: { notes: StoredNote[]; boardCursor: number }) {
+  async save(state: WalletState) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.key, new TextEncoder().encode(JSON.stringify(state))));
     const all = new Uint8Array(12 + ct.length);
@@ -219,9 +219,9 @@ export function HushdProvider({ children }: { children: ReactNode }) {
     const s = await passkeySigner(seed);
     localStorage.setItem(PASSKEY_FLAG, s.accountId);
     // The relayer opens the implicit account with a little testnet NEAR for gas.
-    await fetch(`${NETWORK.api}/v1/relay/activate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ account: s.accountId }) }).catch(() => undefined);
+    await relayer.activate(s.accountId).catch(() => undefined);
     await open(seed, s);
-  }), [open, passkeySigner, run]);
+  }), [open, passkeySigner, relayer, run]);
 
   const unlockWithPasskey = useCallback(() => run(async () => {
     const seed = await unlockPasskey();
