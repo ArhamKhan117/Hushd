@@ -1,4 +1,5 @@
 export * from "./board.js";
+export * from "./desk.js";
 export * from "./box.js";
 export * from "./field.js";
 export * from "./keys.js";
