@@ -1,0 +1,43 @@
+# api.hushd.net: TLS by Caddy; one host, routed by path.
+{$API_HOST} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	handle /v1/relay/* {
+		reverse_proxy relayer:8787
+	}
+	handle /makers/* {
+		reverse_proxy makers:8791
+	}
+	# Each service's own health: /health/relayer, /health/indexer, ...
+	handle /health/relayer {
+		rewrite * /health
+		reverse_proxy relayer:8787
+	}
+	handle /health/indexer {
+		rewrite * /health
+		reverse_proxy indexer:8789
+	}
+	handle /health/matcher {
+		rewrite * /health
+		reverse_proxy matcher:8790
+	}
+	handle /health/makers {
+		rewrite * /health
+		reverse_proxy makers:8791
+	}
+	handle /health/keeper {
+		rewrite * /health
+		reverse_proxy keeper:8792
+	}
+	handle /health/topup {
+		rewrite * /health
+		reverse_proxy topup:8793
+	}
+	handle {
+		reverse_proxy api:8788
+	}
+}

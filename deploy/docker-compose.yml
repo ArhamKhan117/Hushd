@@ -1,0 +1,78 @@
+# Hushd services on one VM: `docker compose -f deploy/docker-compose.yml up -d --build`.
+# Keys and tokens come from ../.env (gitignored; see .env.example). Without keys the
+# API still runs read-only.
+name: hushd
+
+x-service: &service
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: hushd-services
+  restart: unless-stopped
+  env_file: ../.env
+  environment: &env
+    DATABASE_URL: postgres://hushd:hushd@postgres:5432/hushd
+    RELAYER_URL: http://relayer:8787
+    API_URL: http://api:8788
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://localhost:'+process.env.PORT+'/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hushd
+      POSTGRES_PASSWORD: hushd
+      POSTGRES_DB: hushd
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hushd"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    <<: *service
+    environment: { <<: *env, SERVICE: api, PORT: "8788" }
+  relayer:
+    <<: *service
+    environment: { <<: *env, SERVICE: relayer, PORT: "8787" }
+  indexer:
+    <<: *service
+    environment: { <<: *env, SERVICE: indexer, PORT: "8789" }
+  matcher:
+    <<: *service
+    environment: { <<: *env, SERVICE: matcher, PORT: "8790" }
+  makers:
+    <<: *service
+    environment: { <<: *env, SERVICE: makers, PORT: "8791" }
+    volumes: [makers:/data]
+  keeper:
+    <<: *service
+    environment: { <<: *env, SERVICE: keeper, PORT: "8792" }
+  topup:
+    <<: *service
+    environment: { <<: *env, SERVICE: topup, PORT: "8793" }
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      API_HOST: ${API_HOST:-api.hushd.net}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on: [api, relayer, makers]
+
+volumes:
+  pgdata:
+  makers:
+  caddy:
