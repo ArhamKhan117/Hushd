@@ -5,8 +5,21 @@
  * before it is enforced.
  */
 
-/** Hosts the app reads from the browser. */
-const SERVICES = ["https://va.vercel-scripts.com"];
+const origin = (u) => {
+  try {
+    return new URL(u).origin;
+  } catch {
+    return null;
+  }
+};
+
+/** Hosts the app reads from the browser: analytics, the Hushd API, NEAR RPC, the NEAR Connect wallet list. */
+const SERVICES = [
+  "https://va.vercel-scripts.com",
+  origin(process.env.NEXT_PUBLIC_HUSHD_API_URL || "https://api.hushd.net"),
+  ...(process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com,https://rpc.testnet.near.org").split(",").map(origin),
+  "https://raw.githubusercontent.com",
+].filter((x, i, all) => x && all.indexOf(x) === i);
 
 export const CSP_CONNECT_SOURCES = ["'self'", ...SERVICES];
 
