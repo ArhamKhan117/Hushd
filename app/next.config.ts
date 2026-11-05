@@ -9,6 +9,8 @@ import { CSP_REPORT_ONLY } from "./csp.config.mjs";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   poweredByHeader: false,
+  // The SDK and protocol packages ship TypeScript source; Next compiles them.
+  transpilePackages: ["@hushd/sdk", "@hushd/protocol"],
   images: {
     formats: ["image/avif", "image/webp"],
   },
@@ -34,6 +36,15 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  webpack: (config) => {
+    // snarkjs and circomlibjs reach for Node modules the browser never needs.
+    config.resolve.fallback = { ...config.resolve.fallback, fs: false, net: false, tls: false, readline: false, os: false };
+    // The workspace packages use NodeNext ".js" specifiers for their ".ts" sources.
+    config.resolve.extensionAlias = { ...(config.resolve.extensionAlias || {}), ".js": [".ts", ".tsx", ".js"] };
+    // web-worker's Node shim (under snarkjs) imports a module by a computed name; harmless.
+    config.ignoreWarnings = [...(config.ignoreWarnings || []), { module: /web-worker/, message: /Critical dependency/ }];
+    return config;
   },
 };
 
