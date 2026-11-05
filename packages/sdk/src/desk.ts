@@ -13,22 +13,23 @@
  *   3. each proves its leg bound to the deal and all four outputs
  *   4. the maker (always online) submits both legs to `desk.settle` in one call
  */
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { base58 } from "@scure/base";
 import { openJson, sealJson } from "./box.js";
-import { noteMessage, toB64, type NoteMessage } from "./board.js";
+import { bytesToHex as bytesHex, fromB64, hexToBytes, toB64 } from "./bytes.js";
+import { noteMessage, type NoteMessage } from "./board.js";
 import type { Identity } from "./keys.js";
 import { decodeAddress } from "./keys.js";
 import type { HushdNetwork } from "./network.js";
-import { makeNote, type Note } from "./note.js";
+import { be32, randomField } from "./field.js";
+import { makeNote, noteInner, type Note } from "./note.js";
 import { swapLeg } from "./pool.js";
 import type { JoinsplitArgs } from "./prove.js";
 import type { RelayerClient } from "./relayer.js";
 import { view } from "./rpc.js";
 import type { LegPlan, PrivateWallet } from "./wallet.js";
 
-const fromB64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
-const hexToBytes = (h: string) => new Uint8Array(Buffer.from(h.replace(/^0x/, ""), "hex"));
-const bytesHex = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 
 export interface MakerView {
   name: string;
@@ -60,7 +61,19 @@ export interface DealView {
   receipt: null | { outcome: "settled" | "recovered" | "failed" | "unresolved"; evidence: { kind: string; reference: string }[]; recorded_at_ms: string };
 }
 
+export interface DeskConfig {
+  owner: string;
+  pool: string;
+  bond_token: string;
+  outlayer: string;
+  matcher_project: string;
+  mpc: string;
+  keeper: string;
+  min_bond: string;
+}
+
 export const deskView = {
+  config: (net: HushdNetwork) => view<DeskConfig>(net, net.desk!, "config"),
   enclave: (net: HushdNetwork) => view<{ sign_key: string | null; enc_key: string | null; project: string }>(net, net.desk!, "enclave"),
   makers: (net: HushdNetwork) => view<[string, MakerView][]>(net, net.desk!, "makers"),
   deal: (net: HushdNetwork, id: number) => view<DealView | null>(net, net.desk!, "deal", { deal_id: String(id) }),
@@ -133,6 +146,64 @@ export class DeskApi {
 type RoomMsg =
   | { t: "plan"; outputs: [string, string]; noteForYou: NoteMessage }
   | { t: "leg"; leg: ReturnType<typeof swapLeg> };
+
+export type PackageKind = MakerAsk["kind"];
+
+/** What a trader fills in (or the intake drafts): amounts in base units. */
+export interface PackageDraft {
+  kind: PackageKind;
+  sell: { token: string; amount: bigint };
+  buy: { token: string; minAmount: bigint };
+  /** Hyperliquid coin for spot_hedge and carry (defaults to the bought token's). */
+  hedgeCoin?: string;
+  /** How long the quote must hold once matched. */
+  expiresInMs?: number;
+  /** The words the trader typed, sealed to the enclave only. */
+  text?: string;
+}
+
+/** The per-deal key that alone can close a hedge: derived from the spending key and the refund blinding. */
+export function ownerKeyFor(id: Identity, refundBlinding: bigint): { secret: Uint8Array; publicKey: string } {
+  const tag = new TextEncoder().encode("hushd.owner.v1");
+  const seed = sha256(new Uint8Array([...tag, ...be32(id.sk), ...be32(refundBlinding)]));
+  return { secret: seed, publicKey: `ed25519:${base58.encode(ed25519.getPublicKey(seed))}` };
+}
+
+/** Sign "hushd.close:<deal id>" with the deal's owner key, for `desk.close_hedge`. */
+export function closeHedgeSignature(id: Identity, refundBlinding: bigint, dealId: number): Uint8Array {
+  return ed25519.sign(new TextEncoder().encode(`hushd.close:${dealId}`), ownerKeyFor(id, refundBlinding).secret);
+}
+
+/**
+ * Turn a draft into the sealed request's body (enclave only: it holds the limit) and
+ * the ask each maker sees (pair, side and size only). The refund blinding is kept by
+ * the caller: a slashed bond pays a note to `noteInner(pk, refundBlinding)`, and the
+ * same blinding re-derives the owner key.
+ */
+export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft) {
+  if (d.sell.amount <= 0n) throw new Error("Sell a positive amount");
+  if (d.sell.token === d.buy.token) throw new Error("Sell and buy different tokens");
+  const buy = net.tokens.find((t) => t.id === d.buy.token);
+  if (!buy) throw new Error(`Unknown token ${d.buy.token}`);
+  const hedged = d.kind !== "spot";
+  const coin = d.hedgeCoin ?? buy.hedgeCoin;
+  if (hedged && !coin) throw new Error(`${buy.symbol} has no Hyperliquid perp to hedge with`);
+  const refundBlinding = randomField();
+  const owner = ownerKeyFor(id, refundBlinding);
+  const hedge = hedged ? { coin: coin!, testnet: net.id !== "mainnet" } : undefined;
+  const request = {
+    v: 1,
+    kind: d.kind,
+    sell: { token: d.sell.token, amount: d.sell.amount.toString() },
+    buy: { token: d.buy.token, minAmount: d.buy.minAmount.toString() },
+    ...(hedge ? { hedge: { ...hedge, maxSlippageBps: 50 } } : {}),
+    expiresInMs: d.expiresInMs ?? 10 * 60_000,
+    trader: { address: id.address, refundInner: bytesHex(be32(noteInner(id.pk, refundBlinding))), ownerKey: owner.publicKey },
+    ...(d.text ? { text: d.text } : {}),
+  };
+  const ask: Omit<MakerAsk, "rfqId" | "closesAtMs"> = { v: 1, kind: d.kind, sell: request.sell, buyToken: d.buy.token, ...(hedge ? { hedge } : {}) };
+  return { request, ask, refundBlinding };
+}
 
 /** Seal the trader's request to the enclave and its ask to each maker, and commit it on chain. */
 export async function openRfq(p: {
@@ -234,6 +305,6 @@ export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relaye
   const legB = await p.wallet.proveLeg(plan, theirs.outputs.map(BigInt) as [bigint, bigint], bOut.map(BigInt) as [bigint, bigint]);
   const legA = await waitFor<Extract<RoomMsg, { t: "leg" }>>(p.api, p.dealId, me, "leg", 180_000);
   const r = await p.relayer.settle(p.dealId, [legA.leg, swapLeg(legB)]);
-  await p.wallet.settled(plan, received);
+  await p.wallet.settled(plan, received, r.txHash);
   return { txHash: r.txHash, received };
 }

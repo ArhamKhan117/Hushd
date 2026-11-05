@@ -5,6 +5,7 @@
  * Change and refund notes are posted to yourself, so a seed alone recovers a wallet.
  */
 import { openJson, sealJson } from "./box.js";
+import { fromB64, toB64 } from "./bytes.js";
 import type { Identity, ReceiveAddress } from "./keys.js";
 import type { HushdNetwork } from "./network.js";
 import { makeNote, own, type Note } from "./note.js";
@@ -28,8 +29,7 @@ export interface PostView {
   timestamp_ns: string;
 }
 
-const fromB64 = (s: string) => (typeof Buffer !== "undefined" ? new Uint8Array(Buffer.from(s, "base64")) : Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
-export const toB64 = (b: Uint8Array) => (typeof Buffer !== "undefined" ? Buffer.from(b).toString("base64") : btoa(String.fromCharCode(...b)));
+export { toB64 };
 
 export function noteMessage(note: Note, extra: { memo?: string; dealId?: bigint } = {}): NoteMessage {
   return {

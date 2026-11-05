@@ -19,6 +19,8 @@ export interface HushdNetwork {
   desk: string | null;
   board: string | null;
   tokens: TokenInfo[];
+  /** The token makers bond (and a slashed bond pays in). */
+  bondToken: string | null;
   /** Hushd API (relayer, indexer reads): `${api}/v1/...`. */
   api: string;
   explorer: string;
@@ -38,6 +40,7 @@ export const TESTNET: HushdNetwork = {
     { id: "wnear.hushd.testnet", symbol: "wNEAR", decimals: 24, hedgeCoin: "NEAR" },
     { id: "btc.hushd.testnet", symbol: "BTC", decimals: 8, hedgeCoin: "BTC" },
   ],
+  bondToken: "usdc.hushd.testnet",
   api: "https://api.hushd.net",
   explorer: "https://testnet.nearblocks.io",
   intentsExplorer: "https://explorer.near-intents.org",
@@ -52,6 +55,7 @@ export const MAINNET: HushdNetwork = {
   desk: null,
   board: null,
   tokens: [],
+  bondToken: null,
   api: "https://api.hushd.net",
   explorer: "https://nearblocks.io",
   intentsExplorer: "https://explorer.near-intents.org",

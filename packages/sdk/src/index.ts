@@ -1,7 +1,9 @@
 export * from "./board.js";
+export { bytesToHex, fromB64, hexToBytes } from "./bytes.js";
 export * from "./desk.js";
 export * from "./box.js";
 export * from "./field.js";
+export * from "./intake.js";
 export * from "./keys.js";
 export * from "./network.js";
 export * from "./note.js";
@@ -13,3 +15,4 @@ export * from "./relayer.js";
 export * from "./rpc.js";
 export * from "./tree.js";
 export * from "./wallet.js";
+export * from "./x402.js";

@@ -68,3 +68,13 @@ test("an unbalanced plan is refused before proving", async () => {
     /do not balance/,
   );
 });
+
+test("intake encryption round-trips through the model's key", async () => {
+  const { encryptForModel, decryptFromModel, clientKey } = await import("../src/intake.ts");
+  const { ed25519 } = await import("@noble/curves/ed25519.js");
+  // stand in for the model: its ed25519 key, used the way the TEE uses it
+  const model = clientKey();
+  const wire = encryptForModel("sell 50K NEAR for BTC", model.publicHex);
+  assert.equal(decryptFromModel(wire, model.x25519Secret), "sell 50K NEAR for BTC");
+  assert.ok(ed25519.getPublicKey(model.secret).length === 32);
+});

@@ -62,6 +62,14 @@ export class RelayerClient {
   settle(dealId: number, legs: unknown[]) {
     return this.req<Relayed>("/v1/relay/settle", { dealId, legs });
   }
+  /** Close a hedge: the signature by the deal's owner key is the only authority. */
+  closeHedge(dealId: number, signature: string) {
+    return this.req<Relayed>("/v1/relay/close-hedge", { dealId, signature });
+  }
+  /** Testnet only: open a new passkey account with a little NEAR for its own gas. */
+  activate(account: string) {
+    return this.req<{ activated: boolean; txHash?: string }>("/v1/relay/activate", { account });
+  }
   /** Testnet only: faucet tokens for an account (passkey accounts have no gas). */
   faucet(account: string, token: string) {
     return this.req<Relayed>("/v1/relay/faucet", { account, token });

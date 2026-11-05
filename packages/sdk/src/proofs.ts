@@ -13,6 +13,7 @@
  */
 import * as snarkjs from "snarkjs";
 import type { Groth16Proof } from "snarkjs";
+import { b64urlToUtf8, utf8ToB64url } from "./bytes.js";
 import { assetField, proofContext } from "./field.js";
 import type { Identity } from "./keys.js";
 import type { HushdNetwork } from "./network.js";
@@ -43,10 +44,7 @@ export interface ReaderProof {
 const PREFIX = "hushdproof1";
 const S = (x: bigint | number) => x.toString();
 
-const b64url = {
-  enc: (s: string) => (typeof Buffer !== "undefined" ? Buffer.from(s, "utf8").toString("base64url") : btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")),
-  dec: (s: string) => (typeof Buffer !== "undefined" ? Buffer.from(s, "base64url").toString("utf8") : decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))))),
-};
+const b64url = { enc: utf8ToB64url, dec: b64urlToUtf8 };
 
 export function encodeProof(p: ReaderProof): string {
   return PREFIX + b64url.enc(JSON.stringify(p));

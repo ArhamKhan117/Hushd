@@ -2,6 +2,7 @@
  * Read-only NEAR RPC: contract views and account state, with endpoint fallback.
  * No keys and no wallet: this is all a read-only client needs.
  */
+import { utf8ToB64 } from "./bytes.js";
 import type { HushdNetwork } from "./network.js";
 
 export class RpcError extends Error {
@@ -10,7 +11,7 @@ export class RpcError extends Error {
   }
 }
 
-const b64 = (s: string) => (typeof Buffer !== "undefined" ? Buffer.from(s, "utf8").toString("base64") : btoa(unescape(encodeURIComponent(s))));
+const b64 = utf8ToB64;
 
 async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): Promise<T> {
   let last: unknown;
@@ -24,8 +25,12 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
           signal: AbortSignal.timeout(15_000),
         });
         if (res.status === 429 || res.status >= 500) throw new RpcError(`${url} answered ${res.status}`);
-        const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; data?: unknown; message?: string } };
-        if (body.error) throw new RpcError(body.error.cause?.name ?? body.error.message ?? "RPC error", body.error);
+        const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: { requested_account_id?: string } }; data?: unknown; message?: string } };
+        if (body.error) {
+          const c = body.error.cause;
+          const words = c?.name === "UNKNOWN_ACCOUNT" ? `${c.info?.requested_account_id ?? "That account"} does not exist on NEAR ${net.id} (UNKNOWN_ACCOUNT)` : c?.name ?? body.error.message ?? "RPC error";
+          throw new RpcError(words, body.error);
+        }
         return body.result as T;
       } catch (e) {
         last = e;
