@@ -1,0 +1,40 @@
+{
+  "name": "@hushd/mcp",
+  "version": "0.1.0",
+  "description": "Hushd MCP server: a private balance, private payments, private x402 and the OTC desk for AI agents on NEAR, with spending limits.",
+  "author": "Arham Khan",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "hushd-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "start": "tsx src/bin.ts"
+  },
+  "dependencies": {
+    "@hushd/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@noble/hashes": "^2.4.0",
+    "zod": "^3.25.76",
+    "@hushd/protocol": "workspace:*",
+    "near-kit": "0.20.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
