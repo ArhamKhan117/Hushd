@@ -10,7 +10,8 @@
     "build": "pnpm --filter @hushd/app build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "mcp": "pnpm --silent --filter @hushd/mcp start"
+    "mcp": "pnpm --silent --filter @hushd/mcp start",
+    "verify": "pnpm --silent --filter @hushd/services verify"
   },
   "engines": {
     "node": ">=22"
