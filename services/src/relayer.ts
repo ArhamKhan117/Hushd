@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { assetField, extHash, poolView, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
+import { accountBalance, assetField, extHash, poolView, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
 import { decodeSignedDelegateAction } from "near-kit";
 import * as snarkjs from "snarkjs";
 import { account, network, settings } from "./config.js";
@@ -31,8 +31,13 @@ const big = (s: string) => BigInt(s);
 export class Relayer {
   private vkey: unknown;
   private spentToday = { day: "", gas: 0n };
+  private activations = { day: "", count: 0 };
 
-  constructor(readonly net: HushdNetwork, readonly signer: Signer, private readonly opts: { dailyGasBudget: bigint; cashOutFeeBps: number; circuitsDir: string }) {
+  constructor(
+    readonly net: HushdNetwork,
+    readonly signer: Signer,
+    private readonly opts: { dailyGasBudget: bigint; cashOutFeeBps: number; circuitsDir: string; activateYocto?: bigint; activationsPerDay?: number },
+  ) {
     this.vkey = JSON.parse(readFileSync(join(opts.circuitsDir, "joinsplit.vkey.json"), "utf8"));
   }
 
@@ -40,7 +45,7 @@ export class Relayer {
     const a: Record<string, string[]> = {};
     if (this.net.pool) a[this.net.pool] = ["transact"];
     if (this.net.board) a[this.net.board] = ["post", "storage_deposit"];
-    if (this.net.desk) a[this.net.desk] = ["open_rfq", "settle", "register_maker", "set_maker_active", "withdraw_bond"];
+    if (this.net.desk) a[this.net.desk] = ["open_rfq", "settle", "close_hedge", "register_maker", "set_maker_active", "withdraw_bond"];
     for (const t of this.net.tokens) a[t.id] = ["faucet_for", "ft_transfer_call", "storage_deposit"];
     return a;
   }
@@ -158,6 +163,33 @@ export class Relayer {
     return { txHash: r.txHash, result: r.result };
   }
 
+  /** Close a hedge for its trader: `desk.close_hedge` checks the owner key's signature. */
+  async closeHedge(body: { dealId: number; signature: string }) {
+    if (!Number.isInteger(body.dealId) || body.dealId < 0) throw new BadRequest("dealId");
+    if (typeof body.signature !== "string" || Buffer.from(body.signature, "base64").length !== 64) throw new BadRequest("signature is 64 bytes, base64");
+    this.budget(300_000_000_000_000n);
+    const r = await this.signer.call(this.net.desk!, "close_hedge", { deal_id: String(body.dealId), signature: body.signature }, { gas: "300 Tgas" });
+    this.charge(r.gasBurnt);
+    return { txHash: r.txHash, result: r.result };
+  }
+
+  /**
+   * Testnet: open a fresh passkey account (an implicit account, 64 hex) with a little
+   * NEAR for its own gas. Only accounts that do not exist yet, a daily cap overall.
+   */
+  async activate(body: { account: string }) {
+    if (this.net.id !== "testnet") throw new BadRequest("Activation is testnet only");
+    if (!/^[0-9a-f]{64}$/.test(body.account ?? "")) throw new BadRequest("Only a new implicit account (64 hex) is activated");
+    if ((await accountBalance(this.net, body.account)) !== null) return { activated: false, reason: "exists" };
+    const day = new Date().toISOString().slice(0, 10);
+    if (this.activations.day !== day) this.activations = { day, count: 0 };
+    if (this.activations.count >= (this.opts.activationsPerDay ?? 200)) throw new BadRequest("Today's activations are used up; connect a NEAR wallet instead");
+    this.activations.count += 1;
+    const amount = this.opts.activateYocto ?? 50_000_000_000_000_000_000_000n;
+    const tx = (await this.signer.near.transaction(this.signer.accountId).transfer(body.account, amount).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+    return { activated: true, amount: amount.toString(), txHash: tx.transaction?.hash ?? "" };
+  }
+
   /** NEP-366 meta transaction: a maker's own action, gas paid by the relayer. */
   async meta(body: { signedDelegate: string }) {
     const sd = decodeSignedDelegateAction(body.signedDelegate) as unknown as {
@@ -187,6 +219,8 @@ export async function startRelayer() {
     dailyGasBudget: BigInt(settings.str("RELAYER_DAILY_GAS", "300000000000000000")),
     cashOutFeeBps: settings.num("RELAYER_CASHOUT_FEE_BPS", net.id === "testnet" ? 0 : 50),
     circuitsDir: settings.circuitsDir(),
+    activateYocto: BigInt(settings.str("RELAYER_ACTIVATE_YOCTO", "50000000000000000000000")),
+    activationsPerDay: settings.num("RELAYER_ACTIVATIONS_PER_DAY", 200),
   });
   const a = app("relayer", async () => ({ account: signer.accountId, balance: (await signer.balance()).toString(), lanes: signer.snapshot() }));
   a.use("/v1/relay/*", rateLimit(settings.num("RELAYER_PER_MINUTE", 30)));
@@ -197,6 +231,8 @@ export async function startRelayer() {
   a.post("/v1/relay/rfq", async (c) => c.json(await relayer.openRfq(await c.req.json())));
   a.post("/v1/relay/settle", async (c) => c.json(await relayer.settle(await c.req.json())));
   a.post("/v1/relay/faucet", async (c) => c.json(await relayer.faucet(await c.req.json())));
+  a.post("/v1/relay/close-hedge", async (c) => c.json(await relayer.closeHedge(await c.req.json())));
+  a.post("/v1/relay/activate", async (c) => c.json(await relayer.activate(await c.req.json())));
   a.post("/v1/relay/meta", async (c) => c.json(await relayer.meta(await c.req.json())));
   listen(a, settings.port("relayer", 8787), "relayer");
 }

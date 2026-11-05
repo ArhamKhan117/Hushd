@@ -11,7 +11,7 @@
  * quote to the matcher enclave, and settles the deals it wins as leg B.
  * It also sells indicative quotes over x402 (free on testnet).
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
@@ -19,22 +19,26 @@ import { consentBytes, termsHash, termsOf, type PackageQuote } from "@hushd/prot
 import {
   DeskApi,
   deskView,
+  fromB64,
   identityFromSeed,
   loadPoseidon,
   openJson,
+  paymentRequired,
+  paymentResponse,
   PrivateWallet,
   RelayerClient,
   sealJson,
   settleAsMaker,
   toB64,
   tokenInfo,
+  verifyX402Payment,
   view,
+  x402Network,
   type AgreedTerms,
   type HushdNetwork,
   type MakerAsk,
-  type NoteStore,
-  type StoredNote,
 } from "@hushd/sdk";
+import { EncryptedFileStore } from "@hushd/sdk/node";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
@@ -44,16 +48,6 @@ export type Style = "fixed" | "volatility" | "inventory";
 
 const hexBytes = (h: string) => new Uint8Array(Buffer.from(h.replace(/^0x/, ""), "hex"));
 const toHexStr = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
-
-class FileStore implements NoteStore {
-  constructor(private readonly path: string) {}
-  async load() {
-    return existsSync(this.path) ? (JSON.parse(readFileSync(this.path, "utf8")) as { notes: StoredNote[]; boardCursor: number }) : null;
-  }
-  async save(s: { notes: StoredNote[]; boardCursor: number }) {
-    writeFileSync(this.path, JSON.stringify(s));
-  }
-}
 
 /** Spread in basis points for a style. */
 export function spreadBps(style: Style, ctx: { volBps: number; inventoryRatio: number }): number {
@@ -96,7 +90,7 @@ export class Maker {
     this.wallet = new PrivateWallet(net, id, {
       artifacts: { wasm: (n) => join(settings.circuitsDir(), `${n}.wasm`), zkey: (n) => join(settings.circuitsDir(), `${n}.zkey`) },
       relayer,
-      store: new FileStore(join(dataDir, `${signer.accountId}.notes.json`)),
+      store: new EncryptedFileStore(join(dataDir, `${signer.accountId}.notes.enc`), hexBytes(seedHex)),
     });
   }
 
@@ -172,7 +166,7 @@ export class Maker {
     for (const r of await this.api.openRfqs(this.account)) {
       if (this.seen.has(r.rfqId)) continue;
       this.seen.add(r.rfqId);
-      const ask = openJson<MakerAsk>(this.wallet.id.encSecret, Buffer.from(r.box, "base64"));
+      const ask = openJson<MakerAsk>(this.wallet.id.encSecret, fromB64(r.box));
       if (!ask || ask.rfqId !== r.rfqId) continue;
       this.stats.asks++;
       const q = await this.quote(ask).catch((e) => {
@@ -210,9 +204,30 @@ export class Maker {
   }
 }
 
-/** x402 indicative quotes: `GET /makers/:account/quote?sell=&amount=&buy=`, paid per quote (free on testnet). */
-function x402Routes(a: ReturnType<typeof app>, makers: Maker[], net: HushdNetwork) {
-  const free = settings.str("X402_FREE", net.id === "testnet" ? "1" : "0") === "1";
+/** Payment commitments already accepted, kept on disk so a restart cannot replay them. */
+class SeenFile {
+  private set: Set<string>;
+  constructor(private readonly path: string) {
+    this.set = new Set(existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean) : []);
+  }
+  has(c: string) {
+    return this.set.has(c);
+  }
+  add(c: string) {
+    this.set.add(c);
+    appendFileSync(this.path, `${c}\n`);
+  }
+}
+
+/**
+ * Private x402 indicative quotes: `GET /makers/:account/quote?sell=&amount=&buy=`.
+ * The price (X402_QUOTE_PRICE, USDC base units) is paid from a private balance to the
+ * maker's hushd1… address; see packages/sdk/src/x402.ts.
+ */
+function x402Routes(a: ReturnType<typeof app>, makers: Maker[], net: HushdNetwork, dataDir: string) {
+  const usdc = net.tokens.find((t) => t.symbol === "USDC")!;
+  const price = settings.str("X402_QUOTE_PRICE", "10000");
+  const seen = new Map(makers.map((m) => [m.account, new SeenFile(join(dataDir, `${m.account}.x402-seen`))]));
   a.get("/makers/:account/quote", async (c) => {
     const m = makers.find((x) => x.account === c.req.param("account"));
     if (!m) return c.json({ error: "No such maker here" }, 404);
@@ -220,23 +235,15 @@ function x402Routes(a: ReturnType<typeof app>, makers: Maker[], net: HushdNetwor
     const buy = c.req.query("buy");
     const amount = c.req.query("amount");
     if (!sell || !buy || !amount || !/^\d+$/.test(amount)) return c.json({ error: "sell, buy and amount (base units) are required" }, 400);
-    const usdc = net.tokens.find((t) => t.symbol === "USDC")!;
-    const accepts = [
-      ...(free ? [{ scheme: "free", network: `near:${net.id}`, description: "Testnet: indicative quotes are free" }] : []),
-      { scheme: "exact", network: `near:${net.id}`, asset: usdc.id, maxAmountRequired: "10000", payTo: m.account, resource: c.req.url, description: "One indicative quote (0.01 USDC)" },
-    ];
+    const required = paymentRequired(net, { maxAmountRequired: price, asset: usdc.id, payTo: m.wallet.address, resource: c.req.url, description: `One indicative quote from ${m.name}`, mimeType: "application/json" });
     const header = c.req.header("x-payment");
-    if (!header) return c.json({ x402Version: 2, error: "Payment required", accepts }, 402);
-    let payment: { scheme?: string };
-    try {
-      payment = JSON.parse(Buffer.from(header, "base64").toString("utf8")) as { scheme?: string };
-    } catch {
-      return c.json({ x402Version: 2, error: "Unreadable payment header", accepts }, 402);
-    }
-    if (payment.scheme !== "free" || !free) return c.json({ x402Version: 2, error: "Only the free scheme is accepted on this network", accepts }, 402);
+    if (!header) return c.json(required, 402);
+    const paid = await verifyX402Payment(net, m.wallet.id, header, { asset: usdc.id, maxAmountRequired: price }, seen.get(m.account)!);
+    if (!paid.ok) return c.json({ ...required, error: paid.reason }, 402);
     const q = await m.quote({ v: 1, rfqId: 0, kind: "spot", sell: { token: sell, amount }, buyToken: buy, closesAtMs: Date.now() + 60_000 });
-    if (!q) return c.json({ error: "No quote for this pair or size right now" }, 409);
-    return c.json({ maker: m.account, style: m.style, give: { token: q.give.token, amount: q.give.amount.toString() }, take: { token: q.take.token, amount: q.take.amount.toString() }, indicative: true, validMs: 30_000 }, 200, { "x-payment-response": Buffer.from(JSON.stringify({ scheme: "free", success: true })).toString("base64") });
+    const headers = { "x-payment-response": paymentResponse({ txHash: paid.txHash, network: x402Network(net) }) };
+    if (!q) return c.json({ error: "No quote for this pair or size right now", paid: true }, 409, headers);
+    return c.json({ maker: m.account, style: m.style, give: { token: q.give.token, amount: q.give.amount.toString() }, take: { token: q.take.token, amount: q.take.amount.toString() }, indicative: true, validMs: 30_000 }, 200, headers);
   });
 }
 
@@ -261,7 +268,7 @@ export async function startMakers() {
     await m.ensureRegistered(`${publicUrl}/makers/${m.account}/quote`).catch((e) => console.error(`${m.name} register:`, (e as Error).message));
   }
   const a = app("makers", async () => ({ makers: makers.map((m) => ({ account: m.account, style: m.style, ...m.stats, balances: Object.fromEntries([...m.wallet.balances()].map(([k, v]) => [k, v.toString()])) })) }));
-  x402Routes(a, makers, net);
+  x402Routes(a, makers, net, settings.str("MAKERS_DATA_DIR", "./data/makers"));
   listen(a, settings.port("makers", 8791), "makers");
   let lastSync = 0;
   for (;;) {

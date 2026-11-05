@@ -13,6 +13,7 @@ import { boardView, poolView, view, type HushdNetwork } from "@hushd/sdk";
 import { network, settings } from "./config.js";
 import { Db } from "./db.js";
 import { app, BadRequest, listen, rateLimit } from "./http.js";
+import { intakeRoutes } from "./intake.js";
 
 const hex = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 const isB64 = (s: unknown, max: number): s is string => typeof s === "string" && s.length > 0 && s.length <= max && /^[A-Za-z0-9+/]+={0,2}$/.test(s);
@@ -79,6 +80,8 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now()) {
     );
     return c.json(r.rows);
   });
+
+  intakeRoutes(a);
 
   // ---------- RFQs ----------
 

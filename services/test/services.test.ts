@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { encode } from "@msgpack/msgpack";
 import { TESTNET } from "@hushd/sdk";
-import { buildApi } from "../src/api.ts";
-import { Db } from "../src/db.ts";
-import { eventsInBlock } from "../src/indexer.ts";
-import { orderAction, toRsv } from "../src/keeper.ts";
-import { priceAsk, spreadBps } from "../src/makers.ts";
-import { wirePrice, wireSize } from "../src/market.ts";
-import { parseTargets } from "../src/topup.ts";
+import { buildApi } from "../src/api.js";
+import { Db } from "../src/db.js";
+import { eventsInBlock } from "../src/indexer.js";
+import { orderAction, toRsv } from "../src/keeper.js";
+import { priceAsk, spreadBps } from "../src/makers.js";
+import { wirePrice, wireSize } from "../src/market.js";
+import { parseTargets } from "../src/topup.js";
 
 describe("indexer", () => {
   const block = (status: Record<string, unknown>, receiver: string, logs: string[]) => ({
