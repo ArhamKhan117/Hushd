@@ -106,9 +106,22 @@ pub struct MatchResult {
     pub bond: U128,
     /// `inner` (0x hex field) of the trader's note for a slash payout.
     pub trader_inner: Option<String>,
-    /// The trader's per-deal ed25519 key, for actions only the trader may take.
-    pub owner_key: Option<PublicKey>,
+    /// The trader's per-deal ed25519 key ("ed25519:<base58>"), for actions only the trader may take.
+    pub owner_key: Option<String>,
     pub hedge: Option<HedgeSpec>,
+    /// The maker's quote key's signature over `consent_bytes`: the maker agreed to exactly these terms.
+    pub maker_sig: Base64VecU8,
+}
+
+/// What a maker's quote key signs: "hushd.quote.v1" ‖ rfq id (u64 LE) ‖ terms hash (32)
+/// ‖ bond (u128 LE) ‖ expiry (u64 LE). The same bytes as `consentBytes` in the protocol package.
+pub fn consent_bytes(rfq_id: u64, terms_hash: &[u8; 32], bond: u128, expires_at_ms: u64) -> Vec<u8> {
+    let mut b = b"hushd.quote.v1".to_vec();
+    b.extend_from_slice(&rfq_id.to_le_bytes());
+    b.extend_from_slice(terms_hash);
+    b.extend_from_slice(&bond.to_le_bytes());
+    b.extend_from_slice(&expires_at_ms.to_le_bytes());
+    b
 }
 
 impl MatchResult {
@@ -131,7 +144,7 @@ pub struct Deal {
     pub expires_at_ms: U64,
     pub bond: U128,
     pub trader_inner: Option<String>,
-    pub owner_key: Option<PublicKey>,
+    pub owner_key: Option<String>,
     pub hedge: Option<HedgeSpec>,
     pub status: DealStatus,
     pub settle_attempts: u32,
@@ -152,6 +165,8 @@ pub struct Maker {
     pub quote_url: String,
     /// Pricing style, shown in the app: "fixed", "volatility", "inventory", ...
     pub style: String,
+    /// The ed25519 key ("ed25519:<base58>") that signs this maker's quotes.
+    pub quote_key: String,
     pub bond: U128,
     pub locked: U128,
     pub deals: u32,
@@ -252,6 +267,17 @@ fn now_ms() -> u64 {
     env::block_timestamp_ms()
 }
 
+/// The 32 key bytes of "ed25519:<base58>".
+fn ed25519_key(s: &str) -> Option<[u8; 32]> {
+    let pk: PublicKey = s.parse().ok()?;
+    let b = pk.as_bytes();
+    // the first byte is the curve: 0 is ed25519
+    if b.len() != 33 || b[0] != 0 {
+        return None;
+    }
+    b[1..].try_into().ok()
+}
+
 fn parse_hex32(s: &str) -> Option<[u8; 32]> {
     let h = s.strip_prefix("0x")?;
     let mut out = [0u8; 32];
@@ -302,18 +328,20 @@ impl Desk {
 
     /// Register or update the caller as a maker. Pays its own storage (attach 0.01 NEAR).
     #[payable]
-    pub fn register_maker(&mut self, name: String, enc_key: String, quote_url: String, style: String) {
+    pub fn register_maker(&mut self, name: String, enc_key: String, quote_url: String, style: String, quote_key: String) {
         require!(name.len() <= 48 && quote_url.len() <= 200 && style.len() <= 24, "Field too long");
         require!(enc_key.len() == 66 && enc_key.starts_with("0x"), "enc_key is a 0x hex X25519 key");
+        require!(ed25519_key(&quote_key).is_some(), "quote_key is an ed25519 public key");
         let maker = env::predecessor_account_id();
         let before = env::storage_usage();
         let entry = match self.makers.get(&maker) {
-            Some(m) => Maker { name, enc_key, quote_url, style, active: true, ..m.clone() },
+            Some(m) => Maker { name, enc_key, quote_url, style, quote_key, active: true, ..m.clone() },
             None => Maker {
                 name,
                 enc_key,
                 quote_url,
                 style,
+                quote_key,
                 bond: U128(0),
                 locked: U128(0),
                 deals: 0,
@@ -512,7 +540,7 @@ impl Desk {
         require!(deal.status == DealStatus::Closed && deal.hedge.is_some(), "Only a finished hedge deal closes");
         require!(deal.hedge_orders == 1, "Already closed, or never opened");
         let key = deal.owner_key.clone().unwrap_or_else(|| env::panic_str("This deal has no owner key"));
-        let pk: [u8; 32] = key.as_bytes()[1..].try_into().unwrap_or_else(|_| env::panic_str("Owner key is ed25519"));
+        let pk = ed25519_key(&key).unwrap_or_else(|| env::panic_str("Owner key is ed25519"));
         let sig: [u8; 64] = signature.0.as_slice().try_into().unwrap_or_else(|_| env::panic_str("Signature is 64 bytes"));
         require!(env::ed25519_verify(&sig, format!("hushd.close:{}", deal_id.0).as_bytes(), &pk), "Not signed by the deal's owner");
         deal.hedge_orders += 1;
@@ -703,6 +731,12 @@ impl Desk {
             }
         }
         let maker = self.makers.get_mut(&m.maker).ok_or("The maker is not registered")?;
+        let quote_key = ed25519_key(&maker.quote_key).ok_or("The maker's quote key is unreadable")?;
+        let terms_hash = parse_hex32(&m.terms_hash).unwrap();
+        let sig: [u8; 64] = m.maker_sig.0.as_slice().try_into().map_err(|_| "The maker's signature is 64 bytes")?;
+        if !env::ed25519_verify(&sig, &consent_bytes(m.rfq_id.0, &terms_hash, m.bond.0, m.expires_at_ms.0), &quote_key) {
+            return Err("The maker did not sign these terms".into());
+        }
         if !maker.active {
             return Err("The maker is paused".into());
         }

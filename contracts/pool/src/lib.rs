@@ -26,7 +26,7 @@ use groth16::Proof;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::Deserialize;
-use near_sdk::store::{IterableMap, LookupMap};
+use near_sdk::store::{IterableMap, LookupMap, Vector};
 use near_sdk::{
     env, ext_contract, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault,
     Promise, PromiseOrValue,
@@ -35,7 +35,8 @@ use poseidon::Hasher;
 use tree::Tree;
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(10);
-const GAS_ON_PAYOUT: Gas = Gas::from_tgas(30);
+/// A refund inserts a note (about 28 Tgas); 50 leaves room so a refund can never run out.
+const GAS_ON_PAYOUT: Gas = Gas::from_tgas(50);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 /// Amounts are below 2^128 in the circuits; u128 already guarantees it.
 const MAX_MEMO: usize = 256;
@@ -48,6 +49,7 @@ enum Key {
     TokenByField,
     Pending,
     Unclaimed,
+    Leaves,
 }
 
 #[near(serializers = [borsh, json])]
@@ -245,6 +247,8 @@ pub struct Pool {
     pending: IterableMap<u64, Pending>,
     next_change: u64,
     unclaimed: LookupMap<(AccountId, AccountId), u128>,
+    /// Every leaf in order, so any wallet can rebuild the tree from RPC alone.
+    leaves: Vector<Field>,
     stats: Stats,
 }
 
@@ -265,6 +269,7 @@ impl Pool {
             pending: IterableMap::new(Key::Pending),
             next_change: 0,
             unclaimed: LookupMap::new(Key::Unclaimed),
+            leaves: Vector::new(Key::Leaves),
             stats: Stats::default(),
         };
         for a in assets {
@@ -312,7 +317,7 @@ impl Pool {
             self.spends.insert(n, Spend { outputs: [c0, c1], deal: None, block });
         }
         let mut h = Hasher::new();
-        let leaf_index = self.tree.insert_pair(c0, c1, &mut h);
+        let leaf_index = self.insert_pair(c0, c1, &mut h);
         let root = self.tree.root();
 
         if public_amount == 0 {
@@ -397,8 +402,8 @@ impl Pool {
             self.spends.insert(*n, Spend { outputs, deal: Some(deal_id.0), block });
         }
         let mut h = Hasher::new();
-        let leaf_index = self.tree.insert_pair(a_out[0], a_out[1], &mut h);
-        self.tree.insert_pair(b_out[0], b_out[1], &mut h);
+        let leaf_index = self.insert_pair(a_out[0], a_out[1], &mut h);
+        self.insert_pair(b_out[0], b_out[1], &mut h);
         let root = self.tree.root();
         self.stats.swaps += 1;
         events::swap(events::Swap {
@@ -523,6 +528,12 @@ impl Pool {
 
     pub fn next_leaf_index(&self) -> U64 {
         U64(self.tree.next_index)
+    }
+
+    /// Leaves from `from_index`, at most `limit` (up to 1000), in tree order.
+    pub fn leaves(&self, from_index: U64, limit: u32) -> Vec<FieldStr> {
+        let end = (from_index.0 + limit.min(1000) as u64).min(self.leaves.len() as u64);
+        (from_index.0..end).filter_map(|i| self.leaves.get(i as u32).copied().map(FieldStr)).collect()
     }
 
     pub fn is_spent(&self, nullifier: FieldStr) -> bool {
@@ -650,6 +661,19 @@ impl Pool {
 
     // ---------- internals ----------
 
+    fn insert(&mut self, leaf: Field, h: &mut Hasher) -> u64 {
+        let i = self.tree.insert(leaf, h);
+        self.leaves.push(leaf);
+        i
+    }
+
+    fn insert_pair(&mut self, a: Field, b: Field, h: &mut Hasher) -> u64 {
+        let i = self.tree.insert_pair(a, b, h);
+        self.leaves.push(a);
+        self.leaves.push(b);
+        i
+    }
+
     fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner, "Owner only");
     }
@@ -672,6 +696,7 @@ impl Pool {
     /// Charge the caller for the storage this call added and return the rest.
     fn settle_storage(&mut self, before: u64) {
         self.spends.flush();
+        self.leaves.flush();
         let added = env::storage_usage().saturating_sub(before) as u128;
         let cost = env::storage_byte_cost().saturating_mul(added);
         let attached = env::attached_deposit();
@@ -688,7 +713,7 @@ impl Pool {
             (Some(inner), Some(asset)) => {
                 let mut h = Hasher::new();
                 let commitment = h.hash3(&inner.0, &field::from_u128(amount), &asset);
-                let leaf_index = self.tree.insert(commitment, &mut h);
+                let leaf_index = self.insert(commitment, &mut h);
                 self.assets.get_mut(token).unwrap().held += amount;
                 events::payout(events::Payout {
                     token,
@@ -740,7 +765,7 @@ impl Pool {
         let asset_field = asset.field;
         let mut h = Hasher::new();
         let commitment = h.hash3(&parsed.inner.0, &field::from_u128(amount), &asset_field);
-        let leaf_index = self.tree.insert(commitment, &mut h);
+        let leaf_index = self.insert(commitment, &mut h);
         self.assets.get_mut(token).unwrap().held += amount;
         self.stats.shields += 1;
         Ok((leaf_index, commitment))

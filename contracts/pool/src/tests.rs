@@ -337,3 +337,16 @@ fn rule_changes_cannot_skip_the_timelock() {
     let id = pool.propose_change(Change::SetDesk { desk: "desk2.test".parse().unwrap() });
     pool.apply_change(id);
 }
+
+#[test]
+fn every_leaf_is_readable_in_order() {
+    let (pool, f) = replay(5);
+    let leaves = pool.leaves(U64(0), 100);
+    assert_eq!(leaves.len(), 10);
+    assert_eq!(leaves[0], field(&f["shieldAlice"]["commitment"]));
+    assert_eq!(leaves[1], field(&f["send"]["commitments"][0]));
+    assert_eq!(leaves[5], field(&f["shieldMaker"]["commitment"]));
+    assert_eq!(leaves[9], field(&f["swap"]["legB"]["commitments"][1]));
+    assert_eq!(pool.leaves(U64(8), 100).len(), 2);
+    assert!(pool.leaves(U64(50), 10).is_empty());
+}

@@ -191,3 +191,30 @@ mod tests {
         assert!(do_match(&input).unwrap_err().contains("not the one committed"));
     }
 }
+
+#[cfg(test)]
+mod layout {
+    use super::terms::{HedgeSpec, MatchResult};
+    use sha2::{Digest, Sha256};
+
+    /// The same match as `signing_bytes_are_pinned` in contracts/desk/src/tests.rs: the
+    /// enclave's bytes must hash to the desk's pinned value, or the desk would refuse every match.
+    const PINNED_MATCH_HASH: &str = "9dd8983acbabf24f758ab173f0251632dc9d6fe4e9a60b12844e1ff90e1ae47c";
+
+    #[test]
+    fn signing_bytes_match_the_desk() {
+        let m = MatchResult {
+            rfq_id: 5,
+            maker: "maker-b.hushd.testnet".into(),
+            terms_hash: format!("0x{}", "ab".repeat(32)),
+            class: 1,
+            expires_at_ms: 1_800_000_300_000,
+            bond: 5_000_000,
+            trader_inner: Some(format!("0x{}", "01".repeat(32))),
+            owner_key: Some("ed25519:11111111111111111111111111111111".into()),
+            hedge: Some(HedgeSpec { asset: 3, coin: "BTC".into(), is_buy: false, size: "0.0162".into(), limit_px: "61000".into(), deadline_ms: 1_800_000_600_000, testnet: true }),
+            maker_sig: vec![9u8; 64],
+        };
+        assert_eq!(hex::encode(Sha256::digest(m.signing_bytes())), PINNED_MATCH_HASH);
+    }
+}

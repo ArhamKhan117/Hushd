@@ -9,6 +9,14 @@ fn enclave() -> SigningKey {
     SigningKey::from_bytes(&[7u8; 32])
 }
 
+fn quote_signer() -> SigningKey {
+    SigningKey::from_bytes(&[5u8; 32])
+}
+
+fn ed_key(k: &SigningKey) -> String {
+    format!("ed25519:{}", near_sdk::bs58::encode(k.verifying_key().to_bytes()).into_string())
+}
+
 fn ctx(predecessor: &str, deposit: NearToken, ms: u64) -> VMContextBuilder {
     let mut b = VMContextBuilder::new();
     b.current_account_id("desk.test".parse().unwrap())
@@ -55,7 +63,7 @@ fn desk() -> Desk {
     with_result(ctx("desk.test", NearToken::from_yoctonear(0), T0), PromiseResult::Successful(serde_json::to_vec(&out).unwrap()));
     d.on_enclave_key(Ok(Some(out)));
     set(ctx("maker.test", NearToken::from_millinear(20), T0));
-    d.register_maker("Maker".into(), format!("0x{}", "cd".repeat(32)), "https://maker.test/quote".into(), "fixed".into());
+    d.register_maker("Maker".into(), format!("0x{}", "cd".repeat(32)), "https://maker.test/quote".into(), "fixed".into(), ed_key(&quote_signer()));
     set(ctx("usdc.test", NearToken::from_yoctonear(0), T0));
     assert!(matches!(d.ft_on_transfer("maker.test".parse().unwrap(), U128(100_000_000), "bond".into()), PromiseOrValue::Value(U128(0))));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0));
@@ -72,18 +80,20 @@ fn owner_key() -> SigningKey {
 }
 
 fn matched(class: SettlementClass, bond: u128) -> MatchResult {
-    let mut pk = vec![0u8];
-    pk.extend_from_slice(&owner_key().verifying_key().to_bytes());
+    let terms_hash = [0x22u8; 32];
+    let expires = T0 + 300_000;
+    let maker_sig = quote_signer().sign(&consent_bytes(0, &terms_hash, bond, expires)).to_bytes().to_vec();
     MatchResult {
         rfq_id: U64(0),
         maker: "maker.test".parse().unwrap(),
-        terms_hash: format!("0x{}", "22".repeat(32)),
+        terms_hash: format!("0x{}", hex::encode(terms_hash)),
         class,
-        expires_at_ms: U64(T0 + 300_000),
+        expires_at_ms: U64(expires),
         bond: U128(bond),
         trader_inner: Some(format!("0x00{}", "33".repeat(31))),
-        owner_key: Some(PublicKey::try_from(pk).unwrap()),
+        owner_key: Some(ed_key(&owner_key())),
         hedge: (class == SettlementClass::BondedHedge).then(hedge_spec),
+        maker_sig: Base64VecU8(maker_sig),
     }
 }
 
@@ -301,3 +311,36 @@ fn the_digest_view_matches_the_signed_order() {
     assert_eq!(d.hedge_digest(id, U64(42), false), hex::encode(hedge::order_digest(&hedge_spec(), 42, false)));
     assert_eq!(d.hedge_path(id), "hushd/hedge/0");
 }
+
+#[test]
+fn a_match_the_maker_did_not_sign_is_refused() {
+    let mut d = desk();
+    let mut m = matched(SettlementClass::AtomicPool, 0);
+    m.maker_sig = Base64VecU8(SigningKey::from_bytes(&[6u8; 32]).sign(b"something else").to_bytes().to_vec());
+    let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
+    set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000));
+    assert!(d.on_match(U64(0), Ok(Some(out))).is_none());
+    assert!(get_logs().iter().any(|l| l.contains("did not sign these terms")));
+}
+
+/// The enclave (matcher/src/terms.rs) signs exactly these bytes for this match; the same
+/// hex is pinned in the matcher's tests, so the two layouts cannot drift apart.
+#[test]
+fn signing_bytes_are_pinned() {
+    let m = MatchResult {
+        rfq_id: U64(5),
+        maker: "maker-b.hushd.testnet".parse().unwrap(),
+        terms_hash: format!("0x{}", "ab".repeat(32)),
+        class: SettlementClass::BondedHedge,
+        expires_at_ms: U64(1_800_000_300_000),
+        bond: U128(5_000_000),
+        trader_inner: Some(format!("0x{}", "01".repeat(32))),
+        owner_key: Some("ed25519:11111111111111111111111111111111".into()),
+        hedge: Some(HedgeSpec { asset: 3, coin: "BTC".into(), is_buy: false, size: "0.0162".into(), limit_px: "61000".into(), deadline_ms: 1_800_000_600_000, testnet: true }),
+        maker_sig: Base64VecU8(vec![9u8; 64]),
+    };
+    let h = hex::encode(near_sdk::env::sha256(&m.signing_bytes()));
+    assert_eq!(h, PINNED_MATCH_HASH, "update matcher/src/main.rs PINNED_MATCH_HASH too: {h}");
+}
+
+const PINNED_MATCH_HASH: &str = "9dd8983acbabf24f758ab173f0251632dc9d6fe4e9a60b12844e1ff90e1ae47c";

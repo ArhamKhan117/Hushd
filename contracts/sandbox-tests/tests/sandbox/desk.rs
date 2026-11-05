@@ -59,7 +59,7 @@ async fn desk_world(title: &str) -> TestResult<DeskWorld> {
     assert_eq!(enclave, json!({ "sign_key": SIGN_KEY, "enc_key": ENC_KEY, "project": "hushd.sandbox/matcher" }));
 
     // a maker with a bond
-    let args = json!({ "name": "Sandbox maker", "enc_key": ENC_KEY, "quote_url": "https://maker.example/quote", "style": "fixed" });
+    let args = json!({ "name": "Sandbox maker", "enc_key": ENC_KEY, "quote_url": "https://maker.example/quote", "style": "fixed", "quote_key": quote_key() });
     let r = w.env.call_ok(&w.maker, &desk, "register_maker", args, NearToken::from_millinear(10)).await?;
     w.gas.add("register_maker", &r);
     w.mint(&usdc, &w.maker, 1_000).await?;
@@ -87,9 +87,32 @@ async fn fixture_until_maker_shield(w: &mut World) -> TestResult<()> {
     Ok(())
 }
 
+/// The maker's quote key (ed25519), registered on the desk.
+fn quote_signer() -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(&[5u8; 32])
+}
+
+fn quote_key() -> String {
+    format!("ed25519:{}", bs58::encode(quote_signer().verifying_key().to_bytes()).into_string())
+}
+
+/// The maker's consent to these terms: "hushd.quote.v1" ‖ rfq id ‖ terms hash ‖ bond ‖ expiry.
+fn maker_sig(rfq_id: u64, terms_hash: &str, bond: u128, expires_at_ms: u64) -> String {
+    use base64::Engine;
+    use ed25519_dalek::Signer;
+    let mut msg = b"hushd.quote.v1".to_vec();
+    msg.extend_from_slice(&rfq_id.to_le_bytes());
+    msg.extend_from_slice(&hex::decode(&terms_hash[2..]).unwrap());
+    msg.extend_from_slice(&bond.to_le_bytes());
+    msg.extend_from_slice(&expires_at_ms.to_le_bytes());
+    base64::engine::general_purpose::STANDARD.encode(quote_signer().sign(&msg).to_bytes())
+}
+
 /// The matcher's answer for one RFQ, as the OutLayer double hands it back.
 fn match_answer(rfq_id: u64, maker: &AccountId, expires_at_ms: u64, hedge: Option<Value>) -> String {
     let bonded = hedge.is_some();
+    let terms_hash = format!("0x{:064x}", 0xfeed_0000 + rfq_id);
+    let bond: u128 = if bonded { HEDGE_BOND } else { 0 };
     json!({
         "success": true,
         "result": {
@@ -97,13 +120,14 @@ fn match_answer(rfq_id: u64, maker: &AccountId, expires_at_ms: u64, hedge: Optio
             "match": {
                 "rfq_id": rfq_id.to_string(),
                 "maker": maker,
-                "terms_hash": format!("0x{:064x}", 0xfeed_0000 + rfq_id),
+                "terms_hash": terms_hash,
                 "class": if bonded { "bonded_hedge" } else { "atomic_pool" },
                 "expires_at_ms": expires_at_ms.to_string(),
                 "bond": if bonded { HEDGE_BOND.to_string() } else { "0".into() },
                 "trader_inner": if bonded { Some(format!("0x00{}", "33".repeat(31))) } else { None },
                 "owner_key": null,
                 "hedge": hedge,
+                "maker_sig": maker_sig(rfq_id, &terms_hash, bond, expires_at_ms),
             },
         },
     })
