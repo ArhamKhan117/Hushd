@@ -17,7 +17,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Arham Khan"]
-repository = "https://github.com/ArhamKhan117/hushd"
+repository = "https://github.com/ArhamKhan117/Hushd"
 
 [workspace.dependencies]
 near-sdk = "5.30"

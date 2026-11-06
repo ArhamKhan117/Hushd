@@ -41,11 +41,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ArhamKhan117/hushd.git",
+    "url": "git+https://github.com/ArhamKhan117/Hushd.git",
     "directory": "packages/mcp"
   },
   "homepage": "https://hushd.net",
-  "bugs": "https://github.com/ArhamKhan117/hushd/issues",
+  "bugs": "https://github.com/ArhamKhan117/Hushd/issues",
   "keywords": [
     "mcp",
     "near",

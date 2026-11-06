@@ -34,4 +34,4 @@ Every spending tool checks the per-payment and per-day limits first, and a token
 | `HUSHD_API_URL`, `HUSHD_RPC_URL` | The Hushd API and the NEAR RPC (defaults: `https://api.hushd.net`, FastNEAR) |
 | `HUSHD_CIRCUITS_DIR`, `HUSHD_CIRCUITS_URL` | Where the proving artifacts come from (default `https://hushd.net/circuits`, cached in `~/.hushd/circuits`) |
 
-Docs: https://hushd.net/docs. Source: https://github.com/ArhamKhan117/hushd.
+Docs: https://hushd.net/docs. Source: https://github.com/ArhamKhan117/Hushd.

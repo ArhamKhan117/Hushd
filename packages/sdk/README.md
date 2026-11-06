@@ -14,4 +14,4 @@ import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 - Intake: `intake` drafts a package from plain words through a NEAR AI Cloud model in a TEE, encrypted to the model's attested key.
 
 The contracts live on NEAR testnet (`pool.hushd.testnet`, `desk.hushd.testnet`, `board.hushd.testnet`).
-Docs: https://hushd.net/docs/sdk. Source: https://github.com/ArhamKhan117/hushd.
+Docs: https://hushd.net/docs/sdk. Source: https://github.com/ArhamKhan117/Hushd.

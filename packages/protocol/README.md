@@ -7,4 +7,4 @@ import { parseUnits, formatUnits } from "@hushd/protocol";
 ```
 
 The same bytes are checked by the desk contract on NEAR testnet and by the matcher enclave, so a quote signed here verifies there.
-Source: https://github.com/ArhamKhan117/hushd.
+Source: https://github.com/ArhamKhan117/Hushd.
