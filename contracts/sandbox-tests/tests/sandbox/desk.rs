@@ -98,6 +98,31 @@ fn quote_key() -> String {
     format!("ed25519:{}", bs58::encode(quote_signer().verifying_key().to_bytes()).into_string())
 }
 
+/// The trader's per-deal owner key, named in every match.
+fn owner_signer() -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(&[9u8; 32])
+}
+
+fn owner_key() -> String {
+    format!("ed25519:{}", bs58::encode(owner_signer().verifying_key().to_bytes()).into_string())
+}
+
+/// Both parties' approvals of the legs' four outputs: "hushd.settle.v1:<desk>:<deal id>:<a0>,<a1>,<b0>,<b1>".
+fn approvals(desk: &AccountId, deal_id: u64, legs: &Value) -> Value {
+    use base64::Engine;
+    use ed25519_dalek::Signer;
+    let o = |l: usize, i: usize| legs[l]["commitments"][i].as_str().unwrap().to_string();
+    let msg = format!("hushd.settle.v1:{desk}:{deal_id}:{},{},{},{}", o(0, 0), o(0, 1), o(1, 0), o(1, 1));
+    let sig = |k: &ed25519_dalek::SigningKey| base64::engine::general_purpose::STANDARD.encode(k.sign(msg.as_bytes()).to_bytes());
+    json!({ "trader": sig(&owner_signer()), "maker": sig(&quote_signer()) })
+}
+
+/// The settle call's arguments: the fixture's legs for `deal_id`, approved by both parties.
+fn settle_args(d: &DeskWorld, deal_id: u64) -> Value {
+    let l = legs(&d.w.f);
+    json!({ "deal_id": deal_id.to_string(), "approvals": approvals(&d.desk, deal_id, &l), "legs": l })
+}
+
 fn put_str(b: &mut Vec<u8>, s: &str) {
     b.extend_from_slice(&(s.len() as u32).to_le_bytes());
     b.extend_from_slice(s.as_bytes());
@@ -152,7 +177,7 @@ fn match_answer(desk: &AccountId, rfq_id: u64, maker: &AccountId, expires_at_ms:
                 "expires_at_ms": expires_at_ms.to_string(),
                 "bond": if bonded { HEDGE_BOND.to_string() } else { "0".into() },
                 "trader_inner": if bonded { Some(format!("0x00{}", "33".repeat(31))) } else { None },
-                "owner_key": null,
+                "owner_key": owner_key(),
                 "hedge": hedge,
                 "maker_sig": maker_sig,
             },
@@ -213,8 +238,8 @@ async fn desk_settles_the_swap_through_the_pool() -> TestResult {
     fixture_until_maker_shield(&mut d.w).await?;
     open_deals(&mut d, None).await?;
 
+    let args = settle_args(&d, DEAL);
     let w = &mut d.w;
-    let args = json!({ "deal_id": DEAL.to_string(), "legs": legs(&w.f) });
     let r = w.env.call_ok(&w.relayer, &d.desk, "settle", args, NearToken::from_millinear(20)).await?;
     w.gas.add("settle deal 7 (desk -> pool.settle_swap -> desk)", &r);
     let pool_gas = burnt_on(&r, &w.pool);
@@ -266,8 +291,8 @@ async fn a_settle_with_legs_for_another_deal_changes_nothing() -> TestResult {
     open_deals(&mut d, None).await?;
     let root_before = d.w.root().await?;
 
+    let args = settle_args(&d, 6);
     let w = &mut d.w;
-    let args = json!({ "deal_id": "6", "legs": legs(&w.f) });
     let r = w.env.call(&w.relayer, &d.desk, "settle", args, NearToken::from_millinear(20)).await?;
     w.gas.add("settle deal 6 with deal 7's legs (refused)", &r);
     assert!(r.is_success(), "the desk's callback handles the refusal");
@@ -304,7 +329,8 @@ async fn bonded_hedge_signs_through_the_mpc_and_closes_on_the_fill() -> TestResu
     let maker = w.env.view(&d.desk, "maker", json!({ "account_id": w.maker })).await?;
     assert_eq!(maker["locked"], HEDGE_BOND.to_string());
 
-    let args = json!({ "deal_id": DEAL.to_string(), "legs": legs(&w.f) });
+    let args = settle_args(&d, DEAL);
+    let w = &mut d.w;
     let r = w.env.call_ok(&w.relayer, &d.desk, "settle", args, NearToken::from_millinear(20)).await?;
     w.gas.add("settle deal 7, bonded hedge (spot leg)", &r);
     assert!(event(&r, "spot_settled").is_some());
@@ -353,8 +379,8 @@ async fn a_refused_slash_payout_is_retried_into_the_pool() -> TestResult {
     fixture_until_maker_shield(&mut d.w).await?;
     let hedge = hedge_leg(&d).await?;
     open_deals(&mut d, Some(hedge)).await?;
+    let args = settle_args(&d, DEAL);
     let w = &mut d.w;
-    let args = json!({ "deal_id": DEAL.to_string(), "legs": legs(&w.f) });
     let _ = w.env.call_ok(&w.relayer, &d.desk, "settle", args, NearToken::from_millinear(20)).await?;
     let r = w.env.call(&w.owner, &w.pool, "set_deposits_paused", json!({ "paused": true }), NearToken::from_yoctonear(0)).await?;
     assert!(failures(&r).join(" ").contains("exactly 1 yoctoNEAR"), "{:?}", failures(&r));

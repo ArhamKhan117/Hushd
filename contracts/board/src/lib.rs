@@ -108,8 +108,10 @@ impl Board {
         U64(index as u64)
     }
 
-    /// Owner only: the one setting the owner controls.
+    /// Owner only, attach 1 yoctoNEAR: the one setting the owner controls.
+    #[payable]
     pub fn set_max_post_bytes(&mut self, max_post_bytes: u32) {
+        assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "Owner only");
         require!(max_post_bytes > 0, "The size limit must be at least 1 byte");
         self.max_post_bytes = max_post_bytes;

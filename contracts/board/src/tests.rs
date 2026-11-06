@@ -320,7 +320,7 @@ fn unregister_needs_one_yocto() {
 #[test]
 fn the_owner_changes_the_size_limit() {
     let mut b = board(None);
-    ctx(OWNER, NearToken::from_yoctonear(0));
+    ctx(OWNER, NearToken::from_yoctonear(1));
     b.set_max_post_bytes(4096);
     assert_eq!(b.max_post_bytes(), 4096);
     assert!(get_logs()[0].contains(r#""event":"max_post_bytes""#));
@@ -330,7 +330,7 @@ fn the_owner_changes_the_size_limit() {
 #[should_panic(expected = "Owner only")]
 fn only_the_owner_changes_the_size_limit() {
     let mut b = board(None);
-    ctx(RELAYER, NearToken::from_yoctonear(0));
+    ctx(RELAYER, NearToken::from_yoctonear(1));
     b.set_max_post_bytes(4096);
 }
 
@@ -338,6 +338,14 @@ fn only_the_owner_changes_the_size_limit() {
 #[should_panic(expected = "at least 1 byte")]
 fn the_size_limit_cannot_be_zero() {
     let mut b = board(None);
-    ctx(OWNER, NearToken::from_yoctonear(0));
+    ctx(OWNER, NearToken::from_yoctonear(1));
     b.set_max_post_bytes(0);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn the_size_limit_needs_one_yocto() {
+    let mut b = board(None);
+    ctx(OWNER, NearToken::from_yoctonear(0));
+    b.set_max_post_bytes(4096);
 }

@@ -124,6 +124,24 @@ fn maker(d: &Desk) -> Maker {
     d.maker("maker.test".parse().unwrap()).unwrap()
 }
 
+/// Two legs' output commitments, as the relayer passes them on.
+fn legs() -> Value {
+    json!([{ "commitments": ["11", "12"] }, { "commitments": ["21", "22"] }])
+}
+
+fn approvals(id: U64, legs: &Value, trader: &SigningKey, maker: &SigningKey) -> SettleApprovals {
+    let message = settle_message(&desk_id(), id.0, &leg_outputs(legs).unwrap());
+    let sig = |k: &SigningKey| Base64VecU8(k.sign(message.as_bytes()).to_bytes().to_vec());
+    SettleApprovals { trader: sig(trader), maker: sig(maker) }
+}
+
+/// Settle with both parties' approval of the legs.
+fn settle(d: &mut Desk, id: U64) {
+    let l = legs();
+    let a = approvals(id, &l, &owner_key(), &quote_signer());
+    let _ = d.settle(id, l, a);
+}
+
 fn submit(d: &mut Desk, m: MatchResult) -> U64 {
     set(ctx("relayer.test", NearToken::from_millinear(10), T0 + 1_000));
     let s = sign(&m);
@@ -219,14 +237,14 @@ fn an_atomic_deal_settles_with_a_receipt() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     assert_eq!(d.deal(id).unwrap().status, DealStatus::Settling);
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 2_000));
     // a bad submission leaves the deal open
     assert!(!d.on_settled(id, Err(PromiseError::Failed)));
     assert_eq!(d.deal(id).unwrap().status, DealStatus::Matched);
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 3_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 3_000));
     assert!(d.on_settled(id, Ok(json!({ "leaf_index": "6", "root": "0xab" }))));
     let deal = d.deal(id).unwrap();
@@ -250,13 +268,13 @@ fn an_expired_deal_cannot_settle() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 400_000));
-    let _ = d.settle(id, json!([]));
+    settle(&mut d, id);
 }
 
 fn hedge_pending(d: &mut Desk) -> U64 {
     let id = submit(d, matched(SettlementClass::BondedHedge, 10_000_000));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(d, id);
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 2_000));
     d.on_settled(id, Ok(json!({ "leaf_index": "6", "root": "0xab" })));
     assert_eq!(d.deal(id).unwrap().status, DealStatus::HedgePending);
@@ -618,9 +636,9 @@ fn a_deal_cannot_settle_twice_at_once() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     // a self-trading maker's second pair of legs for the same deal
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
 }
 
 #[test]
@@ -629,11 +647,11 @@ fn a_settled_deal_cannot_settle_again() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 2_000));
     d.on_settled(id, Ok(json!({ "leaf_index": "6", "root": "0xab" })));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 3_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
 }
 
 #[test]
@@ -642,7 +660,7 @@ fn a_deal_cannot_expire_while_settling() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::BondedHedge, 10_000_000));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 299_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     // the pool's answer is still on its way when the deal passes its expiry
     set(ctx("anyone.test", NearToken::from_yoctonear(0), T0 + 400_000));
     d.expire(id);
@@ -662,7 +680,7 @@ fn a_late_settle_answer_still_lands_once() {
     let mut d = desk();
     let id = submit(&mut d, matched(SettlementClass::BondedHedge, 10_000_000));
     set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 299_000));
-    let _ = d.settle(id, json!([{}, {}]));
+    settle(&mut d, id);
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 400_000));
     assert!(d.on_settled(id, Ok(json!({ "leaf_index": "6", "root": "0xab" }))));
     assert_eq!(d.deal(id).unwrap().status, DealStatus::HedgePending);
@@ -880,3 +898,144 @@ fn consent_bytes_are_pinned() {
 const PINNED_HEDGE_HASH: &str = "eac12673ba90754c1390ff2158a0c2da8a758ab9837342a89a75cc6392bf9899";
 const PINNED_CONSENT_HEDGED: &str = "f0d0c61833ef7c13d51a25431e275de57380f74cf3905b521f9f18875b2ad259";
 const PINNED_CONSENT_ATOMIC: &str = "c6059f809116681d28c509cc74bd2c26b72159dc24fc4c351aef7b03a2a36156";
+
+// ---------- settlement approvals ----------
+
+#[test]
+#[should_panic(expected = "Not approved by the trader")]
+fn anyone_else_cannot_settle_a_deal_with_legs_of_their_own() {
+    let mut d = desk();
+    let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
+    set(ctx("stranger.test", NearToken::from_millinear(20), T0 + 2_000));
+    // empty legs anyone can prove, signed with keys that are not the deal's
+    let stranger = SigningKey::from_bytes(&[42u8; 32]);
+    let l = legs();
+    let a = approvals(id, &l, &stranger, &stranger);
+    let _ = d.settle(id, l, a);
+}
+
+#[test]
+#[should_panic(expected = "Not approved by the maker")]
+fn the_trader_cannot_settle_without_the_maker() {
+    let mut d = desk();
+    let id = submit(&mut d, matched(SettlementClass::BondedHedge, 10_000_000));
+    set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
+    let l = legs();
+    let a = approvals(id, &l, &owner_key(), &owner_key());
+    let _ = d.settle(id, l, a);
+}
+
+#[test]
+#[should_panic(expected = "Not approved by the trader")]
+fn approvals_cover_exactly_the_outputs_they_name() {
+    let mut d = desk();
+    let id = submit(&mut d, matched(SettlementClass::AtomicPool, 0));
+    set(ctx("relayer.test", NearToken::from_millinear(20), T0 + 2_000));
+    let a = approvals(id, &legs(), &owner_key(), &quote_signer());
+    let other = json!([{ "commitments": ["11", "12"] }, { "commitments": ["21", "99"] }]);
+    let _ = d.settle(id, other, a);
+}
+
+#[test]
+fn the_settle_message_names_the_desk_the_deal_and_the_outputs_in_leg_order() {
+    let outputs = ["1".to_string(), "2".to_string(), "3".to_string(), "4".to_string()];
+    assert_eq!(settle_message(&desk_id(), 7, &outputs), "hushd.settle.v1:desk.test:7:1,2,3,4");
+}
+
+// ---------- storage and maker keys ----------
+
+#[test]
+#[should_panic(expected = "Attach at least")]
+fn an_rfq_pays_for_its_storage() {
+    let mut d = desk();
+    set(ctx("relayer.test", NearToken::from_yoctonear(1), T0));
+    d.open_rfq(format!("0x{}", "12".repeat(32)), U64(30_000));
+}
+
+#[test]
+#[should_panic(expected = "enc_key is a 0x hex X25519 key")]
+fn a_maker_key_must_be_hex() {
+    let mut d = desk();
+    set(ctx("maker2.test", NearToken::from_millinear(20), T0));
+    d.register_maker("Bad".into(), format!("0x{}", "zz".repeat(32)), "https://bad.test".into(), "fixed".into(), ed_key(&quote_signer()));
+}
+
+#[test]
+#[should_panic(expected = "Attach a deposit")]
+fn a_maker_update_needs_a_deposit() {
+    let mut d = desk();
+    set(ctx("maker.test", NearToken::from_yoctonear(0), T0));
+    d.register_maker("Maker".into(), format!("0x{}", "cd".repeat(32)), "https://maker.test/quote".into(), "fixed".into(), ed_key(&owner_key()));
+}
+
+#[test]
+fn a_pinned_matcher_build_is_the_one_outlayer_runs() {
+    set(ctx("owner.test", NearToken::from_yoctonear(0), T0));
+    let mut d = Desk::new(Config { matcher_project: "hushd.test/matcher@abc123".into(), ..config() });
+    set(ctx("anyone.test", NearToken::from_yoctonear(10_000_000_000_000_000_000_000), T0));
+    let _ = d.refresh_enclave_key();
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    let near_sdk::mock::MockAction::FunctionCallWeight { args, .. } = &receipts[0].actions[0] else { panic!("not a call") };
+    let call = String::from_utf8(args.clone()).unwrap();
+    assert!(call.contains(r#""project_id":"hushd.test/matcher","version_key":"abc123""#), "{call}");
+}
+
+// ---------- slash timing and redirects ----------
+
+#[test]
+#[should_panic(expected = "can still be reported")]
+fn a_signed_order_gets_time_to_be_reported_before_a_slash() {
+    let mut d = desk();
+    let id = hedge_pending(&mut d);
+    set(ctx("keeper.test", NearToken::from_yoctonear(0), T0 + 500_000));
+    let _ = d.sign_hedge_order(id);
+    // just past the deadline: the order may have filled and the keeper not reported it yet
+    set(ctx("anyone.test", NearToken::from_yoctonear(0), T0 + 700_000));
+    let _ = d.slash_overdue(id);
+}
+
+#[test]
+fn an_unreported_order_is_slashable_after_the_grace() {
+    let mut d = desk();
+    let id = hedge_pending(&mut d);
+    set(ctx("keeper.test", NearToken::from_yoctonear(0), T0 + 500_000));
+    let _ = d.sign_hedge_order(id);
+    set(ctx("anyone.test", NearToken::from_yoctonear(0), T0 + 600_000 + 600_001));
+    let _ = d.slash_overdue(id);
+    assert_eq!(d.deal(id).unwrap().status, DealStatus::Slashing);
+}
+
+fn refused_slash(d: &mut Desk) -> U64 {
+    let id = hedge_pending(d);
+    set(ctx("anyone.test", NearToken::from_yoctonear(0), T0 + 700_000));
+    let _ = d.slash_overdue(id);
+    slash_answer(d, id, 10_000_000, kept(0));
+    assert_eq!(d.deal(id).unwrap().status, DealStatus::SlashRefused);
+    id
+}
+
+fn redirect_sig(k: &SigningKey, id: U64, inner: &str) -> Base64VecU8 {
+    Base64VecU8(k.sign(format!("hushd.redirect:desk.test:{}:{inner}", id.0).as_bytes()).to_bytes().to_vec())
+}
+
+#[test]
+fn the_trader_redirects_a_refused_slash_payout_to_a_new_note() {
+    let mut d = desk();
+    let id = refused_slash(&mut d);
+    let inner = format!("0x00{}", "44".repeat(31));
+    set(ctx("anyone.test", NearToken::from_yoctonear(0), T0 + 800_000));
+    let _ = d.redirect_slash_payout(id, inner.clone(), redirect_sig(&owner_key(), id, &inner));
+    let deal = d.deal(id).unwrap();
+    assert_eq!(deal.status, DealStatus::Slashing);
+    assert_eq!(deal.trader_inner, Some(inner));
+}
+
+#[test]
+#[should_panic(expected = "Not signed by the deal's owner")]
+fn only_the_trader_redirects_a_slash_payout() {
+    let mut d = desk();
+    let id = refused_slash(&mut d);
+    let inner = format!("0x00{}", "44".repeat(31));
+    set(ctx("maker.test", NearToken::from_yoctonear(0), T0 + 800_000));
+    let _ = d.redirect_slash_payout(id, inner.clone(), redirect_sig(&quote_signer(), id, &inner));
+}

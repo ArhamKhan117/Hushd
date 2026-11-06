@@ -40,6 +40,8 @@ const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 const DEAL_STORAGE: NearToken = NearToken::from_millinear(10);
 /// A hedge leg's opening order may be signed this many times before its deadline.
 pub const MAX_HEDGE_ATTEMPTS: u32 = 3;
+/// After a hedge's deadline, how long the keeper has to report an order signed before it.
+const REPORT_GRACE_MS: u64 = 10 * 60_000;
 /// A match must reach the desk within this long after its RFQ closed.
 pub const MATCH_GRACE_MS: u64 = 15 * 60_000;
 /// r, big-endian: the BN254 scalar field modulus. The pool only takes notes below it.
@@ -141,6 +143,34 @@ pub struct MatchResult {
     pub hedge: Option<HedgeSpec>,
     /// The maker's quote key's signature over `consent_bytes`: the maker agreed to exactly these terms.
     pub maker_sig: Base64VecU8,
+}
+
+/// Both parties' approval of one settlement: ed25519 signatures over `settle_message`. The
+/// trader signs with the deal's owner key, the maker with its quote key. The pool binds each
+/// proof to the deal and its four outputs, but anyone can prove empty legs for a deal; these
+/// signatures say the two parties agreed to exactly these outputs.
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct SettleApprovals {
+    pub trader: Base64VecU8,
+    pub maker: Base64VecU8,
+}
+
+/// "hushd.settle.v1:<desk>:<deal id>:<a0>,<a1>,<b0>,<b1>": the four output commitments as the
+/// legs carry them, leg A (the trader's) first. The same text as `settleMessage` in the
+/// protocol package.
+pub fn settle_message(desk: &AccountId, deal_id: u64, outputs: &[String; 4]) -> String {
+    format!("hushd.settle.v1:{desk}:{deal_id}:{},{},{},{}", outputs[0], outputs[1], outputs[2], outputs[3])
+}
+
+/// The two legs' output commitments, as given (decimal strings), leg A first.
+fn leg_outputs(legs: &Value) -> Option<[String; 4]> {
+    let out = |leg: usize, i: usize| legs.get(leg)?.get("commitments")?.get(i)?.as_str().map(String::from);
+    Some([out(0, 0)?, out(0, 1)?, out(1, 0)?, out(1, 1)?])
+}
+
+fn signed_by(sig: &Base64VecU8, message: &[u8], key: &[u8; 32]) -> bool {
+    <[u8; 64]>::try_from(sig.0.as_slice()).is_ok_and(|sig| env::ed25519_verify(&sig, message, key))
 }
 
 fn push_str(b: &mut Vec<u8>, s: &str) {
@@ -249,7 +279,8 @@ pub struct Config {
     pub pool: AccountId,
     pub bond_token: AccountId,
     pub outlayer: AccountId,
-    /// OutLayer project of the matcher, "owner/name".
+    /// OutLayer project of the matcher, "owner/name"; "owner/name@<wasm hash>" runs exactly
+    /// that build, so a new build waits out the timelock like any other change.
     pub matcher_project: String,
     /// Account whose OutLayer secrets the matcher runs with.
     pub secrets_owner: AccountId,
@@ -298,6 +329,8 @@ pub struct Stats {
 #[ext_contract(ext_outlayer)]
 #[allow(dead_code)]
 trait OutLayer {
+    // the argument list is OutLayer's, not ours to shorten
+    #[allow(clippy::too_many_arguments)]
     fn request_execution(
         &mut self,
         source: Value,
@@ -420,7 +453,9 @@ impl Desk {
     #[payable]
     pub fn register_maker(&mut self, name: String, enc_key: String, quote_url: String, style: String, quote_key: String) {
         require!(name.len() <= 48 && quote_url.len() <= 200 && style.len() <= 24, "Field too long");
-        require!(enc_key.len() == 66 && enc_key.starts_with("0x"), "enc_key is a 0x hex X25519 key");
+        require!(parse_hex32(&enc_key).is_some(), "enc_key is a 0x hex X25519 key");
+        // a deposit means a full-access key: a leaked function-call key cannot swap the quote key
+        require!(env::attached_deposit() >= ONE_YOCTO, "Attach a deposit for storage (at least 1 yoctoNEAR)");
         require!(ed25519_key(&quote_key).is_some(), "quote_key is an ed25519 public key");
         let maker = env::predecessor_account_id();
         let before = env::storage_usage();
@@ -563,11 +598,18 @@ impl Desk {
     /// the pool refunds what it does not use to the desk, not to the sender (a known,
     /// small leftover that stays with the desk).
     #[payable]
-    pub fn settle(&mut self, deal_id: U64, legs: Value) -> Promise {
-        let deal = self.deals.get_mut(&deal_id.0).unwrap_or_else(|| env::panic_str("No such deal"));
+    pub fn settle(&mut self, deal_id: U64, legs: Value, approvals: SettleApprovals) -> Promise {
+        let deal = self.deals.get(&deal_id.0).cloned().unwrap_or_else(|| env::panic_str("No such deal"));
         require!(deal.status == DealStatus::Matched, "The deal is not waiting for settlement");
         require!(deal.class != SettlementClass::AtomicIntents, "This deal settles on NEAR Intents");
         require!(now_ms() <= deal.expires_at_ms.0, "The deal has expired");
+        let outputs = leg_outputs(&legs).unwrap_or_else(|| env::panic_str("Each leg names its two output commitments"));
+        let message = settle_message(&env::current_account_id(), deal_id.0, &outputs);
+        let trader_key = deal.owner_key.as_deref().and_then(ed25519_key).unwrap_or_else(|| env::panic_str("This deal has no owner key"));
+        let maker_key = self.makers.get(&deal.maker).and_then(|m| ed25519_key(&m.quote_key)).unwrap_or_else(|| env::panic_str("The deal's maker has no quote key"));
+        require!(signed_by(&approvals.trader, message.as_bytes(), &trader_key), "Not approved by the trader");
+        require!(signed_by(&approvals.maker, message.as_bytes(), &maker_key), "Not approved by the maker");
+        let deal = self.deals.get_mut(&deal_id.0).unwrap();
         // one settlement in flight: no second settle, no expiry until the pool answers
         deal.status = DealStatus::Settling;
         deal.settle_attempts += 1;
@@ -711,7 +753,10 @@ impl Desk {
     pub fn slash_overdue(&mut self, deal_id: U64) -> Promise {
         let deal = self.deals.get(&deal_id.0).cloned().unwrap_or_else(|| env::panic_str("No such deal"));
         require!(deal.status == DealStatus::HedgePending, "No open hedge leg");
-        require!(now_ms() > deal.hedge.as_ref().unwrap().deadline_ms, "The hedge deadline has not passed");
+        let deadline = deal.hedge.as_ref().unwrap().deadline_ms;
+        require!(now_ms() > deadline, "The hedge deadline has not passed");
+        // an order signed before the deadline may have filled: the keeper gets time to say so
+        require!(deal.hedge_orders == 0 || now_ms() > deadline + REPORT_GRACE_MS, "A signed hedge order can still be reported for 10 minutes after the deadline");
         let mut all = deal.receipt.clone().map(|r| r.evidence).unwrap_or_default();
         all.push(Evidence { kind: "hedge_overdue".into(), reference: format!("no fill by {}", deal.hedge.as_ref().unwrap().deadline_ms) });
         self.slash(deal_id.0, all)
@@ -725,6 +770,23 @@ impl Desk {
         d.status = DealStatus::Slashing;
         let (inner, amount) = (d.trader_inner.clone().unwrap(), d.slash_held.0);
         events::emit("slash_retried", json!({ "deal_id": deal_id, "amount": U128(amount) }));
+        self.pay_slash(deal_id.0, inner, amount)
+    }
+
+    /// The trader names another note for a slashed bond the pool keeps refusing (its note
+    /// already exists, or a limit changed): the new note's `inner`, signed with the deal's
+    /// owner key as "hushd.redirect:<desk>:<deal id>:<inner>".
+    pub fn redirect_slash_payout(&mut self, deal_id: U64, inner: String, signature: Base64VecU8) -> Promise {
+        require!(parse_field_hex(&inner).is_some(), "inner is a 0x hex field element, not zero");
+        let d = self.deals.get_mut(&deal_id.0).unwrap_or_else(|| env::panic_str("No such deal"));
+        require!(d.status == DealStatus::SlashRefused, "No refused slash payout on this deal");
+        let key = d.owner_key.as_deref().and_then(ed25519_key).unwrap_or_else(|| env::panic_str("This deal has no owner key"));
+        let message = format!("hushd.redirect:{}:{}:{}", env::current_account_id(), deal_id.0, inner);
+        require!(signed_by(&signature, message.as_bytes(), &key), "Not signed by the deal's owner");
+        d.trader_inner = Some(inner.clone());
+        d.status = DealStatus::Slashing;
+        let amount = d.slash_held.0;
+        events::emit("slash_redirected", json!({ "deal_id": deal_id, "amount": U128(amount) }));
         self.pay_slash(deal_id.0, inner, amount)
     }
 
@@ -876,13 +938,18 @@ impl Desk {
     }
 
     fn outlayer_call(&self, input: String, fee: NearToken) -> Promise {
+        let (project, version) = match self.config.matcher_project.split_once('@') {
+            Some((p, v)) => (p, Some(v)),
+            None => (self.config.matcher_project.as_str(), None),
+        };
         ext_outlayer::ext(self.config.outlayer.clone())
             .with_attached_deposit(fee)
             .with_static_gas(Gas::from_tgas(60))
             .with_unused_gas_weight(1)
             .request_execution(
-                // the project's active version; its secret opens only for the build it is locked to
-                json!({ "Project": { "project_id": self.config.matcher_project, "version_key": null } }),
+                // "owner/project@<wasm hash>" runs exactly that build, and changing it is a config
+                // change that waits out the timelock; without "@", OutLayer runs the active version
+                json!({ "Project": { "project_id": project, "version_key": version } }),
                 json!({ "max_instructions": 10_000_000_000u64, "max_memory_mb": 128, "max_execution_seconds": 60 }),
                 input,
                 Some(json!({ "profile": "default", "account_id": self.config.secrets_owner })),
@@ -1069,6 +1136,10 @@ impl Desk {
 
     /// Charge the caller for storage this call added, from the deposit attached.
     fn charge_storage(&mut self, before: u64) {
+        // the store collections buffer their writes: flush them, or the new entries are not counted yet
+        self.makers.flush();
+        self.rfqs.flush();
+        self.deals.flush();
         let added = env::storage_usage().saturating_sub(before) as u128;
         let cost = env::storage_byte_cost().saturating_mul(added);
         let attached = env::attached_deposit();
