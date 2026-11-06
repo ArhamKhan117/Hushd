@@ -16,4 +16,6 @@
 - RPC calls rotate across the free endpoints in `TESTNET.rpc` and rest one that rate-limits (`rpcOrder` in `packages/sdk/src/rpc.ts`); `app/csp.config.mjs` repeats that list as its default, so change both together.
 - Free dRPC refuses transactions with more than about 2 KB of arguments ("method is not available"), so it only serves reads: build signers on `sendEndpoints(net)`, never `net.rpc`.
 - FastNEAR answers a rejected transaction with HTTP 400; call `keepRpcErrorBodies(net.rpc)` before using near-kit or the reason (and near-kit's stale-nonce retry) is lost.
+- The testnet contracts are reproducible builds: redeploy only the output of `cargo near build reproducible-wasm` (Docker, a clean committed tree; about 6 min a contract on Apple silicon). `redeploy-code.ts` refuses anything else, and `pnpm verify` fails a contract without NEP-330 `build_info`.
+  Sandbox tests rebuild the same `target/near` paths non-reproducibly, so rebuild reproducibly before a redeploy. The commit a contract names must reach GitHub unchanged (no history rewrite) for NearBlocks to verify it.
 - npm: `pnpm publish:packages` publishes protocol, sdk and mcp in that order; the `@hushd` scope is an npm org.

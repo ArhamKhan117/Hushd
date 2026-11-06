@@ -231,7 +231,10 @@ export default function ContractsPage() {
       <ul>
         <li>Open each account on NearBlocks from the table above: its code hash, transactions and logs.</li>
         <li>
-          Build the contracts from <code>contracts/</code> in the repo and compare. The verifying keys in the pool are
+          Rebuild them. Each contract is a reproducible build: <code>contract_source_metadata</code> names the commit
+          and the pinned Docker image it was built from, and{" "}
+          <code>near contract verify deployed-at pool.hushd.testnet network-config testnet now</code> rebuilds it there
+          and compares the hash, as NearBlocks&apos; Verify and Publish does. The verifying keys in the pool are
           generated from the same files the browser proves with.
         </li>
         <li>

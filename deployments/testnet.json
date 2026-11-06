@@ -5,35 +5,39 @@
   "contracts": {
     "usdc": {
       "account": "usdc.hushd.testnet",
-      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": "CyQLoPKkC72QtEs2AEAkbcW4GAdcYP8LgQ7PhqvmLhvV"
+      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "tx": "CyQLoPKkC72QtEs2AEAkbcW4GAdcYP8LgQ7PhqvmLhvV",
+      "redeployed": "4vFaeMF4YskNwcstTikVmaa8ShFbN1hJ3bqG5kajzpCF"
     },
     "wnear": {
       "account": "wnear.hushd.testnet",
-      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": "BFGCSYqhbNkzRyUPTPUkaSYq3P1juexadEpZSH5hSqPx"
+      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "tx": "BFGCSYqhbNkzRyUPTPUkaSYq3P1juexadEpZSH5hSqPx",
+      "redeployed": "GvvSaUttdBGm5wLjYTp1TM6KbRycszHHrgFSMmkLXxBw"
     },
     "btc": {
       "account": "btc.hushd.testnet",
-      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": "3oVfnMH7HKih8AFrWsFM5KE4HXvTsRQXjhd91aXQVqA8"
+      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "tx": "3oVfnMH7HKih8AFrWsFM5KE4HXvTsRQXjhd91aXQVqA8",
+      "redeployed": "5wqLRkEdJBft8YLxPeM1xxvRUmmp6Bj6W8spyv6Sezj5"
     },
     "pool": {
       "account": "pool.hushd.testnet",
-      "codeHash": "3AvLotBc7bjBEjFYBawtDJcd5AvFyFRoVetJtcXXCv1j",
-      "tx": "9wTpkYhWTCB1YRjgFb65tAUsAAnVATyYZ4P1WoJguP8b"
+      "codeHash": "9njTymxJ8mS4kULzHP9VLtGzBM1Ztmoc3tkyRo51mV1g",
+      "tx": "9wTpkYhWTCB1YRjgFb65tAUsAAnVATyYZ4P1WoJguP8b",
+      "redeployed": "DPXAk4hussq5vDGVPW2w7puknRecZXDCTKZYAt9zC3du"
     },
     "board": {
       "account": "board.hushd.testnet",
-      "codeHash": "21ZMmpkEGEqE9J54w2doysFwnB6cegfdbzKdt3ZyzAHD",
+      "codeHash": "Ag1XkH5QwZBCBcdKnjTLzauwphoz2LGTMyG51VYeEpA6",
       "tx": "GiBFw3p5QSb5uYPHCiL6xuKtM4wfJ9TkAHgWv4hykRzv",
-      "redeployed": "3YxMJoYubxTLNr6hGrA16aS7y979xYr9vKdLGXt1AcZK"
+      "redeployed": "CSY3NLXPPESJua4V2Nmv39vR8K8QSiXQuzCAAY8Q9yhJ"
     },
     "desk": {
       "account": "desk.hushd.testnet",
-      "codeHash": "CSVqmdtYFgTTYd2xyqkRk8zhgD3b4WR4H6eDaKYyH9ST",
+      "codeHash": "9x1XLyLLXUwGDxZbkauJsTruVJTuHNjkMQorD1P1zucF",
       "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
-      "redeployed": "3Rre5v1UskUVVMK44Js4WsptaK8t8rm5Tj8n9DySC5wD"
+      "redeployed": "6fX9f8QXj1p3wUaes8mHFueMiBJNYpKXie8cMAA1sMwW"
     }
   },
   "services": {

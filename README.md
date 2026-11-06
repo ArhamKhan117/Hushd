@@ -15,7 +15,7 @@ Everything runs on NEAR testnet with test tokens.
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
 - **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
 - **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
-- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts and their code, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a trade checked by `intents.near` on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
+- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts, their code and the commit each was built from, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a trade checked by `intents.near` on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
 
 ## What you can do
 
@@ -67,6 +67,8 @@ Everything runs on NEAR testnet with test tokens.
 | Board | [`board.hushd.testnet`](https://testnet.nearblocks.io/address/board.hushd.testnet) | Sealed note posts, so a seed alone recovers a wallet |
 | Tokens | [`usdc`](https://testnet.nearblocks.io/address/usdc.hushd.testnet), [`wnear`](https://testnet.nearblocks.io/address/wnear.hushd.testnet), [`btc`](https://testnet.nearblocks.io/address/btc.hushd.testnet)`.hushd.testnet` | Test NEP-141 tokens with a faucet |
 
+Every contract on testnet is a reproducible build.
+It names the commit and the pinned `sourcescan/cargo-near` Docker image it was built from (NEP-330 `contract_source_metadata`), so anyone can rebuild it byte for byte: `near contract verify deployed-at pool.hushd.testnet network-config testnet now` does that rebuild and compares the hash, as NearBlocks' Verify and Publish does.
 `deployments/testnet.json` records each contract's code hash and deploy transaction; `pnpm verify` checks the deployed code against it.
 
 ## Privacy and security model
@@ -143,7 +145,8 @@ The contract sandbox tests run the whole flow on a local nearcore: build the was
 | cargo audit, cargo deny | RustSec advisories, licenses and crate sources for the contracts and the matcher enclave |
 | Clippy | Rust lints, warnings as errors |
 | pnpm audit | npm advisories in the production JavaScript dependencies |
-| `pnpm verify` | The contracts on testnet run the recorded code hashes, and your own build hashes the same |
+| `pnpm verify` | The contracts on testnet run the recorded code hashes and name the commit and Docker image they were built from; your reproducible build hashes the same |
+| `near contract verify` | Rebuilds a deployed contract from its commit in its pinned image and compares the hash, the check NearBlocks runs |
 
 The contract review of 6 November 2026 found one High: anyone could settle a matched deal with empty legs of their own.
 It is fixed: `desk.settle` now needs both parties' signatures over the deal's four outputs.

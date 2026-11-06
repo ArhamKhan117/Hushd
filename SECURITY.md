@@ -61,9 +61,14 @@ A test contract with one of each classic mistake ([`fixtures/broken`](contracts/
 
 ## Code on chain is the code here
 
-- `pnpm verify` checks that each contract account runs the code hash recorded in [`deployments/testnet.json`](deployments/testnet.json), and that your own build hashes the same.
-- Each contract answers `contract_source_metadata` (NEP-330) with its version and this repository.
-- Next, once the repository is public: reproducible builds (`cargo near build reproducible-wasm`, in Docker) and verification on NearBlocks, so anyone can rebuild the wasm from a commit.
+Solidity projects publish verified source on a block explorer; on NEAR the same guarantee comes from reproducible builds.
+
+- Every contract on testnet (pool, desk, board and the three tokens) is built with `cargo near build reproducible-wasm`, inside a Docker image pinned by digest (`sourcescan/cargo-near:0.21.1-rust-1.96.0`).
+- Each answers `contract_source_metadata` (NEP-330) with the commit it was built from, that image and the build command, so anyone can rebuild it byte for byte.
+- `near contract verify deployed-at <account> network-config testnet now` does exactly that: it reads the metadata, rebuilds the commit in the image and compares the hash with the code on chain.
+  Run from a clean clone of the commit, it matches for every contract.
+- NearBlocks' **Verify and Publish** (Contract Code tab) runs the same rebuild through SourceScan's testnet verifier and then shows the source next to the contract.
+- `pnpm verify` checks that each contract account runs the code hash recorded in [`deployments/testnet.json`](deployments/testnet.json), that it names a commit of this repository and a pinned image, and that your own reproducible build hashes the same.
 
 ## Contract review, 6 November 2026
 

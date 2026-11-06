@@ -30,7 +30,9 @@ export default function SecurityPage() {
           forged proofs. Real value needs a multi-party ceremony first.
         </li>
         <li>
-          <strong>Not audited.</strong> The contracts, circuits and services have tests. No external audit has been done.
+          <strong>Not audited.</strong> The contracts, circuits and services have tests and automated security scans,
+          and every contract on testnet is a reproducible build anyone can rebuild from its commit. No external audit
+          has been done.
         </li>
       </ul>
 
