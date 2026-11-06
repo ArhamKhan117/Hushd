@@ -75,7 +75,7 @@ export interface PackageQuote {
   makerAddress: string;
   /** The maker's quote key ("ed25519:<base58>"), as registered on the desk. */
   quoteKey: string;
-  /** ed25519 signature (base64) by the quote key over consentBytes(rfqId, termsHash(terms), bond, expiresAtMs). */
+  /** ed25519 signature (base64) by the quote key over `quoteConsent(desk, quote, kind)`. */
   signature: string;
 }
 
@@ -167,10 +167,54 @@ export function termsHash(t: Terms): Uint8Array {
   return sha256(termsBytes(t));
 }
 
-/** What the maker's quote key signs: its consent to exactly these terms for this RFQ. */
-export function consentBytes(rfqId: number, termsHash: Uint8Array, bond: bigint, expiresAtMs: number): Uint8Array {
-  if (termsHash.length !== 32) throw new RangeError("termsHash is 32 bytes");
-  return new Writer().bytes(enc.encode("hushd.quote.v1")).u64(rfqId).bytes(termsHash).u128(bond).u64(expiresAtMs).done();
+/** The borsh bytes of the desk's `HedgeSpec`: asset u32, coin, is_buy, size, limit_px, deadline_ms u64, testnet. */
+export function hedgeSpecBytes(h: HedgeLeg): Uint8Array {
+  return new Writer().u32(h.asset).str(h.coin).u8(h.isBuy ? 1 : 0).str(h.size).str(h.limitPx).u64(h.deadlineMs).u8(h.testnet ? 1 : 0).done();
+}
+
+/** sha256 of the hedge spec's borsh bytes, or 32 zero bytes when there is no hedge. */
+export function hedgeHash(h?: HedgeLeg): Uint8Array {
+  return h ? sha256(hedgeSpecBytes(h)) : new Uint8Array(32);
+}
+
+/** Everything a maker's consent covers: the desk, the RFQ, the terms, the bond and its hedge leg. */
+export interface Consent {
+  /** The desk contract's account id: a consent for one desk is no good on another. */
+  desk: string;
+  rfqId: number;
+  termsHash: Uint8Array;
+  bond: bigint;
+  expiresAtMs: number;
+  class: SettlementClass;
+  hedge?: HedgeLeg;
+  maker: string;
+}
+
+/**
+ * What the maker's quote key signs (consent v2): "hushd.quote.v2" ‖ desk ‖ rfq id (u64 LE) ‖
+ * terms hash (32) ‖ bond (u128 LE) ‖ expiry (u64 LE) ‖ class (u8) ‖ hedge hash (32) ‖ maker,
+ * account ids as u32 LE length ‖ utf8. The desk rebuilds these bytes from the match it gets,
+ * so the matcher cannot attach a class, a hedge or a maker the maker did not sign.
+ */
+export function consentBytes(c: Consent): Uint8Array {
+  if (c.termsHash.length !== 32) throw new RangeError("termsHash is 32 bytes");
+  return new Writer()
+    .bytes(enc.encode("hushd.quote.v2"))
+    .str(c.desk)
+    .u64(c.rfqId)
+    .bytes(c.termsHash)
+    .u128(c.bond)
+    .u64(c.expiresAtMs)
+    .u8(CLASS_TAG[c.class])
+    .bytes(hedgeHash(c.hedge))
+    .str(c.maker)
+    .done();
+}
+
+/** The consent a maker signs for its quote on `desk`, for a request of this kind. */
+export function quoteConsent(desk: string, q: PackageQuote, kind: PackageKind): Uint8Array {
+  const t = termsOf(q, kind);
+  return consentBytes({ desk, rfqId: q.rfqId, termsHash: termsHash(t), bond: q.bond, expiresAtMs: q.expiresAtMs, class: t.class, hedge: q.hedge, maker: q.maker });
 }
 
 export function hex(b: Uint8Array): string {
@@ -187,7 +231,7 @@ export function fromJson<T>(s: string): T {
   return JSON.parse(s, (k, x) => (BIGINT_KEYS.has(k) && typeof x === "string" && /^\d+$/.test(x) ? BigInt(x) : x)) as T;
 }
 
-/** The best quote for a request: the most for the trader, inside the limit, still valid. */
+/** The best quote for a request: the most for the trader, inside the limit, still valid (a hedge must outlast the quote). */
 export function bestQuote(req: PackageRequest, quotes: PackageQuote[], nowMs: number): PackageQuote | undefined {
   const ok = quotes.filter(
     (q) =>
@@ -196,7 +240,8 @@ export function bestQuote(req: PackageRequest, quotes: PackageQuote[], nowMs: nu
       q.take.amount === req.sell.amount &&
       q.give.amount >= req.buy.minAmount &&
       q.expiresAtMs >= nowMs + Math.min(req.expiresInMs, 60_000) &&
-      (req.kind === "spot") === (q.hedge === undefined),
+      (req.kind === "spot") === (q.hedge === undefined) &&
+      (q.hedge === undefined || q.hedge.deadlineMs > q.expiresAtMs),
   );
   ok.sort((a, b) => (a.give.amount === b.give.amount ? a.expiresAtMs - b.expiresAtMs : a.give.amount > b.give.amount ? -1 : 1));
   return ok[0];

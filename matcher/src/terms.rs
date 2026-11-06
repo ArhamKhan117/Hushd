@@ -82,7 +82,7 @@ pub struct Quote {
     pub maker_address: String,
     /// The maker's quote key, "ed25519:<base58>", as registered on the desk.
     pub quote_key: String,
-    /// ed25519 over consent_bytes, base64.
+    /// ed25519 over the consent bytes of its agreed terms (`Agreed::consent`), base64.
     pub signature: String,
 }
 
@@ -178,17 +178,63 @@ pub fn terms_hash(t: &Agreed) -> [u8; 32] {
     Sha256::digest(terms_bytes(t)).into()
 }
 
-pub fn consent_bytes(rfq_id: u64, terms_hash: &[u8; 32], bond: u128, expires_at_ms: u64) -> Vec<u8> {
-    let mut b = b"hushd.quote.v1".to_vec();
-    b.extend_from_slice(&rfq_id.to_le_bytes());
-    b.extend_from_slice(terms_hash);
-    b.extend_from_slice(&bond.to_le_bytes());
-    b.extend_from_slice(&expires_at_ms.to_le_bytes());
-    b
+/// What a maker's quote key signs (consent v2): "hushd.quote.v2" ‖ desk account (u32 LE
+/// length ‖ utf8) ‖ rfq id (u64 LE) ‖ terms hash (32) ‖ bond (u128 LE) ‖ expiry (u64 LE) ‖
+/// class (u8) ‖ hedge hash (32) ‖ maker account (u32 LE length ‖ utf8). The desk rebuilds
+/// the same bytes from the match (`MatchResult::consent_bytes` in contracts/desk), and the
+/// protocol package's `consentBytes` makes them in TypeScript.
+pub struct Consent<'a> {
+    pub desk: &'a str,
+    pub rfq_id: u64,
+    pub terms_hash: [u8; 32],
+    pub bond: u128,
+    pub expires_at_ms: u64,
+    pub class: u8,
+    pub hedge: Option<&'a HedgeSpec>,
+    pub maker: &'a str,
+}
+
+impl Consent<'_> {
+    pub fn bytes(&self) -> Vec<u8> {
+        let mut w = W(b"hushd.quote.v2".to_vec());
+        w.str(self.desk);
+        w.0.extend_from_slice(&self.rfq_id.to_le_bytes());
+        w.0.extend_from_slice(&self.terms_hash);
+        w.0.extend_from_slice(&self.bond.to_le_bytes());
+        w.0.extend_from_slice(&self.expires_at_ms.to_le_bytes());
+        w.0.push(self.class);
+        w.0.extend_from_slice(&hedge_hash(self.hedge));
+        w.str(self.maker);
+        w.0
+    }
+}
+
+/// sha256 of the hedge spec's borsh bytes (the desk's `HedgeSpec`), or 32 zero bytes.
+pub fn hedge_hash(h: Option<&HedgeSpec>) -> [u8; 32] {
+    h.map(|h| Sha256::digest(borsh::to_vec(h).expect("borsh")).into()).unwrap_or([0u8; 32])
+}
+
+impl Agreed {
+    /// The consent bytes for these terms on `desk`: what the winning maker signed.
+    pub fn consent(&self, desk: &str) -> Vec<u8> {
+        let hedge = self.hedge.as_ref().map(HedgeSpec::from);
+        Consent {
+            desk,
+            rfq_id: self.rfq_id,
+            terms_hash: terms_hash(self),
+            bond: self.bond,
+            expires_at_ms: self.expires_at_ms,
+            class: self.class,
+            hedge: hedge.as_ref(),
+            maker: &self.maker,
+        }
+        .bytes()
+    }
 }
 
 /// Same rule as `bestQuote` in the protocol package: the most for the trader, inside the
-/// limit, still valid long enough, with a hedge exactly when the package asks for one.
+/// limit, still valid long enough, with a hedge exactly when the package asks for one
+/// (and a hedge deadline after the quote's expiry, as the desk requires).
 pub fn best<'a>(req: &Request, quotes: &'a [Quote], now_ms: u64) -> Option<&'a Quote> {
     let wants_hedge = req.kind != "spot";
     let mut ok: Vec<&Quote> = quotes
@@ -201,7 +247,7 @@ pub fn best<'a>(req: &Request, quotes: &'a [Quote], now_ms: u64) -> Option<&'a Q
                 && q.expires_at_ms >= now_ms + req.expires_in_ms.min(60_000)
                 && q.hedge.is_some() == wants_hedge
                 && match (&q.hedge, &req.hedge) {
-                    (Some(h), Some(w)) => h.coin == w.coin && h.testnet == w.testnet,
+                    (Some(h), Some(w)) => h.coin == w.coin && h.testnet == w.testnet && h.deadline_ms > q.expires_at_ms,
                     (None, _) => true,
                     _ => false,
                 }
@@ -222,6 +268,20 @@ pub struct HedgeSpec {
     pub limit_px: String,
     pub deadline_ms: u64,
     pub testnet: bool,
+}
+
+impl From<&Hedge> for HedgeSpec {
+    fn from(h: &Hedge) -> Self {
+        Self {
+            asset: h.asset,
+            coin: h.coin.clone(),
+            is_buy: h.is_buy,
+            size: h.size.clone(),
+            limit_px: h.limit_px.clone(),
+            deadline_ms: h.deadline_ms,
+            testnet: h.testnet,
+        }
+    }
 }
 
 #[derive(BorshSerialize)]
@@ -249,23 +309,18 @@ impl MatchResult {
             bond: q.bond,
             trader_inner: Some(req.trader.refund_inner.clone()),
             owner_key: Some(req.trader.owner_key.clone()),
-            hedge: q.hedge.as_ref().map(|h| HedgeSpec {
-                asset: h.asset,
-                coin: h.coin.clone(),
-                is_buy: h.is_buy,
-                size: h.size.clone(),
-                limit_px: h.limit_px.clone(),
-                deadline_ms: h.deadline_ms,
-                testnet: h.testnet,
-            }),
+            hedge: q.hedge.as_ref().map(HedgeSpec::from),
             maker_sig: q.signature_bytes().map(|s| s.to_vec()).unwrap_or_default(),
         }
     }
 
-    pub fn signing_bytes(&self) -> Vec<u8> {
-        let mut b = b"hushd.match.v1".to_vec();
-        b.extend_from_slice(&borsh::to_vec(self).expect("borsh"));
-        b
+    /// What the enclave signs: "hushd.match.v2" ‖ desk account (u32 LE length ‖ utf8) ‖ the
+    /// match's borsh bytes (the desk's `MatchResult::signing_bytes`).
+    pub fn signing_bytes(&self, desk: &str) -> Vec<u8> {
+        let mut w = W(b"hushd.match.v2".to_vec());
+        w.str(desk);
+        w.0.extend_from_slice(&borsh::to_vec(self).expect("borsh"));
+        w.0
     }
 
     pub fn to_json(&self) -> Value {

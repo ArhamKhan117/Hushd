@@ -1,18 +1,21 @@
 /**
  * Writes matcher/tests/interop.json: a sealed RFQ and two signed, sealed quotes made the
  * way the trader's agent and the makers make them in TypeScript, for a test-only enclave
- * key. The Rust matcher's test must open them, check both makers' signatures, pick the
- * better quote and arrive at the same terms hash.
+ * key. The Rust matcher's test must open them, check both makers' signatures (consent v2,
+ * for desk.hushd.testnet), pick the better quote and arrive at the same terms hash.
+ *
+ *   pnpm --filter @hushd/services exec tsx scripts/gen-matcher-interop.ts
  */
 import { writeFileSync } from "node:fs";
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
-import { consentBytes, hex, termsHash, termsOf, toJson, type PackageQuote, type PackageRequest } from "@hushd/protocol";
+import { hex, quoteConsent, termsHash, termsOf, toJson, type PackageQuote, type PackageRequest } from "@hushd/protocol";
 import { identityFromSeed, loadPoseidon, seal, toHex, toB64 } from "@hushd/sdk";
 
 await loadPoseidon();
 const enc = new TextEncoder();
+const desk = "desk.hushd.testnet";
 const enclaveSeed = new Uint8Array(32).fill(42);
 const encSecret = sha256(new Uint8Array([...enc.encode("hushd.matcher.enc.v1"), ...enclaveSeed]));
 const enclaveEnc = x25519.getPublicKey(encSecret);
@@ -41,8 +44,7 @@ function quote(maker: string, makerAddress: string, sk: Uint8Array, give: bigint
     v: 1, rfqId: 5, maker, give: { token: "btc.hushd.testnet", amount: give }, take: { token: "usdc.hushd.testnet", amount: 1_000_000_000n },
     bond: 0n, expiresAtMs: now + 300_000, makerAddress, quoteKey: quoteKey(sk), signature: "",
   };
-  const th = termsHash(termsOf(q, "spot"));
-  q.signature = toB64(ed25519.sign(consentBytes(5, th, q.bond, q.expiresAtMs), sk));
+  q.signature = toB64(ed25519.sign(quoteConsent(desk, q, "spot"), sk));
   return q;
 }
 const qa = quote("maker-a.hushd.testnet", makerA.address, quoteSecret(11), 1_550_000n);
@@ -55,7 +57,7 @@ writeFileSync(
   JSON.stringify({
     enclaveSeedHex: Buffer.from(enclaveSeed).toString("hex"),
     nowNs: String(BigInt(now) * 1_000_000n),
-    input: { cmd: "match", rfq_id: "5", rfq_commitment: commitment, batch: Buffer.from(JSON.stringify(batch)).toString("base64") },
+    input: { cmd: "match", desk, rfq_id: "5", rfq_commitment: commitment, batch: Buffer.from(JSON.stringify(batch)).toString("base64") },
     expect: { maker: qb.maker, termsHash: hex(termsHash(termsOf(qb, "spot"))), refused: 1, traderEncKey: hex(trader.encPublic) },
   }, null, 1),
 );

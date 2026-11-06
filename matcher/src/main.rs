@@ -7,11 +7,11 @@
 //! Commands (JSON on stdin, JSON on stdout):
 //! - `{"cmd":"pubkey"}`: the two public keys. The desk asks for these through
 //!   OutLayer on chain, so the key it trusts provably comes from this code in a TEE.
-//! - `{"cmd":"match","rfq_id":..,"rfq_commitment":"0x..","batch":"<base64 JSON>"}`:
+//! - `{"cmd":"match","desk":"<account>","rfq_id":..,"rfq_commitment":"0x..","batch":"<base64 JSON>"}`:
 //!   opens the sealed RFQ (and checks it is the one committed on chain), opens every
-//!   sealed quote, keeps quotes the maker really signed, picks the best one inside the
-//!   trader's limit, and returns a signed match plus the agreed terms sealed to each
-//!   side. Losing quotes and the trader's limit never leave the enclave.
+//!   sealed quote, keeps quotes the maker really signed for this desk, picks the best one
+//!   inside the trader's limit, and returns a match signed for this desk plus the agreed
+//!   terms sealed to each side. Losing quotes and the trader's limit never leave the enclave.
 
 mod box_;
 mod terms;
@@ -54,6 +54,8 @@ fn pubkey() -> Result<Value, String> {
 
 fn do_match(input: &Value) -> Result<Value, String> {
     let (sign, enc) = keys()?;
+    // the desk names itself (request_match); the HTTPS client names the desk it submits to
+    let desk = input["desk"].as_str().filter(|d| (2..=64).contains(&d.len())).ok_or("desk")?;
     let rfq_id = input["rfq_id"].as_str().and_then(|s| s.parse::<u64>().ok()).or_else(|| input["rfq_id"].as_u64()).ok_or("rfq_id")?;
     let commitment = input["rfq_commitment"].as_str().ok_or("rfq_commitment")?;
     let batch_b64 = input["batch"].as_str().ok_or("batch")?;
@@ -73,7 +75,7 @@ fn do_match(input: &Value) -> Result<Value, String> {
         let Some(sealed) = q.as_str().and_then(|s| B64.decode(s).ok()) else { refused += 1; continue };
         let Some(plain) = box_::open(&enc, &sealed) else { refused += 1; continue };
         let Ok(quote) = serde_json::from_slice::<Quote>(&plain) else { refused += 1; continue };
-        if quote.rfq_id != rfq_id || !maker_signed(&quote, &req) {
+        if quote.rfq_id != rfq_id || !maker_signed(&quote, &req, desk) {
             refused += 1;
             continue;
         }
@@ -86,7 +88,7 @@ fn do_match(input: &Value) -> Result<Value, String> {
     let agreed = terms::agreed(&req, best);
     let terms_hash = terms::terms_hash(&agreed);
     let m = MatchResult::new(rfq_id, best, &req, &terms_hash);
-    let signature = sign.sign(&m.signing_bytes());
+    let signature = sign.sign(&m.signing_bytes(desk));
 
     let for_trader = json!({ "terms": agreed.to_json(), "maker_address": best.maker_address, "terms_hash": format!("0x{}", hex::encode(terms_hash)) });
     let for_maker = json!({ "terms": agreed.to_json(), "trader_address": req.trader.address, "terms_hash": format!("0x{}", hex::encode(terms_hash)) });
@@ -103,13 +105,12 @@ fn do_match(input: &Value) -> Result<Value, String> {
     }))
 }
 
-/// The maker's quote key signed its consent to exactly these terms (the desk checks the
-/// same signature against the key the maker registered on chain).
-fn maker_signed(q: &Quote, req: &Request) -> bool {
+/// The maker's quote key signed its consent to exactly these terms on this desk (the desk
+/// checks the same signature against the key the maker registered on chain).
+fn maker_signed(q: &Quote, req: &Request, desk: &str) -> bool {
     let (Some(key), Some(sig)) = (q.quote_key_bytes(), q.signature_bytes()) else { return false };
     let Ok(vk) = VerifyingKey::from_bytes(&key) else { return false };
-    let agreed = terms::agreed(req, q);
-    let msg = terms::consent_bytes(q.rfq_id, &terms::terms_hash(&agreed), q.bond, q.expires_at_ms);
+    let msg = terms::agreed(req, q).consent(desk);
     vk.verify(&msg, &ed25519_dalek::Signature::from_bytes(&sig)).is_ok()
 }
 
@@ -169,7 +170,9 @@ mod tests {
                 maker_sig: B64.decode(j["maker_sig"].as_str().unwrap()).unwrap(),
             }
         };
-        assert!(vk.verify(&m.signing_bytes(), &ed25519_dalek::Signature::from_bytes(&sig)).is_ok());
+        let desk = fx["input"]["desk"].as_str().unwrap();
+        assert!(vk.verify(&m.signing_bytes(desk), &ed25519_dalek::Signature::from_bytes(&sig)).is_ok());
+        assert!(vk.verify(&m.signing_bytes("desk2.hushd.testnet"), &ed25519_dalek::Signature::from_bytes(&sig)).is_err());
 
         // the trader (seed 0x01..) opens its copy of the agreed terms; the maker's key cannot
         let trader_secret: [u8; 32] = Sha256::new().chain_update(b"hushd.enc.v1").chain_update([1u8; 32]).finalize().into();
@@ -180,6 +183,23 @@ mod tests {
         assert_eq!(opened["terms"]["makerGives"]["amount"], json!("1620000"));
         let maker_secret: [u8; 32] = Sha256::new().chain_update(b"hushd.enc.v1").chain_update([3u8; 32]).finalize().into();
         assert!(box_::open(&x25519_dalek::StaticSecret::from(maker_secret), &for_trader).is_none());
+    }
+
+    /// The makers signed for desk.hushd.testnet: for any other desk no quote counts.
+    #[test]
+    fn quotes_signed_for_another_desk_are_refused() {
+        let fx: Value = serde_json::from_str(INTEROP).unwrap();
+        unsafe {
+            std::env::set_var("PROTECTED_MATCHER_KEY", fx["enclaveSeedHex"].as_str().unwrap());
+            std::env::set_var("NEAR_BLOCK_TIMESTAMP", fx["nowNs"].as_str().unwrap());
+        }
+        let mut input = fx["input"].clone();
+        input["desk"] = json!("desk2.hushd.testnet");
+        let out = do_match(&input).unwrap();
+        assert_eq!(out["matched"], json!(false));
+        assert_eq!(out["refused"], json!(3));
+        input.as_object_mut().unwrap().remove("desk");
+        assert_eq!(do_match(&input).unwrap_err(), "desk");
     }
 
     #[test]
@@ -194,12 +214,38 @@ mod tests {
 
 #[cfg(test)]
 mod layout {
-    use super::terms::{HedgeSpec, MatchResult};
+    use super::terms::{hedge_hash, Consent, HedgeSpec, MatchResult};
     use sha2::{Digest, Sha256};
 
     /// The same match as `signing_bytes_are_pinned` in contracts/desk/src/tests.rs: the
     /// enclave's bytes must hash to the desk's pinned value, or the desk would refuse every match.
-    const PINNED_MATCH_HASH: &str = "9dd8983acbabf24f758ab173f0251632dc9d6fe4e9a60b12844e1ff90e1ae47c";
+    const PINNED_MATCH_HASH: &str = "4735ad2e56f565925a38f0edc16b6339821006b06354e2f8551e2baf9f1f613b";
+    /// The shared consent v2 vector (`consent_bytes_are_pinned` in contracts/desk/src/tests.rs,
+    /// "consent bytes are pinned" in packages/protocol/test/protocol.test.ts).
+    const PINNED_HEDGE_HASH: &str = "eac12673ba90754c1390ff2158a0c2da8a758ab9837342a89a75cc6392bf9899";
+    const PINNED_CONSENT_HEDGED: &str = "f0d0c61833ef7c13d51a25431e275de57380f74cf3905b521f9f18875b2ad259";
+    const PINNED_CONSENT_ATOMIC: &str = "c6059f809116681d28c509cc74bd2c26b72159dc24fc4c351aef7b03a2a36156";
+
+    #[test]
+    fn consent_bytes_match_the_desk() {
+        let hedge = HedgeSpec { asset: 3, coin: "BTC".into(), is_buy: false, size: "1.45".into(), limit_px: "60000".into(), deadline_ms: 1_800_000_600_000, testnet: true };
+        let mut c = Consent {
+            desk: "desk.hushd.testnet",
+            rfq_id: 3,
+            terms_hash: [0xab; 32],
+            bond: 5_000_000_000,
+            expires_at_ms: 1_800_000_300_000,
+            class: 1,
+            hedge: Some(&hedge),
+            maker: "maker-a.hushd.testnet",
+        };
+        assert_eq!(hex::encode(hedge_hash(Some(&hedge))), PINNED_HEDGE_HASH);
+        assert_eq!(hex::encode(Sha256::digest(c.bytes())), PINNED_CONSENT_HEDGED);
+        c.class = 0;
+        c.hedge = None;
+        c.bond = 0;
+        assert_eq!(hex::encode(Sha256::digest(c.bytes())), PINNED_CONSENT_ATOMIC);
+    }
 
     #[test]
     fn signing_bytes_match_the_desk() {
@@ -215,6 +261,6 @@ mod layout {
             hedge: Some(HedgeSpec { asset: 3, coin: "BTC".into(), is_buy: false, size: "0.0162".into(), limit_px: "61000".into(), deadline_ms: 1_800_000_600_000, testnet: true }),
             maker_sig: vec![9u8; 64],
         };
-        assert_eq!(hex::encode(Sha256::digest(m.signing_bytes())), PINNED_MATCH_HASH);
+        assert_eq!(hex::encode(Sha256::digest(m.signing_bytes("desk.hushd.testnet"))), PINNED_MATCH_HASH);
     }
 }
