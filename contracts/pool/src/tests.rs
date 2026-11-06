@@ -6,8 +6,8 @@
 
 use super::*;
 use near_sdk::serde_json::{self, Value};
-use near_sdk::test_utils::{accounts, VMContextBuilder};
-use near_sdk::{testing_env, Gas, NearToken};
+use near_sdk::test_utils::{accounts, get_logs, VMContextBuilder};
+use near_sdk::{testing_env, Gas, NearToken, PromiseResult, RuntimeFeesConfig};
 
 const FIXTURE: &str = include_str!("../tests/fixtures.json");
 
@@ -27,18 +27,30 @@ fn proof(v: &Value) -> Proof {
     serde_json::from_value(v["proof"].clone()).unwrap()
 }
 
-fn ctx(predecessor: &str, deposit: NearToken) {
+fn builder(predecessor: &str, deposit: NearToken) -> VMContextBuilder {
     let mut b = VMContextBuilder::new();
     b.current_account_id("pool.test".parse().unwrap())
         .predecessor_account_id(predecessor.parse().unwrap())
         .attached_deposit(deposit)
         .prepaid_gas(Gas::from_tgas(300))
         .block_height(100);
-    testing_env!(b.build());
+    b
 }
 
+fn ctx(predecessor: &str, deposit: NearToken) {
+    testing_env!(builder(predecessor, deposit).build());
+}
+
+/// A callback context with these promise results.
+fn with_results(predecessor: &str, results: Vec<PromiseResult>) {
+    let b = builder(predecessor, NearToken::from_yoctonear(0));
+    testing_env!(b.build(), near_sdk::test_vm_config(), RuntimeFeesConfig::test(), Default::default(), results);
+}
+
+const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
+
 fn limits() -> Limits {
-    Limits { per_deposit: U128(1_000_000), total: U128(10_000_000) }
+    Limits { per_deposit: U128(1_000_000), total: U128(10_000_000), min_deposit: U128(0) }
 }
 
 fn new_pool() -> Pool {
@@ -268,7 +280,7 @@ fn deposits_above_limits_or_unlisted_are_returned() {
 #[test]
 fn paused_deposits_are_returned_but_sends_work() {
     let (mut pool, f) = replay(1);
-    ctx("owner.test", NearToken::from_yoctonear(0));
+    ctx("owner.test", ONE_YOCTO);
     pool.set_deposits_paused(true);
     let back = shield(&mut pool, &f["shieldMaker"]);
     assert_eq!(back.0, 5);
@@ -320,10 +332,10 @@ fn funds_and_volume_proofs_check() {
 #[test]
 fn rule_changes_wait_for_the_timelock() {
     let mut pool = new_pool();
-    ctx("owner.test", NearToken::from_yoctonear(0));
+    ctx("owner.test", ONE_YOCTO);
     let id = pool.propose_change(Change::SetDesk { desk: "desk2.test".parse().unwrap() });
     let mut b = VMContextBuilder::new();
-    b.predecessor_account_id("anyone.test".parse().unwrap()).block_timestamp(10_000);
+    b.predecessor_account_id("anyone.test".parse().unwrap()).attached_deposit(ONE_YOCTO).block_timestamp(10_000);
     testing_env!(b.build());
     pool.apply_change(id);
     assert_eq!(pool.config()["desk"], "desk2.test");
@@ -333,7 +345,7 @@ fn rule_changes_wait_for_the_timelock() {
 #[should_panic(expected = "The timelock has not passed")]
 fn rule_changes_cannot_skip_the_timelock() {
     let mut pool = new_pool();
-    ctx("owner.test", NearToken::from_yoctonear(0));
+    ctx("owner.test", ONE_YOCTO);
     let id = pool.propose_change(Change::SetDesk { desk: "desk2.test".parse().unwrap() });
     pool.apply_change(id);
 }
@@ -349,4 +361,188 @@ fn every_leaf_is_readable_in_order() {
     assert_eq!(leaves[9], field(&f["swap"]["legB"]["commitments"][1]));
     assert_eq!(pool.leaves(U64(8), 100).len(), 2);
     assert!(pool.leaves(U64(50), 10).is_empty());
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn rule_changes_take_one_yocto() {
+    let mut pool = new_pool();
+    ctx("owner.test", NearToken::from_yoctonear(0));
+    pool.propose_change(Change::SetDesk { desk: "desk2.test".parse().unwrap() });
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn pausing_takes_one_yocto() {
+    let mut pool = new_pool();
+    ctx("owner.test", NearToken::from_yoctonear(0));
+    pool.set_deposits_paused(true);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn a_claim_takes_one_yocto() {
+    let mut pool = new_pool();
+    ctx("alice.test", NearToken::from_yoctonear(0));
+    let _ = pool.claim("usdc.sandbox".parse().unwrap());
+}
+
+#[test]
+#[should_panic(expected = "refund_inner must not be zero")]
+fn a_zero_refund_inner_is_refused() {
+    let (mut pool, f) = replay(2);
+    ctx("relayer.test", STORAGE);
+    let usdc = s(&f["tokens"]["usdc"]);
+    let mut ext = cash_out_ext(&f);
+    // None and Some(0) hash alike: without this check a relayer could drop the refund note
+    ext.refund_inner = Some(FieldStr(ZERO));
+    let _ = pool.transact(proof(&f["cashOut"]), transact_args(&f["cashOut"], 30, Some(&usdc), ext));
+}
+
+#[test]
+#[should_panic(expected = "The two outputs are the same note")]
+fn equal_outputs_in_one_transact_are_refused() {
+    let (mut pool, f) = replay(1);
+    ctx("relayer.test", STORAGE);
+    let mut args = transact_args(&f["send"], 0, None, ExtData::default());
+    args.commitments[1] = args.commitments[0];
+    let _ = pool.transact(proof(&f["send"]), args);
+}
+
+#[test]
+#[should_panic(expected = "Two outputs are the same note")]
+fn equal_outputs_in_one_swap_are_refused() {
+    let (mut pool, f) = replay(4);
+    ctx("desk.test", STORAGE);
+    let a = leg(&f["swap"]["legA"]);
+    let mut b = leg(&f["swap"]["legB"]);
+    b.commitments[0] = a.commitments[1];
+    pool.settle_swap(U64(7), [a, b]);
+}
+
+#[test]
+#[should_panic(expected = "This note already exists in the pool")]
+fn a_commitment_already_in_the_tree_is_refused() {
+    let (mut pool, f) = replay(1);
+    // as if the send's payment note had been inserted before (a shield or an earlier move)
+    pool.commitments.insert(field(&f["send"]["commitments"][0]).0);
+    ctx("relayer.test", STORAGE);
+    let _ = pool.transact(proof(&f["send"]), transact_args(&f["send"], 0, None, ExtData::default()));
+}
+
+#[test]
+fn a_shield_of_an_existing_note_is_returned() {
+    let (mut pool, f) = replay(1);
+    let back = shield(&mut pool, &f["shieldAlice"]);
+    assert_eq!(back.0, 100, "the same inner and amount again: the tokens go back");
+    assert!(get_logs().iter().any(|l| l.contains("shield_refused") && l.contains("already exists")));
+    assert_eq!(pool.next_leaf_index().0, 1);
+    assert_eq!(pool.assets().iter().find(|a| a.token.as_str() == "usdc.sandbox").unwrap().held.0, 100);
+}
+
+#[test]
+fn a_refund_note_that_already_exists_is_held_instead() {
+    let (mut pool, f) = replay(1);
+    let usdc: AccountId = s(&f["tokens"]["usdc"]).parse().unwrap();
+    // the refund note for 100 to alice's shield inner is her shield note itself
+    let inner = field(&f["shieldAlice"]["inner"]);
+    with_results("pool.test", vec![PromiseResult::Failed]);
+    pool.on_payout(usdc.clone(), "alice.test".parse().unwrap(), U128(100), None, U128(0), Some(inner));
+    assert_eq!(pool.next_leaf_index().0, 1, "no second leaf with the same commitment");
+    assert_eq!(pool.unclaimed("alice.test".parse().unwrap(), usdc).0, 100);
+}
+
+#[test]
+fn shields_below_the_minimum_are_returned() {
+    ctx("owner.test", NearToken::from_yoctonear(0));
+    let f = fx();
+    let usdc = s(&f["tokens"]["usdc"]);
+    let mut pool = Pool::new(
+        "owner.test".parse().unwrap(),
+        None,
+        U64(1_000),
+        vec![AssetInit { token: usdc.parse().unwrap(), limits: Limits { min_deposit: U128(1_000), ..limits() } }],
+    );
+    ctx(&usdc, NearToken::from_yoctonear(0));
+    let back = pool.ft_on_transfer(accounts(0), U128(999), "{\"inner\":\"5\"}".into());
+    assert!(matches!(back, PromiseOrValue::Value(U128(999))));
+    assert!(get_logs().iter().any(|l| l.contains("Below the minimum deposit")));
+    let back = pool.ft_on_transfer(accounts(0), U128(1_000), "{\"inner\":\"5\"}".into());
+    assert!(matches!(back, PromiseOrValue::Value(U128(0))));
+    assert_eq!(pool.next_leaf_index().0, 1);
+}
+
+#[test]
+fn limits_without_a_minimum_still_parse() {
+    let l: Limits = serde_json::from_str(r#"{"per_deposit":"10","total":"100"}"#).unwrap();
+    assert_eq!(l.min_deposit, U128(0));
+}
+
+#[test]
+#[should_panic(expected = "min_deposit <= per_deposit <= total")]
+fn a_minimum_above_the_per_deposit_limit_is_refused() {
+    ctx("owner.test", NearToken::from_yoctonear(0));
+    Pool::new(
+        "owner.test".parse().unwrap(),
+        None,
+        U64(1_000),
+        vec![AssetInit { token: "usdc.test".parse().unwrap(), limits: Limits { min_deposit: U128(2_000_000), ..limits() } }],
+    );
+}
+
+#[test]
+fn a_payout_that_returns_a_long_value_still_counts_as_paid() {
+    let (mut pool, f) = replay(1);
+    let usdc: AccountId = s(&f["tokens"]["usdc"]).parse().unwrap();
+    with_results("pool.test", vec![PromiseResult::Successful(vec![b'1'; 200])]);
+    pool.on_payout(usdc, "alice.test".parse().unwrap(), U128(29), None, U128(0), Some(field(&f["shieldAlice"]["inner"])));
+    assert!(get_logs().iter().any(|l| l.contains("\"outcome\":\"paid\"")), "{:?}", get_logs());
+    assert_eq!(pool.stats().refunds, 0);
+    assert_eq!(pool.next_leaf_index().0, 1);
+}
+
+/// The receipt proves the note in deal 7's leg A slot 0 (Bob's payment to the maker).
+/// Had that note been the leg's change (slot 1), the same proof must not pass.
+#[test]
+fn a_receipt_only_counts_the_payment_slot() {
+    let (mut pool, f) = replay(5);
+    let r = &f["receipt"];
+    let inputs: Vec<FieldStr> = r["publicSignals"].as_array().unwrap().iter().map(field).collect();
+    let nullifier = field(&f["swap"]["legA"]["nullifiers"][0]).0;
+    let spend = pool.spends.get_mut(&nullifier).unwrap();
+    spend.outputs.swap(0, 1);
+    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None);
+    assert!(check.proof_valid && !check.chain_valid);
+    assert_eq!(check.problems, vec!["The proven note is the payer's change, not the payment".to_string()]);
+    assert!(check.deal_ids.is_empty());
+}
+
+#[test]
+fn a_volume_leg_only_counts_the_payment_slot() {
+    let (mut pool, f) = replay(5);
+    let v = &f["volume"];
+    let inputs: Vec<FieldStr> = v["publicSignals"].as_array().unwrap().iter().map(field).collect();
+    let legs: Vec<[FieldStr; 2]> = v["legs"].as_array().unwrap().iter().map(|l| [field(&l[0]), field(&l[1])]).collect();
+    let spend = pool.spends.get_mut(&legs[0][1].0).unwrap();
+    spend.outputs.swap(0, 1);
+    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(legs));
+    assert!(check.proof_valid && !check.chain_valid);
+    assert!(check.problems.iter().any(|p| p.contains("own change")), "{:?}", check.problems);
+}
+
+#[test]
+fn a_volume_check_with_too_many_legs_stops_early() {
+    let (pool, f) = replay(5);
+    let v = &f["volume"];
+    let inputs: Vec<FieldStr> = v["publicSignals"].as_array().unwrap().iter().map(field).collect();
+    let many: Vec<[FieldStr; 2]> = (0..1_000u128).map(|i| [FieldStr(field::from_u128(i)), FieldStr(field::from_u128(i))]).collect();
+    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(many));
+    assert!(check.proof_valid && !check.chain_valid);
+    assert_eq!(check.problems, vec!["A volume proof covers at most 16 legs".to_string()]);
+}
+
+#[test]
+fn leaves_past_the_end_are_empty() {
+    let (pool, _) = replay(1);
+    assert!(pool.leaves(U64(u64::MAX), 1_000).is_empty());
 }

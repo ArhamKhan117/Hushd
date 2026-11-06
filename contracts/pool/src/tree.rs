@@ -3,6 +3,10 @@
 //! parent = Poseidon(left, right); empty leaves are 0 and an empty subtree of
 //! height h is zeros[h] = Poseidon(zeros[h-1], zeros[h-1]). Proofs may name any of
 //! the last `ROOT_HISTORY` roots, so a proof made a few blocks ago still lands.
+//!
+//! There are no tree epochs: once all 2^20 leaves are used the pool takes no new
+//! notes (spends of existing notes still need a free pair of leaves). A full pool is
+//! replaced by a new deployment; `min_deposit` keeps dust from filling it early.
 
 use crate::field::{Field, ZERO};
 use crate::poseidon::Hasher;
@@ -60,7 +64,7 @@ impl Tree {
         let mut node = leaf;
         let mut i = index;
         for level in 0..LEVELS {
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 self.filled[level] = node;
                 node = h.hash2(&node, &self.zeros[level]);
             } else {
@@ -87,7 +91,7 @@ impl Tree {
         let mut node = h.hash2(&left, &right);
         let mut i = index / 2;
         for level in 1..LEVELS {
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 self.filled[level] = node;
                 node = h.hash2(&node, &self.zeros[level]);
             } else {

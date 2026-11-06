@@ -86,10 +86,10 @@ pub fn g2(p: &[Vec<String>]) -> Option<G2> {
     if p.len() < 2 || p[0].len() != 2 || p[1].len() != 2 {
         return None;
     }
-    if let Some(z) = p.get(2) {
-        if z.len() != 2 || z[0] != "1" || z[1] != "0" {
-            return None;
-        }
+    if let Some(z) = p.get(2)
+        && (z.len() != 2 || z[0] != "1" || z[1] != "0")
+    {
+        return None;
     }
     let mut out = [0u8; 128];
     out[..32].copy_from_slice(&coord(&p[0][0])?);

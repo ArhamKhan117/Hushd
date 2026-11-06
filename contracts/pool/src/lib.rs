@@ -26,10 +26,10 @@ use groth16::Proof;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::Deserialize;
-use near_sdk::store::{IterableMap, LookupMap, Vector};
+use near_sdk::store::{IterableMap, LookupMap, LookupSet, Vector};
 use near_sdk::{
-    env, ext_contract, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault,
-    Promise, PromiseOrValue,
+    assert_one_yocto, env, ext_contract, near, require, AccountId, BorshStorageKey, Gas, NearToken,
+    PanicOnDefault, Promise, PromiseError, PromiseOrValue,
 };
 use poseidon::Hasher;
 use tree::Tree;
@@ -40,6 +40,10 @@ const GAS_ON_PAYOUT: Gas = Gas::from_tgas(50);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 /// Amounts are below 2^128 in the circuits; u128 already guarantees it.
 const MAX_MEMO: usize = 256;
+/// A volume proof covers at most this many legs (the circuit's slots).
+const MAX_LEGS: usize = 16;
+/// Where a spend's payment sits in its outputs: see `Spend`.
+const PAID_SLOT: usize = 0;
 
 #[near(serializers = [borsh])]
 #[derive(BorshStorageKey)]
@@ -50,6 +54,7 @@ enum Key {
     Pending,
     Unclaimed,
     Leaves,
+    Commitments,
 }
 
 #[near(serializers = [borsh, json])]
@@ -57,6 +62,9 @@ enum Key {
 pub struct Limits {
     pub per_deposit: U128,
     pub total: U128,
+    /// The smallest shield taken, so the tree cannot be filled with dust (0: any nonzero amount).
+    #[serde(default)]
+    pub min_deposit: U128,
 }
 
 #[near(serializers = [borsh])]
@@ -85,6 +93,9 @@ pub struct AssetInit {
 /// was a leg of an OTC settlement. Readers of disclosure proofs check against it.
 #[near(serializers = [borsh])]
 pub struct Spend {
+    /// `[paid, change]`: slot 0 (`PAID_SLOT`) is the note made for the other side (the
+    /// payment of a `transact`, the counterparty's note of a swap leg), slot 1 the
+    /// spender's own change. Receipt and volume proofs only count slot 0.
     pub outputs: [Field; 2],
     pub deal: Option<u64>,
     pub block: u64,
@@ -140,6 +151,10 @@ pub struct ExtData {
 impl ExtData {
     /// "hushd.ext.v1" ‖ len ‖ recipient ‖ len ‖ relayer ‖ fee (u128 LE) ‖ refund_inner (32, BE)
     /// ‖ memo length (u32 LE) ‖ memo, hashed with sha256 and cut to 248 bits.
+    ///
+    /// No refund note and a zero `refund_inner` encode alike, so `transact` refuses a zero one.
+    /// The pool's own account is not part of it: a proof is bound to this pool only through
+    /// its root (kept as is, the circuits do not change).
     pub fn hash(&self) -> Field {
         let mut b = b"hushd.ext.v1".to_vec();
         for a in [&self.recipient, &self.relayer] {
@@ -249,6 +264,8 @@ pub struct Pool {
     unclaimed: LookupMap<(AccountId, AccountId), u128>,
     /// Every leaf in order, so any wallet can rebuild the tree from RPC alone.
     leaves: Vector<Field>,
+    /// Every commitment ever inserted: two equal notes would share one nullifier.
+    commitments: LookupSet<Field>,
     stats: Stats,
 }
 
@@ -270,6 +287,7 @@ impl Pool {
             next_change: 0,
             unclaimed: LookupMap::new(Key::Unclaimed),
             leaves: Vector::new(Key::Leaves),
+            commitments: LookupSet::new(Key::Commitments),
             stats: Stats::default(),
         };
         for a in assets {
@@ -290,6 +308,7 @@ impl Pool {
         if let Some(m) = &ext.memo {
             require!(m.len() <= MAX_MEMO, "Memo too long");
         }
+        require!(ext.refund_inner.is_none_or(|f| f.0 != ZERO), "refund_inner must not be zero");
 
         let token_field = if public_amount == 0 {
             require!(args.token.is_none() && ext.recipient.is_none(), "A private send names no token and no recipient");
@@ -307,6 +326,7 @@ impl Pool {
 
         let [n0, n1] = args.nullifiers.map(|f| f.0);
         let [c0, c1] = args.commitments.map(|f| f.0);
+        require!(c0 != c1, "The two outputs are the same note");
         self.check_spendable(&args.root.0, &[n0, n1]);
 
         let inputs = [args.root.0, n0, n1, c0, c1, field::from_u128(public_amount), token_field, ext.hash()];
@@ -384,9 +404,11 @@ impl Pool {
         let nullifiers = [a.nullifiers[0].0, a.nullifiers[1].0, b.nullifiers[0].0, b.nullifiers[1].0];
         self.check_spendable(&a.root.0, &nullifiers[..2]);
         self.check_spendable(&b.root.0, &nullifiers[2..]);
+        let outputs = [a_out[0], a_out[1], b_out[0], b_out[1]];
         for i in 0..4 {
             for j in (i + 1)..4 {
                 require!(nullifiers[i] != nullifiers[j], "A note appears twice");
+                require!(outputs[i] != outputs[j], "Two outputs are the same note");
             }
         }
 
@@ -409,7 +431,7 @@ impl Pool {
         events::swap(events::Swap {
             deal_id,
             nullifiers: nullifiers.map(FieldStr),
-            commitments: [a_out[0], a_out[1], b_out[0], b_out[1]].map(FieldStr),
+            commitments: outputs.map(FieldStr),
             leaf_index: U64(leaf_index),
             root: FieldStr(root),
         });
@@ -427,8 +449,7 @@ impl Pool {
         fee: U128,
         refund_inner: Option<FieldStr>,
     ) {
-        let paid = matches!(env::promise_result_checked(0, 64), Ok(_));
-        if paid {
+        if promise_ok(0) {
             events::payout(events::Payout {
                 token: &token,
                 to: &recipient,
@@ -442,7 +463,7 @@ impl Pool {
             self.refund(&token, &recipient, amount.0, refund_inner);
         }
         if fee.0 > 0 {
-            let fee_paid = env::promise_results_count() > 1 && matches!(env::promise_result_checked(1, 64), Ok(_));
+            let fee_paid = env::promise_results_count() > 1 && promise_ok(1);
             if !fee_paid {
                 // The relayer can claim it later; it never goes back into a note.
                 let relayer = relayer.unwrap();
@@ -452,7 +473,10 @@ impl Pool {
     }
 
     /// Claim tokens the pool could not pay out (only when no refund note was given).
+    /// Attach 1 yoctoNEAR.
+    #[payable]
     pub fn claim(&mut self, token: AccountId) -> Promise {
+        assert_one_yocto();
         let account = env::predecessor_account_id();
         let key = (account.clone(), token.clone());
         let amount = self.unclaimed.remove(&key).unwrap_or(0);
@@ -466,14 +490,17 @@ impl Pool {
 
     #[private]
     pub fn on_claim(&mut self, token: AccountId, account: AccountId, amount: U128) {
-        if env::promise_result_checked(0, 64).is_err() {
+        if !promise_ok(0) {
             self.hold(&token, &account, amount.0);
         }
     }
 
     // ---------- rules ----------
+    // Every rule call takes exactly 1 yoctoNEAR, so only a full-access key can send it.
 
+    #[payable]
     pub fn propose_change(&mut self, change: Change) -> U64 {
+        assert_one_yocto();
         self.assert_owner();
         let id = self.next_change;
         self.next_change += 1;
@@ -483,20 +510,25 @@ impl Pool {
         U64(id)
     }
 
+    #[payable]
     pub fn cancel_change(&mut self, id: U64) {
+        assert_one_yocto();
         self.assert_owner();
         let p = self.pending.remove(&id.0).unwrap_or_else(|| env::panic_str("No such change"));
         events::rule_change(events::RuleChange { id, status: "cancelled", apply_after_ns: p.apply_after_ns, change: &p.change });
     }
 
     /// Anyone may apply a change once its timelock has passed.
+    #[payable]
     pub fn apply_change(&mut self, id: U64) {
+        assert_one_yocto();
         let p = self.pending.get(&id.0).cloned().unwrap_or_else(|| env::panic_str("No such change"));
         require!(env::block_timestamp() >= p.apply_after_ns.0, "The timelock has not passed");
         self.pending.remove(&id.0);
         match p.change.clone() {
             Change::AddAsset { token, limits } => self.add_asset(token, limits),
             Change::SetLimits { token, limits } => {
+                check_limits(&limits);
                 self.assets.get_mut(&token).unwrap_or_else(|| env::panic_str("Unknown token")).limits = limits
             }
             Change::SetDesk { desk } => self.desk = Some(desk),
@@ -506,7 +538,9 @@ impl Pool {
     }
 
     /// Stop or restart new deposits. Cash outs and sends always work.
+    #[payable]
     pub fn set_deposits_paused(&mut self, paused: bool) {
+        assert_one_yocto();
         self.assert_owner();
         self.deposits_paused = paused;
         events::deposits_paused(paused);
@@ -532,7 +566,7 @@ impl Pool {
 
     /// Leaves from `from_index`, at most `limit` (up to 1000), in tree order.
     pub fn leaves(&self, from_index: U64, limit: u32) -> Vec<FieldStr> {
-        let end = (from_index.0 + limit.min(1000) as u64).min(self.leaves.len() as u64);
+        let end = from_index.0.saturating_add(limit.min(1000) as u64).min(self.leaves.len() as u64);
         (from_index.0..end).filter_map(|i| self.leaves.get(i as u32).copied().map(FieldStr)).collect()
     }
 
@@ -608,7 +642,8 @@ impl Pool {
                 "receipt" => {
                     let (commitment, nullifier) = (inputs[0], inputs[1]);
                     match self.spends.get(&nullifier) {
-                        Some(s) if s.outputs.contains(&commitment) => deal_ids.push(s.deal.map(U64)),
+                        Some(s) if s.outputs[PAID_SLOT] == commitment => deal_ids.push(s.deal.map(U64)),
+                        Some(s) if s.outputs.contains(&commitment) => problems.push("The proven note is the payer's change, not the payment".into()),
                         Some(_) => problems.push("The paying note was spent, but not into this note".into()),
                         None => problems.push("The paying note was never spent in the pool".into()),
                     }
@@ -629,13 +664,17 @@ impl Pool {
                 }
                 "volume" => {
                     let legs = legs.unwrap_or_default();
+                    if legs.len() > MAX_LEGS {
+                        problems.push(format!("A volume proof covers at most {MAX_LEGS} legs"));
+                        return DisclosureCheck { proof_valid, chain_valid: false, problems, token, deal_ids };
+                    }
                     let mut h = Hasher::new();
                     let mut acc = ZERO;
                     let count = u64::from_be_bytes(inputs[2][24..].try_into().unwrap());
-                    if legs.len() as u64 != count || legs.len() > 16 {
+                    if legs.len() as u64 != count {
                         problems.push("The list of legs does not match the count".into());
                     }
-                    for i in 0..16 {
+                    for i in 0..MAX_LEGS {
                         let (c, n) = legs.get(i).map(|l| (l[0].0, l[1].0)).unwrap_or((ZERO, ZERO));
                         acc = h.hash3(&acc, &c, &n);
                     }
@@ -647,8 +686,9 @@ impl Pool {
                             problems.push("A leg is counted twice".into());
                         }
                         match self.spends.get(&l[1].0) {
-                            Some(s) if s.outputs.contains(&l[0].0) && s.deal.is_some() => deal_ids.push(s.deal.map(U64)),
-                            Some(s) if s.outputs.contains(&l[0].0) => problems.push("A leg is a payment, not a desk settlement".into()),
+                            Some(s) if s.outputs[PAID_SLOT] == l[0].0 && s.deal.is_some() => deal_ids.push(s.deal.map(U64)),
+                            Some(s) if s.outputs[PAID_SLOT] == l[0].0 => problems.push("A leg is a payment, not a desk settlement".into()),
+                            Some(s) if s.outputs.contains(&l[0].0) => problems.push("A leg counts the maker's own change".into()),
                             _ => problems.push("A leg was never settled in the pool".into()),
                         }
                     }
@@ -661,13 +701,16 @@ impl Pool {
 
     // ---------- internals ----------
 
+    /// Every leaf goes in through these two: a commitment already in the tree is refused.
     fn insert(&mut self, leaf: Field, h: &mut Hasher) -> u64 {
+        require!(self.commitments.insert(leaf), "This note already exists in the pool");
         let i = self.tree.insert(leaf, h);
         self.leaves.push(leaf);
         i
     }
 
     fn insert_pair(&mut self, a: Field, b: Field, h: &mut Hasher) -> u64 {
+        require!(self.commitments.insert(a) && self.commitments.insert(b), "This note already exists in the pool");
         let i = self.tree.insert_pair(a, b, h);
         self.leaves.push(a);
         self.leaves.push(b);
@@ -680,6 +723,7 @@ impl Pool {
 
     fn add_asset(&mut self, token: AccountId, limits: Limits) {
         require!(!self.assets.contains_key(&token), "Token already listed");
+        check_limits(&limits);
         let f = field::asset_field(token.as_str());
         self.token_by_field.insert(f, token.clone());
         self.assets.insert(token, Asset { field: f, limits, held: 0 });
@@ -709,10 +753,14 @@ impl Pool {
 
     fn refund(&mut self, token: &AccountId, recipient: &AccountId, amount: u128, refund_inner: Option<FieldStr>) {
         self.stats.refunds += 1;
-        match (refund_inner, self.assets.get(token).map(|a| a.field)) {
-            (Some(inner), Some(asset)) => {
-                let mut h = Hasher::new();
-                let commitment = h.hash3(&inner.0, &field::from_u128(amount), &asset);
+        let mut h = Hasher::new();
+        let note = match (refund_inner, self.assets.get(token).map(|a| a.field)) {
+            (Some(inner), Some(asset)) => Some(h.hash3(&inner.0, &field::from_u128(amount), &asset)),
+            _ => None,
+        };
+        match note {
+            // a refund note equal to one already in the tree would share its nullifier: hold it instead
+            Some(commitment) if !self.commitments.contains(&commitment) => {
                 let leaf_index = self.insert(commitment, &mut h);
                 self.assets.get_mut(token).unwrap().held += amount;
                 events::payout(events::Payout {
@@ -752,6 +800,9 @@ impl Pool {
         if amount == 0 {
             return Err("Nothing to deposit");
         }
+        if amount < asset.limits.min_deposit.0 {
+            return Err("Below the minimum deposit");
+        }
         if amount > asset.limits.per_deposit.0 {
             return Err("Above the per-deposit limit");
         }
@@ -765,11 +816,24 @@ impl Pool {
         let asset_field = asset.field;
         let mut h = Hasher::new();
         let commitment = h.hash3(&parsed.inner.0, &field::from_u128(amount), &asset_field);
+        if self.commitments.contains(&commitment) {
+            return Err("This note already exists in the pool; use a fresh blinding");
+        }
         let leaf_index = self.insert(commitment, &mut h);
         self.assets.get_mut(token).unwrap().held += amount;
         self.stats.shields += 1;
         Ok((leaf_index, commitment))
     }
+}
+
+/// A promise result counts as failed only when it failed: a success with an unexpected
+/// (long) value is still a success.
+fn promise_ok(index: u64) -> bool {
+    !matches!(env::promise_result_checked(index, 0), Err(PromiseError::Failed))
+}
+
+fn check_limits(l: &Limits) {
+    require!(l.min_deposit.0 <= l.per_deposit.0 && l.per_deposit.0 <= l.total.0, "Limits must be min_deposit <= per_deposit <= total");
 }
 
 #[near]
