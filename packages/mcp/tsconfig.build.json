@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@hushd/sdk": [
+        "../sdk/dist/index.d.ts"
+      ],
+      "@hushd/sdk/node": [
+        "../sdk/dist/node.d.ts"
+      ],
+      "@hushd/protocol": [
+        "../protocol/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ]
+}

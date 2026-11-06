@@ -13,7 +13,9 @@
     "./tools": "./src/tools.ts"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -36,5 +38,33 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArhamKhan117/hushd.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://hushd.net",
+  "bugs": "https://github.com/ArhamKhan117/hushd/issues",
+  "keywords": [
+    "mcp",
+    "near",
+    "agents",
+    "x402",
+    "otc",
+    "privacy"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./tools": {
+        "types": "./dist/tools.d.ts",
+        "default": "./dist/tools.js"
+      }
+    }
   }
 }
