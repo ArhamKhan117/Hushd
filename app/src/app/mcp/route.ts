@@ -1,9 +1,10 @@
 /**
  * The hosted Hushd MCP server (Streamable HTTP, stateless): read tools only. It holds
- * no keys; an agent that pays or trades runs `npx @hushd/mcp` with its own seed.
+ * no keys; an agent that pays or trades runs the MCP server from a checkout of the repo
+ * (`pnpm mcp`) with its own seed.
  */
 import { createServer } from "@hushd/mcp";
-import type { ProofKind } from "@hushd/sdk";
+import { singleThreadCurve, type ProofKind } from "@hushd/sdk";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { NETWORK } from "@/lib/hushd/config";
 
@@ -17,6 +18,7 @@ async function handle(req: Request): Promise<Response> {
     if (!vkeys.has(kind)) vkeys.set(kind, await (await fetch(new URL(`/circuits/${kind}.vkey.json`, req.url))).json());
     return vkeys.get(kind);
   };
+  await singleThreadCurve();
   const server = createServer({ net: NETWORK, vkey });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);

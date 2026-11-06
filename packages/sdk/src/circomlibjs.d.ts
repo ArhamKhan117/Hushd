@@ -22,3 +22,5 @@ declare module "snarkjs" {
     curve?: string;
   }
 }
+
+declare module "ffjavascript";

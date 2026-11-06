@@ -53,7 +53,12 @@ export function encodeProof(p: ReaderProof): string {
 export function decodeProof(s: string): ReaderProof {
   const t = s.trim();
   if (!t.startsWith(PREFIX)) throw new Error("not a Hushd proof");
-  const p = JSON.parse(b64url.dec(t.slice(PREFIX.length))) as ReaderProof;
+  let p: ReaderProof;
+  try {
+    p = JSON.parse(b64url.dec(t.slice(PREFIX.length))) as ReaderProof;
+  } catch {
+    throw new Error("not a complete Hushd proof: check that the whole text was copied");
+  }
   if (p.v !== 1 || !["receipt", "funds", "volume"].includes(p.kind)) throw new Error("unknown proof version or kind");
   return p;
 }
@@ -212,4 +217,17 @@ export async function verifyProof(net: HushdNetwork, p: ReaderProof, vkey: unkno
     shows.push(`Delivered exactly ${sig[1]} (base units) across ${sig[2]} desk deal legs`);
   }
   return { ok: problems.length === 0, shows: problems.length === 0 ? shows : [], problems, ...(chain ? { chain } : {}) };
+}
+
+/**
+ * Verify on one thread: servers that bundle the SDK (a Next route, a function) cannot start
+ * snarkjs's worker threads, and a verify would wait for them forever. Call once before
+ * `verifyProof` there; browsers and plain Node do not need it.
+ */
+export async function singleThreadCurve(): Promise<void> {
+  const g = globalThis as { curve_bn128?: unknown };
+  if (g.curve_bn128) return;
+  const { buildBn128 } = (await import("ffjavascript")) as unknown as { buildBn128: (singleThread: boolean) => Promise<unknown> };
+  // snarkjs builds its curve through ffjavascript, which hands back this cached one
+  g.curve_bn128 = await buildBn128(true);
 }

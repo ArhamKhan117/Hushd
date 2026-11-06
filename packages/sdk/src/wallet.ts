@@ -249,15 +249,22 @@ export class PrivateWallet {
   }
 
   private async ensureCovered(token: string, amount: bigint): Promise<Note[]> {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 12; i++) {
       const picked = this.select(token, amount);
       if (picked) return picked;
       const total = this.spendable(token).reduce((s, n) => s + n.amount, 0n);
-      if (total < amount) throw new Error("not enough in your private balance");
+      if (total < amount) {
+        // change from a payment a moment ago is still landing: wait for it rather than refuse
+        const landing = this.pending().filter((n) => n.token === token).reduce((s, n) => s + n.amount, 0n);
+        if (total + landing < amount) throw new Error("not enough in your private balance");
+        await new Promise((r) => setTimeout(r, 2_500));
+        await this.sync();
+        continue;
+      }
       await this.consolidate(token);
       await this.sync();
     }
-    throw new Error("could not gather enough notes");
+    throw new Error("your notes are still landing in the pool; try again in a moment");
   }
 
   /** Mark inputs spent, track own outputs and post them to self for recovery. */

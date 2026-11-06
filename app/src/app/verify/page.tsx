@@ -17,8 +17,32 @@ function amountWords(p: ReaderProof, line: string) {
   return line.replace(/(\d+) \(base units\)/, (_m, n: string) => `${fmt(p.token, BigInt(n))} ${symbol(p.token)}`);
 }
 
+const NOT_A_PROOF = "This is not a complete Hushd proof. Check that the whole link or text was copied.";
+
+/** The proof in a hushdproof1… string, or null when it does not decode to one with every field in place. */
+function decode(raw: string): ReaderProof | null {
+  try {
+    const p = decodeProof(raw);
+    const complete =
+      typeof p.network === "string" &&
+      typeof p.pool === "string" &&
+      typeof p.reader === "string" &&
+      typeof p.token === "string" &&
+      typeof p.expiresAtMs === "number" &&
+      typeof p.proof === "object" &&
+      p.proof !== null &&
+      [p.proof.pi_a, p.proof.pi_b, p.proof.pi_c].every(Array.isArray) &&
+      Array.isArray(p.publicSignals) &&
+      p.publicSignals.every((x) => typeof x === "string");
+    return complete ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 async function runCheck(raw: string, asReader: string) {
-  const p = decodeProof(raw);
+  const p = decode(raw);
+  if (!p) throw new Error(NOT_A_PROOF);
   const vkey = await (await fetch(`${CIRCUITS_BASE}/${p.kind}.vkey.json`)).json();
   return { proof: p, verdict: await verifyProof(NETWORK, p, vkey, asReader ? { asReader } : {}) };
 }
@@ -29,12 +53,7 @@ function subscribeHash(onChange: () => void) {
 }
 
 function readerOf(raw: string | null): string | null {
-  if (!raw) return null;
-  try {
-    return decodeProof(raw).reader;
-  } catch {
-    return null;
-  }
+  return raw ? (decode(raw)?.reader ?? null) : null;
 }
 
 export default function VerifyPage() {
@@ -52,6 +71,8 @@ export default function VerifyPage() {
   const [error, setError] = useState<string | null>(null);
   // a linked proof is being checked until its verdict or an error arrives
   const working = busy || (Boolean(linked && linkedReader) && !verdict && !error && typed === null);
+  // a link whose proof does not decode says so at once, before anyone presses Check
+  const shownError = error ?? (linked && !linkedReader && typed === null && !busy ? NOT_A_PROOF : null);
 
   const check = async (raw: string, asReader: string) => {
     setBusy(true);
@@ -89,7 +110,7 @@ export default function VerifyPage() {
   return (
     <div className="relative flex min-h-screen flex-col bg-panel text-foreground">
       <Header />
-      <main id="main" className="mx-auto grid w-full max-w-[760px] gap-6 px-5 pb-20 pt-10 sm:pt-16">
+      <main id="main" className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)] gap-6 px-5 pb-20 pt-10 sm:pt-16">
         <div>
           <p className="t-label">Proof checker</p>
           <h1 className="t-display-m mt-3">Check a Hushd proof</h1>
@@ -115,7 +136,7 @@ export default function VerifyPage() {
             Check
           </BusyLabel>
         </button>
-        <ErrorLine error={error} />
+        <ErrorLine error={shownError} />
 
         {proof && verdict && (
           <section className={`hd-card grid gap-4 p-5 sm:p-6 ${verdict.ok ? "" : "border-danger/40"}`} aria-live="polite">
@@ -140,7 +161,7 @@ export default function VerifyPage() {
                 ))}
               </ul>
             )}
-            <dl className="grid gap-1 border-t border-line pt-4 text-[13px] text-mute">
+            <dl className="grid gap-1 break-words border-t border-line pt-4 text-[13px] text-mute">
               <div>
                 <dt className="inline">Made for: </dt>
                 <dd className="inline text-soft">{proof.reader}</dd>
