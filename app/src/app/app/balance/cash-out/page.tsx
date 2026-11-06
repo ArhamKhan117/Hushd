@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { AmountCard, ErrorLine, Field, TxLine } from "@/components/app/forms";
 import { SignInPanel } from "@/components/app/SignInPanel";
@@ -12,16 +12,14 @@ const isAccount = (s: string) => /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a
 
 export default function CashOutPage() {
   const s = useHushd();
-  const [to, setTo] = useState("");
+  // the recipient defaults to your own account until you type another
+  const [typedTo, setTo] = useState<string | null>(null);
+  const to = typedTo ?? s.accountId ?? "";
   const [token, setToken] = useState(TOKENS[0]!.id);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ hash: string; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (s.accountId && !to) setTo(s.accountId);
-  }, [s.accountId, to]);
 
   const amount = parseAmount(token, input);
   const have = s.balances.get(token) ?? 0n;

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
@@ -62,7 +63,7 @@ export default function ReceivePage() {
             </div>
           </div>
           <div className="hd-panel grid place-items-center p-6">
-            {qr ? <img src={qr} alt="QR code of your receive address" width={260} height={260} className="rounded-xl" /> : <div className="hd-skeleton h-[260px] w-[260px] rounded-xl" />}
+            {qr ? <Image src={qr} alt="QR code of your receive address" width={260} height={260} unoptimized className="rounded-xl" /> : <div className="hd-skeleton h-[260px] w-[260px] rounded-xl" />}
             <p className="mt-3 text-center text-[12.5px] text-mute">Scan to get the receive address.</p>
           </div>
         </div>

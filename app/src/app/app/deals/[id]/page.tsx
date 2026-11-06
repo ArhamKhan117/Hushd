@@ -53,6 +53,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+/** The desk's record of a deal, its indexed events and its maker's name. */
+async function fetchDeal(dealId: number) {
+  const [deal, makers, ev] = await Promise.all([
+    deskView.deal(NETWORK, dealId),
+    deskView.makers(NETWORK),
+    fetch(`${NETWORK.api}/v1/deals/${dealId}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ events: DealEvent[] }>) : { events: [] }))
+      .catch(() => ({ events: [] as DealEvent[] })),
+  ]);
+  return { deal, events: ev.events, makerName: deal ? (makers.find(([acc]) => acc === deal.maker)?.[1].name ?? null) : null };
+}
+
 export default function DealPage() {
   const { id } = useParams<{ id: string }>();
   const dealId = Number(id);
@@ -64,32 +76,40 @@ export default function DealPage() {
   const [closing, setClosing] = useState(false);
   const [closed, setClosed] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [d, makers, ev] = await Promise.all([
-        deskView.deal(NETWORK, dealId),
-        deskView.makers(NETWORK),
-        fetch(`${NETWORK.api}/v1/deals/${dealId}`)
-          .then((r) => (r.ok ? (r.json() as Promise<{ events: DealEvent[] }>) : { events: [] }))
-          .catch(() => ({ events: [] as DealEvent[] })),
-      ]);
-      setDeal(d);
-      setEvents(ev.events);
-      if (d) setMakerName(makers.find(([acc]) => acc === d.maker)?.[1].name ?? null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [dealId]);
+  const load = useCallback(
+    () =>
+      fetchDeal(dealId).then(
+        (r) => {
+          setDeal(r.deal);
+          setEvents(r.events);
+          setMakerName(r.makerName);
+        },
+        (e: Error) => setError(e.message),
+      ),
+    [dealId],
+  );
 
+  const validId = Number.isInteger(dealId) && dealId >= 0;
   useEffect(() => {
-    if (!Number.isInteger(dealId) || dealId < 0) {
-      setDeal(null);
-      return;
-    }
-    void load();
-    const t = setInterval(load, 10_000);
-    return () => clearInterval(t);
-  }, [dealId, load]);
+    if (!validId) return;
+    let live = true;
+    const tick = () =>
+      fetchDeal(dealId).then(
+        (r) => {
+          if (!live) return;
+          setDeal(r.deal);
+          setEvents(r.events);
+          setMakerName(r.makerName);
+        },
+        (e: Error) => live && setError(e.message),
+      );
+    void tick();
+    const t = setInterval(tick, 10_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [validId, dealId]);
 
   const mine = s.wallet?.deals().find((d) => d.dealId === dealId);
   const canClose = Boolean(mine?.refundBlinding && deal?.hedge && deal.status === "closed" && deal.hedge_orders === 1 && deal.receipt?.outcome === "settled");
@@ -117,8 +137,8 @@ export default function DealPage() {
         <Link href="/app/deals" className="text-[13px] text-mute hover:text-foreground">
           ← All deals
         </Link>
-        {deal === undefined && !error && <div className="hd-skeleton h-48" />}
-        {deal === null && <p className="text-[14px] text-mute">The desk has no deal #{id}.</p>}
+        {validId && deal === undefined && !error && <div className="hd-skeleton h-48" />}
+        {(!validId || deal === null) && <p className="text-[14px] text-mute">The desk has no deal #{id}.</p>}
         {deal && st && (
           <>
             {mine && (

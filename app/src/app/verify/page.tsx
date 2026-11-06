@@ -1,7 +1,8 @@
 "use client";
 
 import { decodeProof, verifyProof, type ReaderProof, type Verdict } from "@hushd/sdk";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ErrorLine, Field } from "@/components/app/forms";
 import { BusyLabel } from "@/components/ui/Spinner";
@@ -16,43 +17,74 @@ function amountWords(p: ReaderProof, line: string) {
   return line.replace(/(\d+) \(base units\)/, (_m, n: string) => `${fmt(p.token, BigInt(n))} ${symbol(p.token)}`);
 }
 
+async function runCheck(raw: string, asReader: string) {
+  const p = decodeProof(raw);
+  const vkey = await (await fetch(`${CIRCUITS_BASE}/${p.kind}.vkey.json`)).json();
+  return { proof: p, verdict: await verifyProof(NETWORK, p, vkey, asReader ? { asReader } : {}) };
+}
+
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+function readerOf(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    return decodeProof(raw).reader;
+  } catch {
+    return null;
+  }
+}
+
 export default function VerifyPage() {
-  const [input, setInput] = useState("");
-  const [me, setMe] = useState("");
+  // a link carries the proof in the fragment (#p=…), which never reaches a server
+  const hash = useSyncExternalStore(subscribeHash, () => location.hash, () => "");
+  const linked = new URLSearchParams(hash.slice(1)).get("p");
+  const linkedReader = readerOf(linked);
+  const [typed, setInput] = useState<string | null>(null);
+  const [typedMe, setMe] = useState<string | null>(null);
+  const input = typed ?? linked ?? "";
+  const me = typedMe ?? linkedReader ?? "";
   const [proof, setProof] = useState<ReaderProof | null>(null);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a linked proof is being checked until its verdict or an error arrives
+  const working = busy || (Boolean(linked && linkedReader) && !verdict && !error && typed === null);
 
-  const check = useCallback(async (raw: string, asReader: string) => {
+  const check = async (raw: string, asReader: string) => {
     setBusy(true);
     setError(null);
     setVerdict(null);
     try {
-      const p = decodeProof(raw);
-      setProof(p);
-      const vkey = await (await fetch(`${CIRCUITS_BASE}/${p.kind}.vkey.json`)).json();
-      setVerdict(await verifyProof(NETWORK, p, vkey, asReader ? { asReader } : {}));
+      const r = await runCheck(raw, asReader);
+      setProof(r.proof);
+      setVerdict(r.verdict);
     } catch (e) {
       setProof(null);
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, []);
+  };
 
+  // check a linked proof once, as its own reader
   useEffect(() => {
-    const p = new URLSearchParams(location.hash.slice(1)).get("p");
-    if (!p) return;
-    setInput(p);
-    try {
-      const d = decodeProof(p);
-      setMe(d.reader);
-      void check(p, d.reader);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [check]);
+    if (!linked || !linkedReader) return;
+    let live = true;
+    runCheck(linked, linkedReader).then(
+      (r) => {
+        if (!live) return;
+        setProof(r.proof);
+        setVerdict(r.verdict);
+      },
+      (e: Error) => live && setError(e.message),
+    );
+    return () => {
+      live = false;
+    };
+  }, [linked, linkedReader]);
 
   return (
     <div className="relative flex min-h-screen flex-col bg-panel text-foreground">
@@ -78,8 +110,8 @@ export default function VerifyPage() {
         <Field label="You are (NEAR account)" hint="A proof made for someone else is shown as such, never quietly accepted.">
           <input className="hd-input w-full" placeholder="auditor.testnet" value={me} onChange={(e) => setMe(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
         </Field>
-        <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!input || busy} onClick={() => void check(input, me.trim())} aria-busy={busy}>
-          <BusyLabel busy={busy} busyText="Checking in your browser and on chain…">
+        <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!input || working} onClick={() => void check(input, me.trim())} aria-busy={working}>
+          <BusyLabel busy={working} busyText="Checking in your browser and on chain…">
             Check
           </BusyLabel>
         </button>
@@ -139,6 +171,7 @@ export default function VerifyPage() {
           </section>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

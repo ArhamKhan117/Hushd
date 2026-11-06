@@ -1,7 +1,7 @@
 "use client";
 
 import { isAddress } from "@hushd/sdk";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { AmountCard, ErrorLine, Field, TxLine } from "@/components/app/forms";
 import { SignInPanel } from "@/components/app/SignInPanel";
@@ -9,25 +9,30 @@ import { BusyLabel } from "@/components/ui/Spinner";
 import { fmt, parseAmount, symbol, TOKENS } from "@/lib/hushd/format";
 import { useHushd } from "@/lib/hushd/session";
 
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
 export default function SendPage() {
   const s = useHushd();
-  const [to, setTo] = useState("");
-  const [token, setToken] = useState(TOKENS[0]!.id);
-  const [input, setInput] = useState("");
-  const [memo, setMemo] = useState("");
+  // A payment request link fills the form: /app/balance/send#to=…&token=…&amount=…
+  const hash = useSyncExternalStore(subscribeHash, () => location.hash, () => "");
+  const link = new URLSearchParams(hash.slice(1));
+  const linkToken = TOKENS.some((t) => t.id === link.get("token")) ? link.get("token")! : null;
+  const [typedTo, setTo] = useState<string | null>(null);
+  const [typedToken, setToken] = useState<string | null>(null);
+  const [typedInput, setInput] = useState<string | null>(null);
+  const [typedMemo, setMemo] = useState<string | null>(null);
+  const to = typedTo ?? link.get("to") ?? "";
+  const token = typedToken ?? linkToken ?? TOKENS[0]!.id;
+  const input = typedInput ?? link.get("amount") ?? "";
+  const memo = typedMemo ?? link.get("memo") ?? "";
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
   const [done, setDone] = useState<{ hash: string; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // A payment request link fills the form: /app/balance/send#to=…&token=…&amount=…
-  useEffect(() => {
-    const p = new URLSearchParams(location.hash.slice(1));
-    if (p.get("to")) setTo(p.get("to")!);
-    if (p.get("token") && TOKENS.some((t) => t.id === p.get("token"))) setToken(p.get("token")!);
-    if (p.get("amount")) setInput(p.get("amount")!);
-    if (p.get("memo")) setMemo(p.get("memo")!);
-  }, []);
 
   const amount = parseAmount(token, input);
   const have = s.balances.get(token) ?? 0n;

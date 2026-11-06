@@ -19,12 +19,21 @@ export default function AddPage() {
   const [done, setDone] = useState<{ hash: string; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!s.accountId) return;
-    const b = await view<string>(NETWORK, token, "ft_balance_of", { account_id: s.accountId }).catch(() => "0");
-    setPublicBal(BigInt(b));
+  const readBalance = useCallback(async () => {
+    if (!s.accountId) return null;
+    return BigInt(await view<string>(NETWORK, token, "ft_balance_of", { account_id: s.accountId }).catch(() => "0"));
   }, [s.accountId, token]);
-  useEffect(() => void refresh(), [refresh]);
+  const refresh = useCallback(async () => {
+    const b = await readBalance();
+    if (b !== null) setPublicBal(b);
+  }, [readBalance]);
+  useEffect(() => {
+    let live = true;
+    readBalance().then((b) => live && b !== null && setPublicBal(b));
+    return () => {
+      live = false;
+    };
+  }, [readBalance]);
 
   const amount = parseAmount(token, input);
   const tooMuch = amount !== null && publicBal !== null && amount > publicBal;

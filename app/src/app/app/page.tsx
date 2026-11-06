@@ -87,19 +87,23 @@ export default function DeskPage() {
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  // only read while a quote window is open, ticked by the effect below
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
-    intakeAttestation(NETWORK.api).then(setAtt, (e: Error) => setAttError(e.message));
+    intakeAttestation(NETWORK.api).then(
+      (a) => {
+        setAtt(a);
+        if (!a.enabled) setMode("form");
+      },
+      (e: Error) => setAttError(e.message),
+    );
   }, []);
   useEffect(() => {
     if (!run?.closesAtMs || run.phase !== "quoting") return;
     const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
   }, [run?.closesAtMs, run?.phase]);
-  useEffect(() => {
-    if (att && !att.enabled) setMode("form");
-  }, [att]);
 
   const sellAmount = parseAmount(sellToken, sellInput);
   const minAmount = minInput.trim() === "" ? 0n : parseAmount(buyToken, minInput);

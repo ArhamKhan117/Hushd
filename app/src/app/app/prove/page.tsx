@@ -2,7 +2,7 @@
 
 import { artifactsAt, encodeProof, proveFunds, proveReceipt, proveVolume, type Payment } from "@hushd/sdk";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { Segmented } from "@/components/app/desk";
 import { AmountCard, ErrorLine, Field, TokenSelect } from "@/components/app/forms";
@@ -29,6 +29,9 @@ const EXPIRY = [
   { value: "30", label: "30 days" },
 ] as const;
 
+/** When a proof made now for `days` days stops holding. */
+const expiryIn = (days: number) => Date.now() + days * 86_400_000;
+
 const READER = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 
 function paymentLabel(p: Payment) {
@@ -42,7 +45,7 @@ function ProveInner() {
   const [what, setWhat] = useState<What>(params.get("deal") ? "exact" : "exact");
   const [reader, setReader] = useState("");
   const [days, setDays] = useState<(typeof EXPIRY)[number]["value"]>("7");
-  const [pick, setPick] = useState(0);
+  const [pick, setPick] = useState<number | null>(null);
   const [minInput, setMinInput] = useState("");
   const [showPayee, setShowPayee] = useState(false);
   const [token, setToken] = useState(TOKENS[0]!.id);
@@ -52,15 +55,11 @@ function ProveInner() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const payments = useMemo(() => s.wallet?.payments() ?? [], [s.wallet, s.balances]);
-  useEffect(() => {
-    const d = params.get("deal");
-    if (!d) return;
-    const i = payments.findIndex((p) => p.dealId === d);
-    if (i >= 0) setPick(i);
-  }, [params, payments]);
-
-  const payment = payments[pick];
+  const payments = s.wallet?.payments() ?? [];
+  // a ?deal= link preselects that deal's payment until another is picked
+  const fromLink = payments.findIndex((p) => p.dealId === params.get("deal"));
+  const chosen = pick ?? (fromLink >= 0 ? fromLink : 0);
+  const payment = payments[chosen];
   const dealLegs = payments.filter((p) => p.kind === "deal" && p.token === token).slice(0, 16);
   const volumeTotal = dealLegs.reduce((t, p) => t + p.made.amount, 0n);
   const min = what === "atleast" && payment ? parseAmount(payment.token, minInput) : null;
@@ -80,7 +79,7 @@ function ProveInner() {
     setOut(null);
     setCopied(false);
     try {
-      const scope = { net: NETWORK, reader: reader.trim(), expiresAtMs: Date.now() + Number(days) * 86_400_000 };
+      const scope = { net: NETWORK, reader: reader.trim(), expiresAtMs: expiryIn(Number(days)) };
       const src = artifactsAt(CIRCUITS_BASE);
       let proof;
       if (what === "exact" || what === "atleast") {
@@ -123,7 +122,7 @@ function ProveInner() {
             <Field label="Which payment">
               <Select
                 label="Payment"
-                value={pick}
+                value={chosen}
                 onChange={setPick}
                 options={payments.map((p, i) => ({ value: i, label: paymentLabel(p), description: when(p.atMs) }))}
                 className="w-full"
