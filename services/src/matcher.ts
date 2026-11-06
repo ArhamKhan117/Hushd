@@ -56,7 +56,8 @@ export class Matcher {
         return;
       }
       const batch = Buffer.from(JSON.stringify({ rfq: rfqBox, quotes: quotes.rows.map((q) => q.box) })).toString("base64");
-      const out = await this.enclave({ cmd: "match", rfq_id: String(rfqId), rfq_commitment: commitment, batch });
+      // makers sign for one desk and the enclave signs the match for it: name it
+      const out = await this.enclave({ cmd: "match", desk: this.net.desk, rfq_id: String(rfqId), rfq_commitment: commitment, batch });
       if (out.matched !== true) {
         await this.finish(rfqId, "no_match", null, { matched: false, reason: out.reason ?? out.error ?? "No quote inside the limit" }, null);
         return;

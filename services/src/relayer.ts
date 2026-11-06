@@ -28,6 +28,26 @@ interface Leg {
 const isField = (s: unknown): s is string => typeof s === "string" && /^(0x[0-9a-fA-F]{1,64}|\d{1,78})$/.test(s);
 const big = (s: string) => BigInt(s);
 
+/** Methods the contracts accept only with exactly 1 yoctoNEAR attached. */
+export const ONE_YOCTO_METHODS = new Set(["ft_transfer_call", "set_maker_active", "withdraw_bond"]);
+
+type DecodedDelegate = {
+  signedDelegate?: { delegateAction?: { receiverId: string; actions: { functionCall?: { methodName: string; deposit: bigint | string } }[] } };
+};
+
+/** Check a decoded NEP-366 delegate against the allowlist before paying its gas. */
+export function checkDelegate(allow: Record<string, string[]>, decoded: DecodedDelegate) {
+  const da = decoded.signedDelegate?.delegateAction;
+  if (!da) throw new BadRequest("Not a signed delegate action");
+  const allowed = allow[da.receiverId];
+  if (!allowed) throw new BadRequest("The relayer does not send to that contract");
+  for (const act of da.actions) {
+    const fc = act.functionCall;
+    if (!fc || !allowed.includes(fc.methodName)) throw new BadRequest("Only allowlisted function calls are relayed");
+    if (ONE_YOCTO_METHODS.has(fc.methodName) && BigInt(fc.deposit) !== 1n) throw new BadRequest(`${fc.methodName} takes exactly 1 yoctoNEAR`);
+  }
+}
+
 export class Relayer {
   private vkey: unknown;
   private spentToday = { day: "", gas: 0n };
@@ -190,16 +210,15 @@ export class Relayer {
     return { activated: true, amount: amount.toString(), txHash: tx.transaction?.hash ?? "" };
   }
 
-  /** NEP-366 meta transaction: a maker's own action, gas paid by the relayer. */
+  /** NEP-366 meta transaction: a maker's own action (deposits come from the maker), gas paid by the relayer. */
   async meta(body: { signedDelegate: string }) {
-    const sd = decodeSignedDelegateAction(body.signedDelegate) as unknown as {
-      delegateAction: { receiverId: string; actions: { functionCall?: { methodName: string; deposit: bigint | string } }[] };
-    };
-    const allowed = this.allow()[sd.delegateAction.receiverId];
-    if (!allowed) throw new BadRequest("The relayer does not send to that contract");
-    for (const act of sd.delegateAction.actions) {
-      if (!act.functionCall || !allowed.includes(act.functionCall.methodName)) throw new BadRequest("Only allowlisted function calls are relayed");
+    let sd: ReturnType<typeof decodeSignedDelegateAction>;
+    try {
+      sd = decodeSignedDelegateAction(body.signedDelegate);
+    } catch {
+      throw new BadRequest("signedDelegate is a base64 NEP-366 signed delegate action");
     }
+    checkDelegate(this.allow(), sd as unknown as DecodedDelegate);
     this.budget(100_000_000_000_000n);
     const outcome = (await this.signer.near.transaction(this.signer.accountId).signedDelegateAction(sd as never).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
     return { txHash: outcome.transaction?.hash ?? "" };

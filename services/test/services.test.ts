@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { encode } from "@msgpack/msgpack";
 import { TESTNET } from "@hushd/sdk";
+import { decodeSignedDelegateAction, encodeSignedDelegateAction } from "near-kit";
 import { buildApi } from "../src/api.js";
 import { Db } from "../src/db.js";
 import { approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
 import { eventsInBlock } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
 import { priceAsk, spreadBps } from "../src/makers.js";
+import { checkDelegate } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
 
@@ -39,6 +41,36 @@ describe("keeper", () => {
     // contracts/desk/src/hedge.rs pins this msgpack for asset 4, buy, 1100, 0.2, IOC.
     const action = orderAction({ asset: 4, coin: "X", is_buy: true, size: "0.2", limit_px: "1100", deadline_ms: 0, testnet: true }, false);
     assert.equal(Buffer.from(encode(action)).toString("hex"), "83a474797065a56f72646572a66f72646572739186a16104a162c3a170a431313030a173a3302e32a172c2a17481a56c696d697481a3746966a3496f63a867726f7570696e67a26e61");
+  });
+});
+
+describe("relayer meta transactions", () => {
+  const allow = { "desk.hushd.testnet": ["set_maker_active", "withdraw_bond"] };
+  // a real NEP-366 payload, encoded and decoded the way a maker's wallet and the relayer do
+  const delegate = (receiverId: string, methodName: string, deposit: bigint) =>
+    decodeSignedDelegateAction(
+      encodeSignedDelegateAction({
+        signedDelegate: {
+          delegateAction: {
+            senderId: "maker-a.hushd.testnet",
+            receiverId,
+            actions: [{ functionCall: { methodName, args: new TextEncoder().encode("{}"), gas: 30_000_000_000_000n, deposit } }],
+            nonce: 1n,
+            maxBlockHeight: 100n,
+            publicKey: { ed25519Key: { data: Array(32).fill(1) } },
+          },
+          signature: { ed25519Signature: { data: Array(64).fill(2) } },
+        },
+      } as never),
+    );
+  test("relays allowlisted calls with the 1 yoctoNEAR the desk asks for", () => {
+    checkDelegate(allow, delegate("desk.hushd.testnet", "withdraw_bond", 1n) as never);
+  });
+  test("refuses a missing yocto, other methods and other contracts", () => {
+    assert.throws(() => checkDelegate(allow, delegate("desk.hushd.testnet", "withdraw_bond", 0n) as never), /exactly 1 yoctoNEAR/);
+    assert.throws(() => checkDelegate(allow, delegate("desk.hushd.testnet", "propose_config", 1n) as never), /allowlisted/);
+    assert.throws(() => checkDelegate(allow, delegate("pool.hushd.testnet", "withdraw_bond", 1n) as never), /does not send/);
+    assert.throws(() => checkDelegate(allow, {}), /signed delegate/);
   });
 });
 

@@ -15,7 +15,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
-import { consentBytes, termsHash, termsOf, type PackageQuote } from "@hushd/protocol";
+import { quoteConsent, type PackageQuote } from "@hushd/protocol";
 import {
   DeskApi,
   deskView,
@@ -159,8 +159,8 @@ export class Maker {
       const usdc = this.net.tokens.find((t) => t.symbol === "USDC")!;
       q.bond = BigInt(Math.max(1, Math.round(notionalUsd * 0.1))) * 10n ** BigInt(usdc.decimals);
     }
-    const th = termsHash(termsOf(q, ask.kind));
-    q.signature = toB64(ed25519.sign(consentBytes(q.rfqId, th, q.bond, q.expiresAtMs), this.quoteSecret));
+    // consent v2: this desk, these terms, this class and exactly this hedge leg
+    q.signature = toB64(ed25519.sign(quoteConsent(this.net.desk!, q, ask.kind), this.quoteSecret));
     return q;
   }
 

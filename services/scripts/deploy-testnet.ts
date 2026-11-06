@@ -7,8 +7,9 @@
  * Each contract account is created, funded, given the deployer's key, deployed and
  * initialised in one transaction. Service accounts (relayer, matcher, keeper, three
  * makers) get fresh keys, written to `.env.testnet` (gitignored) with the makers' wallet
- * seeds and quote keys. Then: storage registrations, maker inventory shielded into the
- * pool, maker bonds posted on the desk. The result goes to `deployments/testnet.json`.
+ * seeds and quote keys. Then: the relayer named a faucet operator on each token, storage
+ * registrations, maker inventory shielded into the pool, maker bonds posted on the desk.
+ * The result goes to `deployments/testnet.json`.
  *
  * Reads the deployer key from DEPLOYER_PRIVATE_KEY or ~/.near-credentials/testnet/<id>.json.
  * The OutLayer matcher project is a separate step (see the runbook): the desk's
@@ -51,11 +52,13 @@ const wasm = (name: string) => {
 };
 const codeHash = (b: Uint8Array) => base58.encode(createHash("sha256").update(b).digest());
 
+// minDeposit keeps dust out of the tree: 1 USDC, 0.1 wNEAR, 0.00001 BTC
 const TOKENS = [
-  { name: "usdc", symbol: "USDC", title: "Hushd test USDC", decimals: 6, faucet: 10_000n * 10n ** 6n, perDeposit: 1_000_000n * 10n ** 6n, total: 100_000_000n * 10n ** 6n },
-  { name: "wnear", symbol: "wNEAR", title: "Hushd test wNEAR", decimals: 24, faucet: 1_000n * NEAR, perDeposit: 1_000_000n * NEAR, total: 100_000_000n * NEAR },
-  { name: "btc", symbol: "BTC", title: "Hushd test BTC", decimals: 8, faucet: 1n * 10n ** 8n, perDeposit: 100n * 10n ** 8n, total: 10_000n * 10n ** 8n },
+  { name: "usdc", symbol: "USDC", title: "Hushd test USDC", decimals: 6, faucet: 10_000n * 10n ** 6n, minDeposit: 10n ** 6n, perDeposit: 1_000_000n * 10n ** 6n, total: 100_000_000n * 10n ** 6n },
+  { name: "wnear", symbol: "wNEAR", title: "Hushd test wNEAR", decimals: 24, faucet: 1_000n * NEAR, minDeposit: NEAR / 10n, perDeposit: 1_000_000n * NEAR, total: 100_000_000n * NEAR },
+  { name: "btc", symbol: "BTC", title: "Hushd test BTC", decimals: 8, faucet: 1n * 10n ** 8n, minDeposit: 1_000n, perDeposit: 100n * 10n ** 8n, total: 10_000n * 10n ** 8n },
 ];
+const DAY_NS = 24n * 3_600n * 10n ** 9n;
 const SERVICES = ["relayer", "matcher", "keeper", "maker-a", "maker-b", "maker-c"] as const;
 const FUND: Record<string, bigint> = { pool: near(6), desk: near(5), board: near(3), usdc: near(3), wnear: near(3), btc: near(3), relayer: near(8), matcher: near(3), keeper: near(3), "maker-a": near(2), "maker-b": near(2), "maker-c": near(2) };
 const MAKER_INVENTORY = { usdc: 500_000n * 10n ** 6n, wnear: 50_000n * NEAR, btc: 8n * 10n ** 8n };
@@ -101,8 +104,8 @@ async function main() {
   await deploy("pool", wasm("pool"), {
     owner_id: DEPLOYER,
     desk_id: sub("desk"),
-    timelock_ns: (24n * 3_600n * 10n ** 9n).toString(),
-    assets: TOKENS.map((t) => ({ token: sub(t.name), limits: { per_deposit: t.perDeposit.toString(), total: t.total.toString() } })),
+    timelock_ns: DAY_NS.toString(),
+    assets: TOKENS.map((t) => ({ token: sub(t.name), limits: { per_deposit: t.perDeposit.toString(), total: t.total.toString(), min_deposit: t.minDeposit.toString() } })),
   });
   await deploy("board", wasm("board"), { owner_id: DEPLOYER, max_post_bytes: 2048 });
   await deploy("desk", wasm("desk"), {
@@ -117,6 +120,8 @@ async function main() {
       keeper: sub("keeper"),
       outlayer_fee: (10n ** 23n).toString(),
       min_bond: (1_000n * 10n ** 6n).toString(),
+      // pool, bond token and MPC are fixed for good; anything else waits a day after propose_config
+      config_timelock_ns: DAY_NS.toString(),
     },
   });
 
@@ -167,6 +172,13 @@ async function main() {
     report.steps.push({ what: `${from} -> ${contract}.${method}`, tx: hashOf(out) });
     return out;
   };
+  // only the owner and its operators may faucet for another account: the relayer funds passkey accounts
+  for (const t of TOKENS) {
+    if (!(await view<boolean>(net, sub(t.name), "is_operator", { account_id: sub("relayer") }))) {
+      await call(client, DEPLOYER, sub(t.name), "set_operator", { account_id: sub("relayer"), allowed: true }, 1n, "30 Tgas");
+    }
+  }
+
   const registered = async (token: string, acc: string) => (await view<unknown>(net, token, "storage_balance_of", { account_id: acc })) !== null;
   const STORAGE = 1_250_000_000_000_000_000_000n;
   for (const t of TOKENS) {

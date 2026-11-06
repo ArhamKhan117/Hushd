@@ -5,12 +5,19 @@
  * - Runs each bonded hedge leg: asks the desk to have the MPC sign the deal's own
  *   order (the desk rebuilds it from the deal; the keeper cannot change it), submits it
  *   to Hyperliquid testnet from the deal's own address, and records the fill or the
- *   rejection. A rejection or a missed deadline slashes the maker's bond to the trader.
+ *   rejection. A rejection before the deadline lets the desk sign the order again (up to
+ *   three attempts); the last rejection or a missed deadline slashes the maker's bond.
+ * - Retries a slashed bond the pool refused (deposits paused, a limit).
  */
 import { deskView, type DealView, type HushdNetwork } from "@hushd/sdk";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
+
+/** The desk signs a hedge leg's opening order at most this many times (MAX_HEDGE_ATTEMPTS in contracts/desk). */
+const MAX_HEDGE_ATTEMPTS = 3;
+/** How often a refused slash payout is sent to the pool again. */
+const SLASH_RETRY_MS = 10 * 60_000;
 
 const HL_EXCHANGE = () => settings.str("HYPERLIQUID_TESTNET_EXCHANGE_URL", "https://api.hyperliquid-testnet.xyz/exchange");
 
@@ -36,7 +43,8 @@ export function orderAction(h: NonNullable<DealView["hedge"]>, close: boolean) {
 type HlStatus = { filled?: { totalSz: string; avgPx: string; oid: number }; resting?: { oid: number }; error?: string };
 
 export class Keeper {
-  stats = { expired: 0, hedgesSigned: 0, filled: 0, rejected: 0, slashed: 0, lastError: "" };
+  stats = { expired: 0, hedgesSigned: 0, filled: 0, rejected: 0, slashed: 0, slashRetries: 0, lastError: "" };
+  private slashRetriedAt = new Map<string, number>();
   constructor(readonly net: HushdNetwork, readonly signer: Signer) {}
 
   async step(now = Date.now()) {
@@ -50,9 +58,14 @@ export class Keeper {
           if (now > d.hedge.deadline_ms) {
             await this.signer.call(this.net.desk!, "slash_overdue", { deal_id: d.id }, { gas: "200 Tgas" });
             this.stats.slashed++;
-          } else if (d.hedge_orders === 0) {
+          } else if (d.hedge_orders === 0 && d.hedge_attempts < MAX_HEDGE_ATTEMPTS) {
             await this.runHedge(d);
           }
+        } else if (d.status === "slash_refused" && now - (this.slashRetriedAt.get(d.id) ?? 0) > SLASH_RETRY_MS) {
+          // the pool refused the payout (paused, a limit): try again now and then, not every round
+          this.slashRetriedAt.set(d.id, now);
+          await this.signer.call(this.net.desk!, "retry_slash_payout", { deal_id: d.id }, { gas: "150 Tgas" });
+          this.stats.slashRetries++;
         }
       } catch (e) {
         this.stats.lastError = `deal ${d.id}: ${(e as Error).message}`;

@@ -1,6 +1,12 @@
 /**
  * One entrypoint for every Hushd service: `tsx src/main.ts <service>` or SERVICE=<service>.
  */
+import { existsSync } from "node:fs";
+
+// Outside Docker, read the repo's .env (values already in the environment win).
+const dotenv = new URL("../../.env", import.meta.url).pathname;
+if (existsSync(dotenv)) process.loadEnvFile(dotenv);
+
 const service = process.argv[2] ?? process.env.SERVICE;
 const services: Record<string, () => Promise<unknown>> = {
   relayer: async () => (await import("./relayer.js")).startRelayer(),
