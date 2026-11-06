@@ -21,7 +21,7 @@ pnpm test                                   # SDK, services, MCP, circuits (unit
 pnpm dev                                    # the app on :3000, against testnet
 pnpm verify                                 # every README claim, checked live, PASS/FAIL
 pnpm mcp init && pnpm --silent mcp          # local MCP server with an agent seed
-cd contracts && cargo test                  # contract unit tests (real proofs)
+cd contracts && cargo test -p hushd-pool -p hushd-desk -p hushd-board -p hushd-token  # unit tests, real proofs
 pnpm --filter @hushd/services deploy:testnet  # deploy from a funded hushd.testnet
 ```
 

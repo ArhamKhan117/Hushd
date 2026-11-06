@@ -6,11 +6,15 @@ A five-minute path through Hushd, then where to look in the code.
 
 1. Open [hushd.net/app](https://hushd.net/app) and sign in with a passkey (no wallet needed; the relayer opens the account on testnet).
 2. Balance, then Add privately: the faucet gives test USDC and one click moves it into the pool.
-3. Desk, then Describe it: type "sell 500 USDC for BTC, at least 0.008 BTC". The draft comes from a NEAR AI model in a TEE; the line under the box shows the attestation the API verified, and the draft shows the signature your browser checked.
+3. Desk, then Describe it: type "sell 500 USDC for BTC at the best price". The draft comes from a NEAR AI model in a TEE; the line under the box shows the attestation the API verified, and the draft shows the signature your browser checked. (Or use Fill the form: Spot, 500 USDC, BTC.)
 4. Ask for quotes and watch the steps: committed on chain, sealed quotes arriving, matched in the enclave, settled in the pool. Open the deal page: the chain shows a deal and an outcome, not the amounts or you.
 5. Prove, then Exact payment for that deal, reader `judge.testnet`, then open the link. The checker verifies the proof in your browser and asks the pool contract to check it again.
 
-Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks every README claim against the live deployment.
+Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC), both for `judge.testnet` until 6 December 2026. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.
+
+Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools: deposit, a private x402 payment, a cash out, a spot trade, proofs and a hedged trade.
+
+Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the README's live claims against the deployment, one PASS or FAIL each.
 
 ## What to look at
 

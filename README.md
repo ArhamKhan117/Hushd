@@ -13,16 +13,16 @@ Everything runs on NEAR testnet with test tokens.
 ## Try it
 
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
-- **Check a proof:** [hushd.net/verify](https://hushd.net/verify).
+- **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
 - **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
-- **Every claim in this README, checked live:** `pnpm verify` prints PASS or FAIL per claim.
+- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts and their code, the enclave key, bonded makers, settled deals, the services, the intake attestation, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
 
 ## What you can do
 
 - **Hold a private balance.** Tokens become notes in a shielded pool. Only your key spends them, and nobody can see what you hold.
 - **Send, receive and cash out privately.** A relayer sends every proven action from its own account, so your NEAR account never appears next to your payments. Payment request links fill in the amount for the payer.
 - **Ask for a price without showing your hand.** Your request, including the least you accept, is sealed to the matcher enclave. Makers see the pair, the side and the size, never your limit.
-- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry add a Hyperliquid testnet perp order signed by NEAR Chain Signatures and backed by the maker's bond.
+- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry add a Hyperliquid testnet perp order signed by NEAR Chain Signatures and backed by the maker's bond (at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC).
 - **Describe the trade in plain words.** A NEAR AI Cloud model inside a TEE drafts the request. Your words are encrypted to the model's attested key in the browser, and the answer's TEE signature is checked in the browser too. You confirm every number.
 - **Prove one fact to one reader.** An exact payment, a payment of at least an amount, funds held above a threshold, or your total desk volume. Each proof names its reader and expires, and the pool contract checks it again on chain.
 - **Let agents do all of it** through MCP, inside per-payment and per-day limits, including paying x402 resources privately.
@@ -43,12 +43,12 @@ Everything runs on NEAR testnet with test tokens.
 
 | What | Where you see it |
 | --- | --- |
-| Groth16 proofs verified on chain with NEAR's `alt_bn128` host functions (about 55 to 60 Tgas each) | Every private send, cash out and settlement; `/verify` asks the pool to check a proof again |
+| Groth16 proofs verified on chain with NEAR's `alt_bn128` host functions (a proof check is about 36 Tgas; a private send's pool call about 90, a two-leg settlement about 125) | Every private send, cash out and settlement; `/verify` asks the pool to check a proof again |
 | Chain Signatures sign each deal's Hyperliquid order from its own derivation path | A deal page's hedge row |
 | OutLayer runs the matcher in a TEE, with on-chain yield and resume for the desk's enclave key | Makers page, "The matcher" |
 | NEAR AI Cloud verifiable private inference, attestation checked with `@nearai/inference-sdk` | Desk, "Describe it" |
 | Named accounts as proof readers: a proof is for `auditor.testnet`, not for a key | Prove page, "Who may read it" |
-| Passkeys that derive an implicit account, opened by the relayer with a little NEAR | Sign in with a passkey |
+| Passkeys that derive an implicit account, opened by the relayer with 0.2 testnet NEAR for its own gas | Sign in with a passkey |
 | Gas keys give the relayer parallel nonce lanes; it also relays NEP-366 meta transactions for allowlisted calls | Settings page, "Relayer" |
 | NEP-141 `ft_transfer_call` deposits straight into the pool | Balance, "Add privately" |
 | NEP-297 events read from FastNEAR's neardata by the indexer | A deal page's "On chain" list |
@@ -118,7 +118,7 @@ Deploy your own copy to testnet from one funded account: `pnpm --filter @hushd/s
 
 ```bash
 pnpm test                           # circuits, protocol, SDK, services, MCP
-cd contracts && cargo test          # pool, desk, board and token, with real proofs
+cd contracts && cargo test -p hushd-pool -p hushd-desk -p hushd-board -p hushd-token   # with real proofs
 pnpm verify                         # the live deployment, claim by claim
 ```
 

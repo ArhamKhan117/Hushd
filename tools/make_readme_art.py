@@ -593,7 +593,7 @@ def pipeline() -> Columns:
         [
             Item("Swap note openings in a sealed room", "Each side checks the note made for it"),
             Item("Both legs bound to the deal", "extHash covers the deal id and all four outputs"),
-            Item("pool.settle_swap", "Both legs or neither, about 130 Tgas", mono=True),
+            Item("pool.settle_swap", "Both legs or neither, about 125 Tgas", mono=True),
         ],
         subtitle="Private notes in the pool",
     )
@@ -623,12 +623,12 @@ def repository() -> Columns:
     contracts = Panel(
         "Contracts on NEAR",
         [
-            Item("contracts/pool", "Notes, nullifiers, depth-20 Poseidon tree; Groth16 on alt_bn128 in about 55 to 60 Tgas", mono=True),
+            Item("contracts/pool", "Notes, nullifiers, depth-20 Poseidon tree; a Groth16 check on alt_bn128 in about 36 Tgas", mono=True),
             Item("contracts/desk", "Makers and NEP-141 bonds, RFQ commitments, matches, receipts, slashing", mono=True),
             Item("desk/src/hedge.rs", "Hyperliquid msgpack and EIP-712 digest, pinned against reference vectors", mono=True, accent=True),
             Item("contracts/board, token", "Sealed note posts; test tokens with a faucet", mono=True),
         ],
-        subtitle="Rust, near-sdk 5, 80 unit tests and 5 sandbox tests",
+        subtitle="Rust, near-sdk 5, 135 unit tests and 6 sandbox tests",
     )
     zk = Panel(
         "Proofs and the enclave",
