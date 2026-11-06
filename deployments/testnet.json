@@ -39,9 +39,13 @@
     "relayer": "relayer.hushd.testnet",
     "matcher": "matcher.hushd.testnet",
     "keeper": "keeper.hushd.testnet",
-    "maker-a": "maker-a.hushd.testnet",
-    "maker-b": "maker-b.hushd.testnet",
-    "maker-c": "maker-c.hushd.testnet"
+    "maker-a": "7d572467311e9e734803db5fa0fb8cf138cdae2e3d84c100d3da3bb22cfcf428",
+    "maker-b": "6f30a55eb488b534922f47646837bca44fe2b849b947035ddacc305cf0179f0f",
+    "maker-c": "625fd4909d26f32d757a63ef9d8520291a07d4b69a369179dfcd3477a69c1f47",
+    "maker-a-retired": "maker-a.hushd.testnet",
+    "maker-b-retired": "maker-b.hushd.testnet",
+    "maker-c-retired": "maker-c.hushd.testnet",
+    "demo-agent": "7608542248180c7831268a629bd873a3d28cd059d9284981386ec05711c7ca8d"
   },
   "steps": [
     {
@@ -281,5 +285,169 @@
     "project": "hushd.testnet/matcher",
     "wasmSha256": "7521d46a6a79a26f31fe94d70f4c84b9ba6bf825090ec8f18b9ecdb14bf363ae",
     "secret": "PROTECTED_MATCHER_KEY (generated in the TEE, locked to this build)"
+  },
+  "policyWallets": {
+    "DEMO_AGENT": {
+      "prefix": "DEMO_AGENT",
+      "account": "7608542248180c7831268a629bd873a3d28cd059d9284981386ec05711c7ca8d",
+      "owner": "hushd.testnet",
+      "rules": {
+        "transaction_types": [
+          "call"
+        ],
+        "allowed_tokens": [
+          "native"
+        ],
+        "addresses": {
+          "mode": "whitelist",
+          "list": [
+            "pool.hushd.testnet",
+            "desk.hushd.testnet",
+            "board.hushd.testnet",
+            "usdc.hushd.testnet",
+            "wnear.hushd.testnet",
+            "btc.hushd.testnet"
+          ]
+        },
+        "limits": {
+          "per_transaction": {
+            "native": "20000000000000000000000"
+          },
+          "daily": {
+            "native": "200000000000000000000000"
+          }
+        },
+        "rate_limit": {
+          "max_per_hour": 60
+        }
+      },
+      "txs": {
+        "store_policy": "8wCP7yPYJvSwFGetiBnytRBa6mncSbiu5rjF5uPbhby6",
+        "fund": "8XdSJebyLnYvqwGM1wZ77zAN3uCAoQ5smjWihWzJVZpc",
+        "freeze_1793966589209": "HYhxJ5QatGeCnX2Dw7oxnipQ7aZyWabr3uipVvxghgNP",
+        "unfreeze_1793966614146": "HakVmxj48pNkjwSxvJJ4dkuQJiX4EmtPrKxoK9JKVYVd"
+      },
+      "createdAt": "2026-11-06T12:01:27.413Z"
+    },
+    "MAKER_A": {
+      "prefix": "MAKER_A",
+      "account": "7d572467311e9e734803db5fa0fb8cf138cdae2e3d84c100d3da3bb22cfcf428",
+      "owner": "hushd.testnet",
+      "rules": {
+        "transaction_types": [
+          "call"
+        ],
+        "allowed_tokens": [
+          "native"
+        ],
+        "addresses": {
+          "mode": "whitelist",
+          "list": [
+            "pool.hushd.testnet",
+            "desk.hushd.testnet",
+            "board.hushd.testnet",
+            "usdc.hushd.testnet",
+            "wnear.hushd.testnet",
+            "btc.hushd.testnet"
+          ]
+        },
+        "limits": {
+          "per_transaction": {
+            "native": "20000000000000000000000"
+          },
+          "daily": {
+            "native": "200000000000000000000000"
+          }
+        },
+        "rate_limit": {
+          "max_per_hour": 60
+        }
+      },
+      "txs": {
+        "store_policy": "SDiE9HuZEpPLefBmkLH4deyMkVw6ocLogpPN95cZMUk",
+        "fund": "HvtMeqjhxqRZTr1Ex1cwABFbP8qJ2cbyfbkoNZ9c7Zo"
+      },
+      "createdAt": "2026-11-06T12:08:00.870Z"
+    },
+    "MAKER_B": {
+      "prefix": "MAKER_B",
+      "account": "6f30a55eb488b534922f47646837bca44fe2b849b947035ddacc305cf0179f0f",
+      "owner": "hushd.testnet",
+      "rules": {
+        "transaction_types": [
+          "call"
+        ],
+        "allowed_tokens": [
+          "native"
+        ],
+        "addresses": {
+          "mode": "whitelist",
+          "list": [
+            "pool.hushd.testnet",
+            "desk.hushd.testnet",
+            "board.hushd.testnet",
+            "usdc.hushd.testnet",
+            "wnear.hushd.testnet",
+            "btc.hushd.testnet"
+          ]
+        },
+        "limits": {
+          "per_transaction": {
+            "native": "20000000000000000000000"
+          },
+          "daily": {
+            "native": "200000000000000000000000"
+          }
+        },
+        "rate_limit": {
+          "max_per_hour": 60
+        }
+      },
+      "txs": {
+        "store_policy": "27BSZDWjfFwEBbsbxeTFu9uhDjSLAtKz8qouKYh57xEq",
+        "fund": "5FNExFcXJhnNBFbYe6vaGkgHAVtgphATdZeyAME5QS1Y"
+      },
+      "createdAt": "2026-11-06T12:08:27.485Z"
+    },
+    "MAKER_C": {
+      "prefix": "MAKER_C",
+      "account": "625fd4909d26f32d757a63ef9d8520291a07d4b69a369179dfcd3477a69c1f47",
+      "owner": "hushd.testnet",
+      "rules": {
+        "transaction_types": [
+          "call"
+        ],
+        "allowed_tokens": [
+          "native"
+        ],
+        "addresses": {
+          "mode": "whitelist",
+          "list": [
+            "pool.hushd.testnet",
+            "desk.hushd.testnet",
+            "board.hushd.testnet",
+            "usdc.hushd.testnet",
+            "wnear.hushd.testnet",
+            "btc.hushd.testnet"
+          ]
+        },
+        "limits": {
+          "per_transaction": {
+            "native": "20000000000000000000000"
+          },
+          "daily": {
+            "native": "200000000000000000000000"
+          }
+        },
+        "rate_limit": {
+          "max_per_hour": 60
+        }
+      },
+      "txs": {
+        "store_policy": "H1dxQnj9RxngUAx4JZvk7kdgn64FLn9kD46rwibVtwHP",
+        "fund": "3JESgXnAqnipzSdPSQtqKKQnwVJRzip1CRBS32MJzErU"
+      },
+      "createdAt": "2026-11-06T12:09:09.383Z"
+    }
   }
 }
