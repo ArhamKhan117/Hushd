@@ -15,6 +15,18 @@ Whoever ran the script could have kept the entropy of the single contribution, a
 That is why these keys are for testnet only.
 A mainnet deployment needs a multi-party phase-2 ceremony, where one honest contributor is enough.
 
+## The mainnet ceremony
+
+`scripts/ceremony.mjs` runs it, on the same circuits and the same Powers of Tau file:
+
+1. `start`: the coordinator makes key 0000 for each circuit.
+2. `contribute "<name>"`: each contributor in turn, on their own machine, adds fresh randomness to the latest keys, publishes the hashes it prints and sends the new keys on.
+3. `verify`: anyone checks every contribution in the chain against the r1cs and the Powers of Tau.
+4. `finalize <height> --install`: a public beacon, the hash of a NEAR mainnet block whose height was announced before it existed, then the final keys and verifying keys.
+
+It refuses to finalize with fewer than two contributors.
+A rehearsal on the `receipt` circuit (two contributors, a beacon from mainnet block 223,383,975) verified end to end on 7 November 2026; the mainnet keys themselves have not been made yet.
+
 ## Transcript
 
 | Circuit | Constraints | Public inputs | r1cs sha256 | Final key sha256 |

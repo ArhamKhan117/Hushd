@@ -9,6 +9,7 @@
   "scripts": {
     "compile": "node scripts/compile.mjs",
     "setup": "node scripts/setup-dev-keys.mjs",
+    "ceremony": "node scripts/ceremony.mjs",
     "vk": "node scripts/gen-vk-rs.mjs",
     "fixtures": "node scripts/gen-fixtures.mjs",
     "publish-artifacts": "node scripts/copy-artifacts.mjs",
