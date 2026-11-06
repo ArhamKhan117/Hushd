@@ -205,8 +205,9 @@ export class Relayer {
     if (this.activations.day !== day) this.activations = { day, count: 0 };
     if (this.activations.count >= (this.opts.activationsPerDay ?? 200)) throw new BadRequest("Today's activations are used up; connect a NEAR wallet instead");
     this.activations.count += 1;
-    const amount = this.opts.activateYocto ?? 50_000_000_000_000_000_000_000n;
-    const tx = (await this.signer.near.transaction(this.signer.accountId).transfer(body.account, amount).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+    // enough to prepay a deposit's gas at testnet prices (about 0.1 NEAR for 100 Tgas); unused gas comes back
+    const amount = this.opts.activateYocto ?? 200_000_000_000_000_000_000_000n;
+    const tx = (await this.signer.send((c) => c.transaction(this.signer.accountId).transfer(body.account, amount).send({ waitUntil: "EXECUTED_OPTIMISTIC" }))) as unknown as { transaction?: { hash?: string } };
     return { activated: true, amount: amount.toString(), txHash: tx.transaction?.hash ?? "" };
   }
 
@@ -220,7 +221,7 @@ export class Relayer {
     }
     checkDelegate(this.allow(), sd as unknown as DecodedDelegate);
     this.budget(100_000_000_000_000n);
-    const outcome = (await this.signer.near.transaction(this.signer.accountId).signedDelegateAction(sd as never).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+    const outcome = (await this.signer.send((c) => c.transaction(this.signer.accountId).signedDelegateAction(sd as never).send({ waitUntil: "EXECUTED_OPTIMISTIC" }))) as unknown as { transaction?: { hash?: string } };
     return { txHash: outcome.transaction?.hash ?? "" };
   }
 
@@ -238,7 +239,7 @@ export async function startRelayer() {
     dailyGasBudget: BigInt(settings.str("RELAYER_DAILY_GAS", "300000000000000000")),
     cashOutFeeBps: settings.num("RELAYER_CASHOUT_FEE_BPS", net.id === "testnet" ? 0 : 50),
     circuitsDir: settings.circuitsDir(),
-    activateYocto: BigInt(settings.str("RELAYER_ACTIVATE_YOCTO", "50000000000000000000000")),
+    activateYocto: BigInt(settings.str("RELAYER_ACTIVATE_YOCTO", "200000000000000000000000")),
     activationsPerDay: settings.num("RELAYER_ACTIVATIONS_PER_DAY", 200),
   });
   const a = app("relayer", async () => ({ account: signer.accountId, balance: (await signer.balance()).toString(), lanes: signer.snapshot() }));

@@ -165,8 +165,12 @@ export class Maker {
   }
 
   /** One round: answer new asks, settle new wins. */
+  private enclaveCache: { at: number; encKey: string | null } = { at: 0, encKey: null };
+
   async step() {
-    const enclave = await deskView.enclave(this.net);
+    // the enclave key changes only on refresh_enclave_key: read it once a minute, not every step
+    if (Date.now() - this.enclaveCache.at > 60_000) this.enclaveCache = { at: Date.now(), encKey: (await deskView.enclave(this.net)).enc_key };
+    const enclave = { enc_key: this.enclaveCache.encKey };
     if (!enclave.enc_key) return;
     for (const r of await this.api.openRfqs(this.account)) {
       if (this.seen.has(r.rfqId)) continue;

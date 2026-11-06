@@ -79,7 +79,7 @@ export function shieldCall(net: HushdNetwork, note: Note) {
     contract: note.token,
     method: "ft_transfer_call",
     args: { receiver_id: pool(net), amount: note.amount.toString(), memo: null, msg: JSON.stringify({ inner: toHex(note.inner) }) },
-    gas: "120000000000000",
+    gas: "100000000000000",
     deposit: "1",
   };
 }

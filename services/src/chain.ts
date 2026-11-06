@@ -45,18 +45,41 @@ function failureText(f: unknown): string {
   return m ? m[1]!.replace(/^Smart contract panicked: /, "") : s.slice(0, 400);
 }
 
+/** A refusal before broadcast (rate limit): safe to send again elsewhere. */
+const rateLimited = (e: { message?: string; transactionHash?: string }) => !e.transactionHash && /429|too many|rate.?limit/i.test(e.message ?? "");
+
 export class Signer {
-  readonly near: Near;
+  /** One client per RPC endpoint; transactions fail over when an endpoint rate-limits. */
+  private readonly clients: Near[];
   private lane = 0;
   private stats = { sent: 0, failed: 0, gasBurnt: 0n, perLane: new Map<number, number>() };
 
   constructor(readonly net: HushdNetwork, readonly cfg: AccountConfig) {
-    this.near = new Near({
-      network: { networkId: net.id, rpcUrl: net.rpc[0]! },
-      privateKey: cfg.privateKey as `ed25519:${string}`,
-      defaultSignerId: cfg.accountId,
-      defaultWaitUntil: "EXECUTED_OPTIMISTIC",
-    });
+    this.clients = net.rpc.map(
+      (rpcUrl) =>
+        new Near({
+          network: { networkId: net.id, rpcUrl },
+          privateKey: cfg.privateKey as `ed25519:${string}`,
+          defaultSignerId: cfg.accountId,
+          defaultWaitUntil: "EXECUTED_OPTIMISTIC",
+        }),
+    );
+  }
+
+  get near(): Near {
+    return this.clients[0]!;
+  }
+
+  /** Send any transaction made with a client, failing over on rate limits like `call`. */
+  async send<T>(build: (client: Near) => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await build(this.clients[attempt % this.clients.length]!);
+      } catch (e) {
+        if (!rateLimited(e as { message?: string; transactionHash?: string }) || attempt >= this.clients.length * 3) throw e;
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
   }
 
   get accountId(): string {
@@ -68,24 +91,28 @@ export class Signer {
   }
 
   async call(contract: string, method: string, args: object, opts: { gas?: string; deposit?: bigint | string } = {}): Promise<CallResult> {
-    let tx = this.near.transaction(this.cfg.accountId).functionCall(contract, method, args, {
-      gas: (opts.gas ?? "300 Tgas") as `${number} Tgas`,
-      attachedDeposit: BigInt(opts.deposit ?? 0),
-    });
-    let lane: number | null = null;
-    if (this.cfg.gasKey) {
-      lane = this.lane++ % this.cfg.gasKey.lanes;
-      tx = tx.signWith(this.cfg.gasKey.privateKey as `ed25519:${string}`).useGasKey(lane);
-    }
+    const lane = this.cfg.gasKey ? this.lane++ % this.cfg.gasKey.lanes : null;
     this.stats.sent++;
     if (lane !== null) this.stats.perLane.set(lane, (this.stats.perLane.get(lane) ?? 0) + 1);
-    let outcome: Outcome;
-    try {
-      outcome = (await tx.send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as Outcome;
-    } catch (e) {
-      this.stats.failed++;
-      const err = e as { message?: string; data?: unknown; transactionHash?: string };
-      throw new ChainError(err.data ? failureText(err.data) : err.message ?? String(e), err.transactionHash);
+    let outcome: Outcome | null = null;
+    for (let attempt = 0; outcome === null; attempt++) {
+      const client = this.clients[attempt % this.clients.length]!;
+      let tx = client.transaction(this.cfg.accountId).functionCall(contract, method, args, {
+        gas: (opts.gas ?? "300 Tgas") as `${number} Tgas`,
+        attachedDeposit: BigInt(opts.deposit ?? 0),
+      });
+      if (lane !== null) tx = tx.signWith(this.cfg.gasKey!.privateKey as `ed25519:${string}`).useGasKey(lane);
+      try {
+        outcome = (await tx.send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as Outcome;
+      } catch (e) {
+        const err = e as { message?: string; data?: unknown; transactionHash?: string };
+        if (rateLimited(err) && attempt < this.clients.length * 3) {
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+          continue;
+        }
+        this.stats.failed++;
+        throw new ChainError(err.data ? failureText(err.data) : err.message ?? String(e), err.transactionHash);
+      }
     }
     const txHash = outcome.transaction?.hash ?? outcome.transaction_outcome?.id ?? "";
     const gasBurnt = BigInt(outcome.transaction_outcome?.outcome?.gas_burnt ?? 0) + (outcome.receipts_outcome ?? []).reduce((s, r) => s + BigInt(r.outcome?.gas_burnt ?? 0), 0n);

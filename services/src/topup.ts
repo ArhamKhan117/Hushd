@@ -33,7 +33,7 @@ export class TopUp {
       const bal = await accountBalance(this.net, t.account);
       if (bal !== null && bal >= t.floor) continue;
       const amount = t.floor * 2n - (bal ?? 0n);
-      const tx = await this.treasury.near.transaction(this.treasury.accountId).transfer(t.account, amount).send({ waitUntil: "EXECUTED_OPTIMISTIC" });
+      const tx = await this.treasury.send((c) => c.transaction(this.treasury.accountId).transfer(t.account, amount).send({ waitUntil: "EXECUTED_OPTIMISTIC" }));
       const hash = (tx as unknown as { transaction?: { hash?: string } }).transaction?.hash ?? "";
       this.log.unshift({ at: Date.now(), account: t.account, amount: amount.toString(), txHash: hash });
       this.log = this.log.slice(0, 50);

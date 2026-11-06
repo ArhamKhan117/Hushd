@@ -18,7 +18,12 @@ export function app(service: string, health: () => Promise<Record<string, unknow
       return c.json({ service, ok: false, error: (e as Error).message }, 503);
     }
   });
-  a.onError((e, c) => c.json({ error: e.message }, (e as { status?: number }).status === 400 ? 400 : 500));
+  a.onError((e, c) => {
+    const client = (e as { status?: number }).status === 400;
+    // a refused request is the caller's business; anything else is ours, so log it
+    if (!client) console.error(`${service} ${c.req.method} ${c.req.path}: ${e.message}`);
+    return c.json({ error: e.message }, client ? 400 : 500);
+  });
   return a;
 }
 
