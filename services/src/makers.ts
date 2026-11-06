@@ -46,7 +46,7 @@ import { addressOfKey, approveDealAgent, dealAddress } from "./hyperliquid.js";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
-import { type PerpMeta, capByMarket, hourVolBps, intentsQuote, mids, testnetPerps, testnetWithdrawable, wirePrice, wireSize } from "./market.js";
+import { type PerpMeta, capByMarket, hourVolBps, intentsQuote, mids, hedgePerps, hedgeTestnet, hedgeWithdrawable, wirePrice, wireSize } from "./market.js";
 
 export type Style = "fixed" | "volatility" | "inventory";
 
@@ -185,13 +185,13 @@ export class Maker {
       // never promise a hedge this maker cannot place: it needs a Hyperliquid account with the margin
       if (!this.hlKey) return null;
       const coin = ask.hedge?.coin ?? buy.hedgeCoin;
-      const perps = await testnetPerps().catch(() => ({}) as Record<string, PerpMeta>);
+      const perps = await hedgePerps().catch(() => ({}) as Record<string, PerpMeta>);
       const perp = coin ? perps[coin] : undefined;
       const px = coin ? m[coin] : undefined;
       if (!coin || !perp || !px) return null;
       if ((await this.hlMargin()) < hedgeMargin(notionalUsd, perp.maxLeverage)) return null;
       const size = Number(give) / 10 ** buy.decimals;
-      q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: now + 10 * 60_000, testnet: true };
+      q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: now + 10 * 60_000, testnet: hedgeTestnet() };
       // about a tenth of the trade's value in USDC, held by the desk until the hedge leg is done
       const usdc = this.net.tokens.find((t) => t.symbol === "USDC")!;
       const minBond = await this.minBond();
@@ -214,11 +214,11 @@ export class Maker {
     return this.minBondCache.value;
   }
 
-  /** Margin free on this maker's Hyperliquid testnet account, read at most every 30 seconds. */
+  /** Margin free on this maker's Hyperliquid account, read at most every 30 seconds. */
   private hlMarginCache: { at: number; value: number } = { at: 0, value: 0 };
   private async hlMargin(): Promise<number> {
     if (!this.hlKey) return 0;
-    if (Date.now() - this.hlMarginCache.at > 30_000) this.hlMarginCache = { at: Date.now(), value: await testnetWithdrawable(addressOfKey(this.hlKey)).catch(() => 0) };
+    if (Date.now() - this.hlMarginCache.at > 30_000) this.hlMarginCache = { at: Date.now(), value: await hedgeWithdrawable(addressOfKey(this.hlKey)).catch(() => 0) };
     return this.hlMarginCache.value;
   }
 
@@ -365,7 +365,8 @@ export async function startMakers() {
     makers.push(new Maker(net, name, style, near, seed, quoteKey, api, relayer, settings.str("MAKERS_DATA_DIR", "./data/makers"), process.env[`${prefix}_HL_KEY`] || null, slot));
   }
   if (makers.length === 0) throw new Error("No maker configured (MAKER_A_SEED, _QUOTE_KEY, and _POLICY_WALLET_KEY or _ACCOUNT with _PRIVATE_KEY)");
-  const bondTarget = BigInt(settings.str("MAKER_BOND", "20000000000"));
+  // the bond each maker keeps on the desk: 20,000 test USDC on testnet, 1,000 real USDC on mainnet (scripts/deploy.ts)
+  const bondTarget = BigInt(settings.str("MAKER_BOND", net.id === "mainnet" ? "1000000000" : "20000000000"));
   for (const m of makers) {
     await m.wallet.restore();
     await m.ensureRegistered(`${publicUrl}/makers/${m.account}/quote`).catch((e) => console.error(`${m.name} register:`, (e as Error).message));

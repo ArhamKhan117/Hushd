@@ -8,6 +8,8 @@
  *   poll keep the index current, including transactions signed by users' own wallets.
  * - "blocks": every final block from the neardata stream. Its free tier reads about 30
  *   blocks a minute, slower than testnet makes them, so this needs NEARDATA_API_KEY.
+ * - "rpc": every final block from the RPC node itself (a self-run node or a local
+ *   sandbox), with no hosted API: each transaction to a watched contract, with its outcome.
  *
  * Restart-safe: it resumes from its saved cursors, and every event is keyed by
  * (receipt id, log index), so reading a transaction or block twice never duplicates
@@ -258,6 +260,40 @@ export class TxIndexer {
   }
 }
 
+/** Indexes from the RPC node: the chunks of each final block, then every transaction sent to a watched contract. */
+export class RpcIndexer {
+  head = 0;
+  cursor = 0;
+  constructor(readonly net: HushdNetwork, readonly db: Db, readonly watched: Set<string>) {}
+
+  private async rpc<T>(method: string, params: object): Promise<T | null> {
+    const r = await postJson<{ result?: T; error?: unknown }>(this.net.rpc[0]!, { jsonrpc: "2.0", id: 1, method, params });
+    return r.result ?? null;
+  }
+
+  async step(maxBlocks = 50): Promise<number> {
+    this.head = await finalHeight(this.net);
+    const saved = await this.db.getCursor("indexer:rpc");
+    const from = saved !== null ? saved + 1 : Math.max(settings.num("INDEXER_FROM_BLOCK", 0) || this.head - 10, 0);
+    const to = Math.min(this.head, from + maxBlocks - 1);
+    for (let h = from; h <= to; h++) {
+      // a height with no block (skipped) has nothing to index
+      const block = await this.rpc<{ header: { timestamp: number }; chunks: { chunk_hash: string; height_included: number }[] }>("block", { block_id: h });
+      for (const c of block?.chunks.filter((x) => x.height_included === h) ?? []) {
+        const chunk = await this.rpc<{ transactions: { hash: string; signer_id: string; receiver_id: string }[] }>("chunk", { chunk_id: c.chunk_hash });
+        for (const tx of chunk?.transactions ?? []) {
+          if (!this.watched.has(tx.receiver_id)) continue;
+          const outcome = await this.rpc<OutcomeLike>("EXPERIMENTAL_tx_status", { tx_hash: tx.hash, sender_account_id: tx.signer_id, wait_until: "FINAL" });
+          if (outcome) await storeEvents(this.db, eventsInOutcome(outcome, this.watched, { height: h, ms: Math.floor(block!.header.timestamp / 1e6) }));
+        }
+      }
+      await this.db.setCursor("indexer:rpc", h);
+      this.cursor = h;
+    }
+    return to >= from ? to - from + 1 : 0;
+  }
+}
+
 // the transactions API returns up to this many per page
 const TX_PAGE = 200;
 
@@ -281,7 +317,7 @@ export async function startIndexer() {
   await db.migrate();
   const watched = watchedContracts(net);
   const source = settings.str("INDEXER_SOURCE", "transactions");
-  const ix = source === "blocks" ? new Indexer(net, db, watched) : new TxIndexer(net, db, watched, () => finalHeight(net));
+  const ix = source === "blocks" ? new Indexer(net, db, watched) : source === "rpc" ? new RpcIndexer(net, db, watched) : new TxIndexer(net, db, watched, () => finalHeight(net));
   const a = app("indexer", async () => ({ source, cursor: ix.cursor, head: ix.head, behind: ix.head - ix.cursor }));
   listen(a, settings.port("indexer", 8789), "indexer");
   for (;;) {

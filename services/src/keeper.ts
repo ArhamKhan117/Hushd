@@ -4,7 +4,7 @@
  * - Expires matched deals nobody settled in time (receipt: failed).
  * - Runs each bonded hedge leg: asks the desk to have the MPC sign the deal's own
  *   order (the desk rebuilds it from the deal; the keeper cannot change it), submits it
- *   to Hyperliquid testnet from the deal's own address, and records the fill or the
+ *   to Hyperliquid (the network the deal's terms name) from the deal's own address, and records the fill or the
  *   rejection. A rejection before the deadline lets the desk sign the order again (up to
  *   three attempts); the last rejection or a missed deadline slashes the maker's bond.
  * - Retries a slashed bond the pool refused (deposits paused, a limit).
@@ -19,7 +19,9 @@ const MAX_HEDGE_ATTEMPTS = 3;
 /** How often a refused slash payout is sent to the pool again. */
 const SLASH_RETRY_MS = 10 * 60_000;
 
-const HL_EXCHANGE = () => settings.str("HYPERLIQUID_TESTNET_EXCHANGE_URL", "https://api.hyperliquid-testnet.xyz/exchange");
+/** The Hyperliquid exchange endpoint, testnet or mainnet, that a deal's hedge names. */
+const hlExchange = (testnet: boolean) =>
+  testnet ? settings.str("HYPERLIQUID_TESTNET_EXCHANGE_URL", "https://api.hyperliquid-testnet.xyz/exchange") : settings.str("HYPERLIQUID_EXCHANGE_URL", "https://api.hyperliquid.xyz/exchange");
 
 type MpcSignature = { big_r?: string | { affine_point: string }; s?: string | { scalar: string }; recovery_id?: number };
 
@@ -80,7 +82,7 @@ export class Keeper {
     const out = signed.result as { nonce: string; signature: MpcSignature } | null;
     if (!out) throw new Error("the MPC did not sign");
     const body = { action: orderAction(d.hedge!, false), nonce: Number(out.nonce), signature: toRsv(out.signature), vaultAddress: null };
-    const res = await fetch(HL_EXCHANGE(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(hlExchange(d.hedge!.testnet), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000) });
     const json = (await res.json().catch(() => ({ status: "err", response: `HTTP ${res.status}` }))) as { status: string; response: unknown };
     const status = json.status === "ok" ? ((json.response as { data?: { statuses?: HlStatus[] } }).data?.statuses?.[0] ?? {}) : { error: String(json.response) };
     const filled = !!status.filled;

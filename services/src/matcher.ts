@@ -4,20 +4,21 @@
  * the enclave-signed match to the desk. It cannot read the request, the quotes or the
  * result's sealed terms; it only carries them.
  */
+import { spawn } from "node:child_process";
 import { network, account, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { Db } from "./db.js";
 import { app, listen } from "./http.js";
-import type { HushdNetwork } from "@hushd/sdk";
+import { CUSTODY, type HushdNetwork } from "@hushd/sdk";
 
 export interface EnclaveCall {
   (input: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
 /** OutLayer's HTTPS API: POST {api}/call/{owner}/{project}. */
-export function outlayerHttps(): EnclaveCall {
-  const api = settings.str("OUTLAYER_API", "https://testnet-api.outlayer.ai");
-  const project = settings.str("OUTLAYER_PROJECT", "hushd.testnet/matcher");
+export function outlayerHttps(net: HushdNetwork): EnclaveCall {
+  const api = settings.str("OUTLAYER_API", CUSTODY[net.id].api);
+  const project = settings.str("OUTLAYER_PROJECT", net.id === "mainnet" ? "hushd.near/matcher" : "hushd.testnet/matcher");
   const key = settings.str("OUTLAYER_KEY", "");
   return async (input) => {
     if (!key) throw new Error("OUTLAYER_KEY is not set (a payment key or a wk_ API key)");
@@ -36,6 +37,33 @@ export function outlayerHttps(): EnclaveCall {
     const parsed = (typeof out === "string" ? JSON.parse(out) : out) as Record<string, unknown>;
     return body.attestation_url ? { ...parsed, attestation_url: body.attestation_url } : parsed;
   };
+}
+
+/**
+ * The same matcher code run as a local process, for a local sandbox node only: there is
+ * no TEE, so whoever runs it sees the requests and quotes. MATCHER_LOCAL_BIN is a native
+ * build of `matcher/` and MATCHER_LOCAL_KEY its 32-byte hex seed.
+ */
+export function localEnclave(bin: string, seedHex: string): EnclaveCall {
+  return (input) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(bin, [], { env: { PROTECTED_MATCHER_KEY: seedHex }, stdio: ["pipe", "pipe", "pipe"] });
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (b: Buffer) => (out += b.toString()));
+      child.stderr.on("data", (b: Buffer) => (err += b.toString()));
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code !== 0) return reject(new Error(`the local matcher exited ${code}: ${err.slice(0, 300)}`));
+        try {
+          // like OutLayer, hand back the module's own answer (a failed match is `matched: false` with its reason)
+          resolve(JSON.parse(out) as Record<string, unknown>);
+        } catch {
+          reject(new Error(`the local matcher printed no JSON: ${out.slice(0, 200)}`));
+        }
+      });
+      child.stdin.end(JSON.stringify(input));
+    });
 }
 
 export class Matcher {
@@ -89,7 +117,9 @@ export async function startMatcher() {
   if (!acc) throw new Error("MATCHER_ACCOUNT and MATCHER_PRIVATE_KEY are required");
   const db = new Db(settings.databaseUrl());
   await db.migrate();
-  const m = new Matcher(net, db, new Signer(net, acc), outlayerHttps());
+  const local = settings.str("MATCHER_LOCAL_BIN", "");
+  if (local && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(net.rpc[0]!)) throw new Error("MATCHER_LOCAL_BIN runs the matcher outside a TEE: only against a local sandbox node");
+  const m = new Matcher(net, db, new Signer(net, acc), local ? localEnclave(local, settings.str("MATCHER_LOCAL_KEY", "")) : outlayerHttps(net));
   listen(app("matcher", async () => ({ account: acc.accountId })), settings.port("matcher", 8790), "matcher");
   for (;;) {
     await m.step().catch((e) => console.error("matcher:", (e as Error).message));

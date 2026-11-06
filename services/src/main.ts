@@ -3,8 +3,8 @@
  */
 import { existsSync } from "node:fs";
 
-// Outside Docker, read the repo's .env (values already in the environment win).
-const dotenv = new URL("../../.env", import.meta.url).pathname;
+// Outside Docker, read the repo's .env, or HUSHD_ENV_FILE (values already in the environment win).
+const dotenv = process.env.HUSHD_ENV_FILE ?? new URL("../../.env", import.meta.url).pathname;
 if (existsSync(dotenv)) process.loadEnvFile(dotenv);
 
 const service = process.argv[2] ?? process.env.SERVICE;

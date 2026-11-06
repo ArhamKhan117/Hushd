@@ -3,13 +3,17 @@
  * Hyperliquid's perp metadata and number formats for hedge orders, and NEAR Intents
  * (1Click) dry quotes as a second price: what the open market would pay right now.
  * Prices come from mainnet (public data, no account, nothing is traded); hedge orders
- * go to Hyperliquid testnet.
+ * go to Hyperliquid testnet, or mainnet when Hushd runs on mainnet (`hedgeTestnet`).
  */
 import { OneClick, quoteRequest } from "@hushd/sdk";
 import { settings } from "./config.js";
 
 const HL_MAIN = () => settings.str("HYPERLIQUID_INFO_URL", "https://api.hyperliquid.xyz/info");
 const HL_TEST = () => settings.str("HYPERLIQUID_TESTNET_INFO_URL", "https://api.hyperliquid-testnet.xyz/info");
+
+/** Hedge orders go to Hyperliquid testnet unless HYPERLIQUID_NETWORK=mainnet; it follows HUSHD_NETWORK by default. */
+export const hedgeTestnet = () => settings.str("HYPERLIQUID_NETWORK", settings.str("HUSHD_NETWORK", "testnet")) !== "mainnet";
+const HL_HEDGE = () => (hedgeTestnet() ? HL_TEST() : HL_MAIN());
 
 async function info<T>(url: string, body: object): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
@@ -48,17 +52,17 @@ export interface PerpMeta {
 }
 
 let metaCache: Record<string, PerpMeta> | null = null;
-/** Hyperliquid testnet perp universe: asset index and size decimals by coin. */
-export async function testnetPerps(): Promise<Record<string, PerpMeta>> {
+/** The perp universe of the Hyperliquid network hedges go to: asset index and size decimals by coin. */
+export async function hedgePerps(): Promise<Record<string, PerpMeta>> {
   if (metaCache) return metaCache;
-  const m = await info<{ universe: { name: string; szDecimals: number; maxLeverage: number }[] }>(HL_TEST(), { type: "meta" });
+  const m = await info<{ universe: { name: string; szDecimals: number; maxLeverage: number }[] }>(HL_HEDGE(), { type: "meta" });
   metaCache = Object.fromEntries(m.universe.map((u, i) => [u.name, { asset: i, szDecimals: u.szDecimals, maxLeverage: u.maxLeverage }]));
   return metaCache;
 }
 
-/** USDC an account on Hyperliquid testnet can still put up as margin (0 when the account does not exist). */
-export async function testnetWithdrawable(address: string): Promise<number> {
-  const s = await info<{ withdrawable?: string }>(HL_TEST(), { type: "clearinghouseState", user: address });
+/** USDC an account can still put up as margin where hedges go (0 when the account does not exist). */
+export async function hedgeWithdrawable(address: string): Promise<number> {
+  const s = await info<{ withdrawable?: string }>(HL_HEDGE(), { type: "clearinghouseState", user: address });
   return Number(s.withdrawable ?? 0);
 }
 

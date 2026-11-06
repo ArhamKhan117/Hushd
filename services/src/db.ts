@@ -28,7 +28,15 @@ export class Db {
     this.pool = new pg.Pool({ connectionString: url, max: 5 });
   }
   async migrate() {
-    await this.pool.query(SCHEMA);
+    // services starting together on an empty database would race on `create table if not exists`
+    const c = await this.pool.connect();
+    try {
+      await c.query("select pg_advisory_lock(7317)");
+      await c.query(SCHEMA);
+    } finally {
+      await c.query("select pg_advisory_unlock(7317)").catch(() => undefined);
+      c.release();
+    }
   }
   q<T extends pg.QueryResultRow = Record<string, unknown>>(sql: string, args: unknown[] = []) {
     return this.pool.query<T>(sql, args);
