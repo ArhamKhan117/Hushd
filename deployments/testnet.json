@@ -1,0 +1,285 @@
+{
+  "network": "testnet",
+  "deployer": "hushd.testnet",
+  "deployedAt": "2026-11-06T06:42:29.913Z",
+  "contracts": {
+    "usdc": {
+      "account": "usdc.hushd.testnet",
+      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
+      "tx": ""
+    },
+    "wnear": {
+      "account": "wnear.hushd.testnet",
+      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
+      "tx": ""
+    },
+    "btc": {
+      "account": "btc.hushd.testnet",
+      "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
+      "tx": ""
+    },
+    "pool": {
+      "account": "pool.hushd.testnet",
+      "codeHash": "3AvLotBc7bjBEjFYBawtDJcd5AvFyFRoVetJtcXXCv1j",
+      "tx": "9wTpkYhWTCB1YRjgFb65tAUsAAnVATyYZ4P1WoJguP8b"
+    },
+    "board": {
+      "account": "board.hushd.testnet",
+      "codeHash": "GpaqnwDd7X6soEFxtnM8sDzpf7JvNYhwia63VZPc5jyD",
+      "tx": "GiBFw3p5QSb5uYPHCiL6xuKtM4wfJ9TkAHgWv4hykRzv"
+    },
+    "desk": {
+      "account": "desk.hushd.testnet",
+      "codeHash": "CKQHb1JKRM1smft8EAwL2VZ2nrftBzjxtEe4HNTuzDTN",
+      "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
+      "redeployed": "MKcLXTL1nmia5J7AZpzLrHryU68mkzgivvJMJGN5xd7"
+    }
+  },
+  "services": {
+    "relayer": "relayer.hushd.testnet",
+    "matcher": "matcher.hushd.testnet",
+    "keeper": "keeper.hushd.testnet",
+    "maker-a": "maker-a.hushd.testnet",
+    "maker-b": "maker-b.hushd.testnet",
+    "maker-c": "maker-c.hushd.testnet"
+  },
+  "steps": [
+    {
+      "what": "create relayer.hushd.testnet",
+      "tx": "DkXNzb3MT2NBv1TTze4MREv8vS82yg8dPbHbVJRAKHnL"
+    },
+    {
+      "what": "create matcher.hushd.testnet",
+      "tx": "6bpct6GSJbPWcbUPCLSCG7tHCCcUjWkxceRKsm4fKReR"
+    },
+    {
+      "what": "create keeper.hushd.testnet",
+      "tx": "DT2SMTFWHLBHa1EDRNHAyhXDJPFRqvoPCegyxCDCGgk8"
+    },
+    {
+      "what": "create maker-a.hushd.testnet",
+      "tx": "HtuSUcP7MTK3AXf5WBwj9UhJvodjthRXVnLHsULaZocZ"
+    },
+    {
+      "what": "create maker-b.hushd.testnet",
+      "tx": "FjnsvL7KamDWhET864opfbbTbCFmpJLZjr582SeGPvYh"
+    },
+    {
+      "what": "create maker-c.hushd.testnet",
+      "tx": "GYhkRKyefBFwZ7YM5YBmS1NGppgYREvkEGjPyVzoTZGJ"
+    },
+    {
+      "what": "fund the relayer's gas key",
+      "tx": "DJh5PcHShfGSqXWkwyKfza1bwY2PbLqFwAHtAEUeD1VZ"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.set_operator",
+      "tx": "F4caFMkBDoqvPeTnDD7RLrjecxrYaCewEqidye5HxAPv"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.set_operator",
+      "tx": "2vdy7NsWYxJhrimZPyssyVtW7wibuqwnSG9knqxj2rcd"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.set_operator",
+      "tx": "8cSFXUvb49GdfHnaKkSt26j5bD6e9wqMUEC8Z2gurbwe"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.storage_deposit",
+      "tx": "HdLXFQ5ho5ffZEbskicgs7KoLxhbnr6zi3XFTRKWhiZx"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.storage_deposit",
+      "tx": "vLhousTWbkyMtWmYM6aUrugTJnVUke43ksj8H1pFWzk"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.storage_deposit",
+      "tx": "E5zPf57WNdnUr7Dng5dn237ziyrx5kcREK9Z8e2DbDs1"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.storage_deposit",
+      "tx": "2TAqoAt8FoU2yznDh7vHmyAawVZWiLToa6nTCBTCcHB7"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.storage_deposit",
+      "tx": "BD1hibke14rQyoMKq55Z3RptzdHGwEnvArQVzpGG74wR"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.storage_deposit",
+      "tx": "9AXGYFKaZpK4itwzk9BSSkUjHoDj3jY13wJre45Hic2h"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.storage_deposit",
+      "tx": "BGVHpeKcBvNh9vzbgoWsTQCCuhW8qV4eJQAat2bbLTd3"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.storage_deposit",
+      "tx": "53EPpLqMa6ycnBX77Fe6MoPEyf1REPDVRxfGt6Dc4bBL"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.storage_deposit",
+      "tx": "3h4Em7NUGRMDzQ36bbB7ZnwukaBaS25X8EpBaAXriRby"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.storage_deposit",
+      "tx": "9uD6cygSnAKDe4YBErgka6CsYfShbRKSCYihC7cZX7k8"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.storage_deposit",
+      "tx": "4hdYR6TnnuUqR2qgFPKPueaJvzco11mcgynHgj6dLDfQ"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.storage_deposit",
+      "tx": "13SERHKjpcrziCnM5CTvhwbhEvEWZzW5bFuqd5g3gLoC"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.storage_deposit",
+      "tx": "AM7cGQfxmwWGLMiatq2cKi4vHYSypcPyb4Mu659qrc9Q"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.storage_deposit",
+      "tx": "G5FTUXxddj3Mu2CRBc73W5CesM5gHuBjZ5Wvfa9XMc11"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.storage_deposit",
+      "tx": "9qjPzX7aCGw7SEqUtByGcouw447U1DyYJcHbypsog6Kh"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> board.hushd.testnet.storage_deposit",
+      "tx": "2b49BFnPT8y2U1DrcYAgew9c27MHX4DNK9H9fn2phDkH"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.mint",
+      "tx": "5iys4FmNBbqGV1aXE7AXP8x6HroHDTSXTMRwfRggLRCg"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "5mqiQyMUdnHtS9FPTsjJhZCavuKzLSqDCqT73ppBwi9f"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "G6uuphrwneUE7zgLLhEVsxZpCQX2T2gJ661ZJEDKhHFz"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.mint",
+      "tx": "4jKJRrmwEVWMmnEuhFN9Y8zNdyxZR64nkvLfgjvtZ3cB"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "ww2zdHeeLd4wm4BXWNWzE5xrYqBzDfguJockzRJA3Eo"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> wnear.hushd.testnet.ft_transfer_call",
+      "tx": "7fXzYHFfy65KeH2tQMaAAnpFmtDBTqrqeAEgboFeVqUJ"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.mint",
+      "tx": "BcwwfXrYsoBZ9gAJNiH27iEPW2JnfYY3UJDBhiKRAPKb"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "1npMJhoGw3jfGpYRMEkD63sHqamFvyodiLTr3pFtoam"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> btc.hushd.testnet.ft_transfer_call",
+      "tx": "GDMRRSkv4hZP8CFqGdKdcNMkvKAnAab1xaJNYjpH6sxM"
+    },
+    {
+      "what": "maker-a.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "G2UJz4juoh7BFj6JDKUnGfnwAJFVMinBaXEFMGkY6ED7"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> board.hushd.testnet.storage_deposit",
+      "tx": "FuhaAMtzHMCn9Rxeqb1Td28CQe5jWjaQjpf3ACfGjp76"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.mint",
+      "tx": "69JjpMkrScKpbh1Cbg2CcW656VCabyGMsbfY2AA15oZi"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "5dWPE8ef9aRHe9HviDBRhm5ormjQRRq9in6Avx32FWMp"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "JDsKkxkVvXi1aDbHJ7rARE89DfuES8q3LPaMUjgQ6ULM"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.mint",
+      "tx": "5Ln7WAwJxqTPpWqNBfTpMsPeKdj6itK5JZVjXLthXxyJ"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "Cds7zK4qWmmEvnmVhLkbysBsU7oRWowtxmNRG9k6XMvs"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> wnear.hushd.testnet.ft_transfer_call",
+      "tx": "GAHfhTVkbnR8VCtuRCzAr5zAw1qA2u8Mk4jFVubTt156"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.mint",
+      "tx": "5tKnS5tE14ZGUnwMY8z3L6aLLuSBuQfYavBiiTYQbho6"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "AxsCwHcUdQxHyKNtDx1Mv7FE7L5Ey4Foh1dUZw3Nshme"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> btc.hushd.testnet.ft_transfer_call",
+      "tx": "4gFy2JfQhScTdMdftDKAjUxVLsZUTRLpKBUf4595kLg5"
+    },
+    {
+      "what": "maker-b.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "EXNdmZGMHoPXsUteHss1kGis3LCZN1xXy76zvZK3x6Y4"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> board.hushd.testnet.storage_deposit",
+      "tx": "D5k3BgMSri78qMKukt9zxUsVXxE3vQs3VX8rNoXCWnmM"
+    },
+    {
+      "what": "hushd.testnet -> usdc.hushd.testnet.mint",
+      "tx": "FBU34UaMNXpwheHgcBDPHaskaiEzZZHh3weRyemxm7HN"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "7wPvr2AkA6gpArsetZJcFAvDZP3zx8wQMuRhfxFFpvcD"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "D85RQWa5uEz6xGSujBPp179Pt74cJmmsS1YrrNChWacs"
+    },
+    {
+      "what": "hushd.testnet -> wnear.hushd.testnet.mint",
+      "tx": "7vVseiy14gm8a5NnDxFBKmFW6uZHNfQjXFhCS9XvqGtK"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "9CSH2MDbtE5nuiLENroKm8fWeTwrPeiB2XfTpM4p63cQ"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> wnear.hushd.testnet.ft_transfer_call",
+      "tx": "GFHK1BTf3xQK1Z37o3oerSGxLDyvxpMZaRkevcoT3pbQ"
+    },
+    {
+      "what": "hushd.testnet -> btc.hushd.testnet.mint",
+      "tx": "AkgPVKhHVkzyPeV4rBdjo68Zh7KL8LHtk4RgenM4DTh6"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> board.hushd.testnet.post",
+      "tx": "45AC74zDChJLdXLUoS5GEhGYURqJcLZBPeT9tgaVLtcW"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> btc.hushd.testnet.ft_transfer_call",
+      "tx": "6wvt9x28cm4vTvwxmrb76QVHKqwELDg4RNFfcp8j5U24"
+    },
+    {
+      "what": "maker-c.hushd.testnet -> usdc.hushd.testnet.ft_transfer_call",
+      "tx": "5BYDkTkfPU5PjYrGZwEMq3PkvemmDMRHfSc4H8gnb8oT"
+    }
+  ],
+  "matcher": {
+    "project": "hushd.testnet/matcher",
+    "wasmSha256": "7521d46a6a79a26f31fe94d70f4c84b9ba6bf825090ec8f18b9ecdb14bf363ae",
+    "secret": "PROTECTED_MATCHER_KEY (generated in the TEE, locked to this build)"
+  }
+}
