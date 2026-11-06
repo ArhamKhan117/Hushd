@@ -42,6 +42,12 @@ const EVIDENCE_WORDS: Record<string, string> = {
   expired: "Expired",
 };
 
+/** How the match reached the desk (the deal's `attested_by`), in words. */
+const ATTESTED_WORDS: Record<string, string> = {
+  enclave_signature: "signed with the matcher enclave's key",
+  outlayer: "returned by OutLayer's on-chain callback",
+};
+
 const BOND = NETWORK.bondToken ?? NETWORK.tokens[0]!.id;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -178,7 +184,9 @@ export default function DealPage() {
                     {makerName ? `${makerName} (${deal.maker})` : deal.maker}
                   </a>
                 </Row>
-                <Row label="Matched">{when(deal.matched_at_ms)}, attested by enclave key <span className="break-all text-soft">{deal.attested_by}</span></Row>
+                <Row label="Matched">
+                  {when(deal.matched_at_ms)}, {ATTESTED_WORDS[deal.attested_by] ?? <>attested by <span className="break-all text-soft">{deal.attested_by}</span></>}
+                </Row>
                 <Row label="Terms hash">
                   <span className="break-all font-mono text-[12.5px] text-soft">{deal.terms_hash}</span>
                 </Row>

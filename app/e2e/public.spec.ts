@@ -28,7 +28,8 @@ test("the proof checker refuses something that is not a proof", async ({ page })
   await page.goto("/verify");
   await page.getByPlaceholder("hushdproof1…").fill("hushdproof1notreallyaproof");
   await page.getByRole("button", { name: "Check" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  // Next adds an empty route announcer with role=alert: look for ours, the one with text
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
 });
 
 test("the app asks to sign in before the desk", async ({ page }) => {

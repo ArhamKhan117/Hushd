@@ -334,7 +334,7 @@ export function Landing() {
               A deal can have more than one leg. Makers quote the whole package, and it settles and is recorded as one.
             </p>
           </div>
-          <div className="-mx-4 mt-10 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-4 mt-10 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:scroll-px-0 sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
             {PACKAGES.map((p) => (
               <Link
                 key={p.title}
@@ -342,7 +342,7 @@ export function Landing() {
                 className="hd-tile group flex min-h-[240px] w-[78%] shrink-0 snap-start flex-col p-6 transition-colors hover:bg-surface-2 sm:w-auto"
               >
                 {p.icon}
-                <div className="mt-auto pt-10">
+                <div className="pt-14">
                   <p className="text-[19px] leading-snug tracking-[-0.01em] text-foreground">{p.title}</p>
                   <p className="mt-2 text-[14px] leading-relaxed text-mute">{p.body}</p>
                 </div>

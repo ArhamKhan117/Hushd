@@ -84,9 +84,9 @@ export default function MakersPage() {
         )}
 
         {enclave && (
-          <section className="hd-tile grid gap-2 p-5 sm:p-6">
+          <section className="grid gap-2">
             <p className="t-label">The matcher</p>
-            <p className="text-[14px] leading-relaxed text-soft">
+            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">
               Requests and quotes are opened only inside a TEE: the matcher runs as the OutLayer project <span className="text-foreground">{enclave.project}</span>, with keys generated inside the enclave. The desk accepts a match only from OutLayer&apos;s on-chain callback or signed by this enclave key.
             </p>
             <p className="break-all text-[12.5px] text-mute">Signing key {short(enclave.sign_key)} · Sealing key {short(enclave.enc_key)}</p>

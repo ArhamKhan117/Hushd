@@ -306,7 +306,7 @@ export default function DeskPage() {
                   id="intake"
                   rows={4}
                   className="mt-2 w-full resize-none bg-transparent text-[16px] leading-relaxed text-foreground outline-none placeholder:text-faint"
-                  placeholder="Sell 2,000 USDC for BTC, at least 0.03 BTC, and keep me neutral."
+                  placeholder="Sell 500 USDC for BTC at the best price."
                   value={text}
                   maxLength={600}
                   onChange={(e) => setText(e.target.value)}

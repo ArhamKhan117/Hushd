@@ -132,7 +132,7 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
   }, [open]);
 
   return (
-    <div className="hushd-app relative flex min-h-full flex-col bg-background">
+    <div className="hushd-app relative flex min-h-svh flex-col bg-background">
       <aside className="hd-sidebar fixed bottom-3 left-3 top-3 z-40 w-[248px] flex-col rounded-[20px] border border-line bg-panel p-3 shadow-card" aria-label="App">
         <div className="flex items-center justify-between px-2 pb-5 pt-2">
           <Logo size={24} />

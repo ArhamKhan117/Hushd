@@ -1,9 +1,9 @@
 /**
  * Where a Hushd seed comes from in the browser, and the keys derived from it.
  *
- * - A NEAR wallet signs one fixed NEP-413 message (same message, same nonce): the
- *   signature is the seed, so the same wallet key unlocks the same private balance on
- *   any device and nothing secret is ever stored.
+ * - A NEAR wallet signs one fixed NEP-413 message (same message, same nonce): the seed
+ *   is a hash of that signature, so the same wallet key unlocks the same private balance
+ *   on any device and nothing secret is ever stored.
  * - A passkey's WebAuthn PRF output is the seed. It also derives a NEAR key for an
  *   implicit account, so someone with no wallet can still sign their own deposits.
  */
