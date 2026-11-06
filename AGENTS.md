@@ -23,6 +23,9 @@ pnpm verify                                 # every README claim, checked live, 
 pnpm mcp init && pnpm --silent mcp          # local MCP server with an agent seed
 cd contracts && cargo test -p hushd-pool -p hushd-desk -p hushd-board -p hushd-token  # unit tests, real proofs
 pnpm --filter @hushd/services deploy:testnet  # deploy from a funded hushd.testnet
+pnpm --filter @hushd/services deploy:mainnet  # the mainnet plan; sends only with HUSHD_MAINNET_GO=hushd.near (owner's yes)
+pnpm --filter @hushd/services mainnet:sandbox # the mainnet build end to end on a local node with the real USDC, wrap.near and nBTC code
+pnpm --filter circuits ceremony start|contribute <name>|verify|finalize <height>  # multi-party proving keys for mainnet
 pnpm --filter @hushd/services policy-wallet create|show|freeze|unfreeze <ENV_PREFIX>  # an agent's OutLayer policy wallet
 pnpm --filter @hushd/services intents:sandbox # the NEAR Intents trade on a local node running intents.near's code
 pnpm --filter @hushd/services intents:mainnet # plan and dry run of the mainnet Intents trades (sends nothing)

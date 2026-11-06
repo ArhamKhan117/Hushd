@@ -109,7 +109,7 @@ What held up, with the evidence in the review:
 
 ## Trust and limits
 
-- The proving keys are development keys from one machine, not a multi-party ceremony.
+- The proving keys are development keys from one machine, not a multi-party ceremony; mainnet waits for one (`circuits/scripts/ceremony.mjs`, see [MAINNET.md](MAINNET.md)).
 - The matcher enclave sees requests and quotes in the clear; you trust OutLayer's attestation that it runs this repository's `matcher/` code.
 - The relayer can refuse to send a proof, but it cannot change a recipient, an amount or a fee.
 - The full trust model is on [hushd.net/docs/threat-model](https://hushd.net/docs/threat-model).

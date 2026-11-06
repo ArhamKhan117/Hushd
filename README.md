@@ -152,6 +152,12 @@ The contract review of 6 November 2026 found one High: anyone could settle a mat
 It is fixed: `desk.settle` now needs both parties' signatures over the deal's four outputs.
 That finding, the three Medium and six Low, and what changed for each are in [SECURITY.md](SECURITY.md).
 
+## Mainnet
+
+Hushd runs on testnet, and every part is built to run on mainnet too: going live is a deploy and environment switches, with no code changes.
+`pnpm --filter @hushd/services mainnet:sandbox` runs the mainnet build end to end on a local node holding the real mainnet USDC, `wrap.near` and nBTC code: a deploy as `hushd.near`, the services on mainnet settings, and an agent that shields, sends, trades two pairs, cashes out, proves and pays over x402 (16 of 16 checks pass).
+Mainnet still needs a multi-party proving-key ceremony first (`circuits/scripts/ceremony.mjs`); [MAINNET.md](MAINNET.md) has what is ready, how it was tested and the steps to go live.
+
 ## Repository
 
 <img src="assets/readme/repository.png" alt="What is in the repository: Rust contracts on NEAR, circom circuits and the OutLayer matcher enclave, and the TypeScript SDK, MCP server, services and app" width="960">
