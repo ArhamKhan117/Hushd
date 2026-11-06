@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { CUSTODY, CustodyWallet, custodyView, DeskApi, identityFromSeed, loadPoseidon, PrivateWallet, RelayerClient, TESTNET, withOverrides, type ArtifactSource, type CallSpec, type HushdNetwork, type Identity } from "@hushd/sdk";
+import { CUSTODY, CustodyWallet, custodyView, DeskApi, identityFromSeed, keepRpcErrorBodies, loadPoseidon, PrivateWallet, RelayerClient, sendEndpoints, TESTNET, withOverrides, type ArtifactSource, type CallSpec, type HushdNetwork, type Identity } from "@hushd/sdk";
 import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 import { Near } from "near-kit";
 import { DEFAULT_PER_DAY, DEFAULT_PER_PAYMENT, Limits, parseCaps, parseRules } from "./limits.js";
@@ -76,7 +76,8 @@ async function nearAccount(env: Env, net: HushdNetwork): Promise<NearAccount | n
   }
   if (!env.HUSHD_NEAR_ACCOUNT || !env.HUSHD_NEAR_PRIVATE_KEY) return null;
   const accountId = env.HUSHD_NEAR_ACCOUNT;
-  const near = new Near({ network: { networkId: net.id, rpcUrl: net.rpc[0]! }, privateKey: env.HUSHD_NEAR_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: accountId });
+  keepRpcErrorBodies(net.rpc);
+  const near = new Near({ network: { networkId: net.id, rpcUrl: sendEndpoints(net)[0]! }, privateKey: env.HUSHD_NEAR_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: accountId });
   return {
     accountId,
     kind: "key",

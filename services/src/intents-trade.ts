@@ -10,7 +10,7 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { Near } from "near-kit";
-import { type CallSpec, type HushdNetwork, type Intent, type MultiPayload, accountBalance, implicitAccount, signIntents, tradeDiffs, verifierCalls, verifierView, view } from "@hushd/sdk";
+import { type CallSpec, type HushdNetwork, type Intent, type MultiPayload, accountBalance, implicitAccount, keepRpcErrorBodies, sendEndpoints, signIntents, tradeDiffs, verifierCalls, verifierView, view } from "@hushd/sdk";
 
 export interface Leg {
   token: string;
@@ -29,8 +29,9 @@ export class IntentsAgent {
   ) {
     this.accountId = implicitAccount(secret);
     const pub = ed25519.getPublicKey(secret);
+    keepRpcErrorBodies(net.rpc);
     this.client = new Near({
-      network: { networkId: net.id, rpcUrl: net.rpc[0]! },
+      network: { networkId: net.id, rpcUrl: sendEndpoints(net)[0]! },
       privateKey: `ed25519:${base58.encode(new Uint8Array([...secret, ...pub]))}`,
       defaultSignerId: this.accountId,
       defaultWaitUntil: "FINAL",
