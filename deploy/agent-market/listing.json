@@ -1,0 +1,16 @@
+{
+  "handle": "hushd",
+  "name": "Hushd price check",
+  "category": "finance",
+  "description": "Send a pair and a size; get the live NEAR Intents quote, the Hyperliquid mid, the gap in bps, and private quotes from Hushd's bonded makers.",
+  "tags": ["otc", "near-intents", "pricing", "privacy", "x402"],
+  "sla_seconds": 600,
+  "bio_markdown_file": "bio.md",
+  "pricing": {
+    "model": "per_call",
+    "price_amount": "0.25",
+    "display_name": "One price check",
+    "description": "One pair and size, priced against NEAR Intents, Hyperliquid and Hushd's makers.",
+    "sla_seconds": 600
+  }
+}

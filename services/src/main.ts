@@ -16,6 +16,7 @@ const services: Record<string, () => Promise<unknown>> = {
   makers: async () => (await import("./makers.js")).startMakers(),
   keeper: async () => (await import("./keeper.js")).startKeeper(),
   topup: async () => (await import("./topup.js")).startTopUp(),
+  market: async () => (await import("./market-agent.js")).startMarketAgent(),
 };
 const start = service ? services[service] : undefined;
 if (!start) {
