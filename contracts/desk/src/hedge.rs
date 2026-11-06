@@ -147,6 +147,12 @@ pub fn order_digest(spec: &HedgeSpec, nonce: u64, close: bool) -> [u8; 32] {
     agent_digest(connection_id(&action, nonce), spec.testnet)
 }
 
+/// sha256 of the spec's borsh bytes (32 zero bytes for no hedge): what a maker's consent
+/// commits to, so the hedge leg it bonds is exactly the one it signed.
+pub fn spec_hash(spec: Option<&HedgeSpec>) -> [u8; 32] {
+    spec.map(|s| env::sha256_array(near_sdk::borsh::to_vec(s).expect("borsh"))).unwrap_or([0u8; 32])
+}
+
 /// Chain Signatures derivation path of a deal's own Hyperliquid address: one fresh
 /// address per deal, so deals cannot be linked to each other on Hyperliquid.
 pub fn derivation_path(deal_id: u64) -> String {

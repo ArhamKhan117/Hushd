@@ -1,7 +1,9 @@
 //! Hushd testnet tokens (testnet only): a standard NEP-141 token with NEP-145
 //! storage and NEP-148 metadata, plus a faucet. The faucet gives a fixed amount
 //! per account per cooldown and registers the receiver's storage itself, so a new
-//! account can get tokens in one call. The owner can mint to seed the reference makers.
+//! account can get tokens in one call. `faucet_for` (paying another account) is for
+//! the owner and the operators it names (the relayer). The owner can mint to seed the
+//! reference makers.
 
 use near_contract_standards::fungible_token::events::{FtBurn, FtMint};
 use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC};
@@ -10,8 +12,8 @@ use near_contract_standards::storage_management::{StorageBalance, StorageBalance
 use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::{U128, U64};
-use near_sdk::store::LookupMap;
-use near_sdk::{env, near, require, AccountId, BorshStorageKey, NearToken, PanicOnDefault, PromiseOrValue};
+use near_sdk::store::{LookupMap, LookupSet};
+use near_sdk::{assert_one_yocto, env, near, require, AccountId, BorshStorageKey, NearToken, PanicOnDefault, PromiseOrValue};
 
 #[derive(BorshSerialize, BorshStorageKey)]
 #[borsh(crate = "near_sdk::borsh")]
@@ -19,6 +21,7 @@ enum Key {
     Token,
     Metadata,
     LastDrip,
+    Operators,
 }
 
 #[near(contract_state)]
@@ -30,6 +33,8 @@ pub struct Token {
     faucet_amount: u128,
     faucet_cooldown_ns: u64,
     last_drip: LookupMap<AccountId, u64>,
+    /// Accounts that may call `faucet_for`, besides the owner.
+    operators: LookupSet<AccountId>,
 }
 
 #[near(serializers = [json])]
@@ -42,6 +47,7 @@ pub struct FaucetInfo {
 #[near]
 impl Token {
     #[init]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(owner_id: AccountId, name: String, symbol: String, decimals: u8, icon: Option<String>, faucet_amount: U128, faucet_cooldown_ns: U64) -> Self {
         let metadata = FungibleTokenMetadata {
             spec: FT_METADATA_SPEC.to_string(),
@@ -60,6 +66,7 @@ impl Token {
             faucet_amount: faucet_amount.0,
             faucet_cooldown_ns: faucet_cooldown_ns.0,
             last_drip: LookupMap::new(Key::LastDrip),
+            operators: LookupSet::new(Key::Operators),
         }
     }
 
@@ -68,9 +75,28 @@ impl Token {
         self.drip(env::predecessor_account_id())
     }
 
-    /// Faucet for any account (a relayer can fund a new passkey account). Same cooldown.
+    /// Faucet for another account (the relayer funds a new passkey account). Owner or
+    /// operator only, same cooldown per receiving account.
     pub fn faucet_for(&mut self, account_id: AccountId) -> U128 {
+        let caller = env::predecessor_account_id();
+        require!(caller == self.owner || self.operators.contains(&caller), "Owner or operator only");
         self.drip(account_id)
+    }
+
+    /// Owner only, attach 1 yoctoNEAR: allow or stop an account calling `faucet_for`.
+    #[payable]
+    pub fn set_operator(&mut self, account_id: AccountId, allowed: bool) {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "Owner only");
+        if allowed {
+            self.operators.insert(account_id);
+        } else {
+            self.operators.remove(&account_id);
+        }
+    }
+
+    pub fn is_operator(&self, account_id: AccountId) -> bool {
+        self.operators.contains(&account_id)
     }
 
     pub fn faucet_info(&self, account_id: AccountId) -> FaucetInfo {
@@ -178,8 +204,12 @@ mod tests {
     use near_sdk::testing_env;
 
     fn ctx(who: &str, ts: u64) {
+        ctx_with(who, ts, NearToken::from_yoctonear(0));
+    }
+
+    fn ctx_with(who: &str, ts: u64, deposit: NearToken) {
         let mut b = VMContextBuilder::new();
-        b.predecessor_account_id(who.parse().unwrap()).block_timestamp(ts);
+        b.predecessor_account_id(who.parse().unwrap()).block_timestamp(ts).attached_deposit(deposit);
         testing_env!(b.build());
     }
 
@@ -205,8 +235,46 @@ mod tests {
         let mut t = token();
         ctx("alice.test", 1);
         t.faucet();
-        ctx("bob.test", 2);
+        ctx("owner.test", 2);
         t.faucet_for("alice.test".parse().unwrap());
+    }
+
+    #[test]
+    #[should_panic(expected = "Owner or operator only")]
+    fn strangers_cannot_faucet_for_others() {
+        let mut t = token();
+        ctx("bob.test", 1);
+        t.faucet_for("alice.test".parse().unwrap());
+    }
+
+    #[test]
+    fn an_operator_can_faucet_for_others_until_removed() {
+        let mut t = token();
+        ctx_with("owner.test", 1, NearToken::from_yoctonear(1));
+        t.set_operator("relayer.test".parse().unwrap(), true);
+        assert!(t.is_operator("relayer.test".parse().unwrap()));
+        ctx("relayer.test", 2);
+        assert_eq!(t.faucet_for("alice.test".parse().unwrap()).0, 1_000_000_000);
+        assert_eq!(t.ft_balance_of("alice.test".parse().unwrap()).0, 1_000_000_000);
+        ctx_with("owner.test", 3, NearToken::from_yoctonear(1));
+        t.set_operator("relayer.test".parse().unwrap(), false);
+        assert!(!t.is_operator("relayer.test".parse().unwrap()));
+    }
+
+    #[test]
+    #[should_panic(expected = "Owner only")]
+    fn only_the_owner_names_operators() {
+        let mut t = token();
+        ctx_with("relayer.test", 1, NearToken::from_yoctonear(1));
+        t.set_operator("relayer.test".parse().unwrap(), true);
+    }
+
+    #[test]
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn naming_an_operator_takes_one_yocto() {
+        let mut t = token();
+        ctx("owner.test", 1);
+        t.set_operator("relayer.test".parse().unwrap(), true);
     }
 
     #[test]
