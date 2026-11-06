@@ -6,7 +6,7 @@ This page lists what is checked, how to run every check yourself, what the last 
 
 ## Report a problem
 
-Please report privately through GitHub's **Report a vulnerability** (the Security tab of [ArhamKhan117/hushd](https://github.com/ArhamKhan117/hushd/security)).
+Please report privately through GitHub's **Report a vulnerability** (the Security tab of [ArhamKhan117/Hushd](https://github.com/ArhamKhan117/Hushd/security)).
 Do not open a public issue for anything that could move funds, break privacy or fake a receipt.
 It is testnet software, so there is no paid bug bounty.
 

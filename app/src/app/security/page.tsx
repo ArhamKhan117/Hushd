@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/security" },
 };
 
-const ISSUES = "https://github.com/ArhamKhan117/hushd/issues";
+const ISSUES = "https://github.com/ArhamKhan117/Hushd/issues";
 
 export default function SecurityPage() {
   return (

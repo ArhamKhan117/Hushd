@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/sdk" },
 };
 
-const GITHUB = "https://github.com/ArhamKhan117/hushd";
+const GITHUB = "https://github.com/ArhamKhan117/Hushd";
 
 /* ---------- line icons (same hand as the landing) ---------- */
 
@@ -306,7 +306,7 @@ export default function SdkPage() {
                     rel="noreferrer"
                     className="mt-2.5 flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-panel py-1.5 pl-3.5 pr-3 text-[13.5px] text-foreground transition-colors hover:border-line-strong sm:pl-4 sm:text-[14.5px]"
                   >
-                    <span className="min-w-0 [overflow-wrap:anywhere]">github.com/ArhamKhan117/hushd</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">github.com/ArhamKhan117/Hushd</span>
                     <ArrowUpRight className="text-mute" />
                   </a>
                   <p className="mt-5 text-[13px] text-mute">Then, in a clone of it</p>
@@ -452,7 +452,7 @@ export default function SdkPage() {
                 </p>
               </div>
               <div className="mt-10">
-                <CopyCommand command="git clone https://github.com/ArhamKhan117/hushd" />
+                <CopyCommand command="git clone https://github.com/ArhamKhan117/Hushd" />
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

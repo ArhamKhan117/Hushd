@@ -150,7 +150,7 @@ export default function ThreatModelPage() {
       <h2 id="reporting-a-problem">Reporting a problem</h2>
       <p>
         Open an issue on{" "}
-        <a href="https://github.com/ArhamKhan117/hushd/issues" target="_blank" rel="noreferrer">
+        <a href="https://github.com/ArhamKhan117/Hushd/issues" target="_blank" rel="noreferrer">
           GitHub
         </a>
         . If the problem could put someone at risk, say only that you found one and ask for a private way to share it,

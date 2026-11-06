@@ -30,7 +30,7 @@ const DEFAULT_QUICK_LINKS = [
   { href: "/verify", label: "Verify a proof" },
   { href: "/transparency", label: "Transparency" },
   { href: "/docs/privacy-model", label: "What stays private" },
-  { href: "https://github.com/ArhamKhan117/hushd", label: "GitHub" },
+  { href: "https://github.com/ArhamKhan117/Hushd", label: "GitHub" },
 ];
 
 /** Section ids scroll to just under the sticky header (100px mobile, 112px desktop). */

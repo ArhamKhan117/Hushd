@@ -22,7 +22,7 @@ export const metadata: Metadata = {
  */
 
 const MCP_URL = "https://hushd.net/mcp";
-const GITHUB = "https://github.com/ArhamKhan117/hushd";
+const GITHUB = "https://github.com/ArhamKhan117/Hushd";
 
 const FOUR = [
   {

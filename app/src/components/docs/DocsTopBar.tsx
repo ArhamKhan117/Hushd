@@ -10,7 +10,7 @@ import { DOCS_TABS, DocsNavList, activeTab } from "./DocsNav";
 import { SearchField, SearchIconButton, SearchPalette, useSearchShortcut } from "./DocsSearch";
 import { CloseIcon, GitHubIcon, MenuIcon } from "./docsUi";
 
-const GITHUB_URL = "https://github.com/ArhamKhan117/hushd";
+const GITHUB_URL = "https://github.com/ArhamKhan117/Hushd";
 
 /** Desktop and mobile header heights, so sticky rails can sit right under it. */
 export const DOCS_HEADER_OFFSET = "top-[100px] lg:top-[112px]";

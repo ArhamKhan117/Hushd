@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const ISSUES = "https://github.com/ArhamKhan117/hushd/issues";
+const ISSUES = "https://github.com/ArhamKhan117/Hushd/issues";
 
 export default function TermsPage() {
   return (
@@ -23,7 +23,7 @@ export default function TermsPage() {
         Hushd is open-source software for a private over-the-counter desk on NEAR, run by Arham Khan at hushd.net. It
         includes the website and app, the Hushd API at api.hushd.net, the hosted MCP server at hushd.net/mcp, and the
         contracts, services and packages in its{" "}
-        <a href="https://github.com/ArhamKhan117/hushd" target="_blank" rel="noreferrer">
+        <a href="https://github.com/ArhamKhan117/Hushd" target="_blank" rel="noreferrer">
           public repository
         </a>
         . By using any of them you accept these terms.

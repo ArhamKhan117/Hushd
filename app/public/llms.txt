@@ -46,7 +46,7 @@ Public on chain: deposits and cash outs with their amounts; that a desk deal hap
 
 ## Repository
 
-- https://github.com/ArhamKhan117/hushd (MIT)
+- https://github.com/ArhamKhan117/Hushd (MIT)
 - AGENTS.md: how to work on the repo
 - skills/hushd/SKILL.md: an agent skill for using Hushd
 - contracts/ (Rust, near-sdk), circuits/ (Circom, Groth16), matcher/ (Rust, OutLayer WASI module), services/ (relayer, API, indexer, matcher client, makers, keeper, top-up), packages/sdk, packages/mcp, packages/protocol, app/ (Next.js)

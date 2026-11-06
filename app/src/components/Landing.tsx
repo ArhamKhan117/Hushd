@@ -204,7 +204,7 @@ const DEV_LINKS = [
   { label: "Agents and MCP", href: "/docs/agents" },
   { label: "Private x402", href: "/docs/x402" },
   { label: "Run a maker", href: "/docs/makers" },
-  { label: "Source on GitHub", href: "https://github.com/ArhamKhan117/hushd" },
+  { label: "Source on GitHub", href: "https://github.com/ArhamKhan117/Hushd" },
 ];
 
 export function Landing() {

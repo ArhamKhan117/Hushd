@@ -4,7 +4,7 @@ import { Mark } from "./Logo";
 import { ThemeSegmented } from "./ThemeToggle";
 import { ArrowUpRight } from "./ui/ArrowUpRight";
 
-const GITHUB = "https://github.com/ArhamKhan117/hushd";
+const GITHUB = "https://github.com/ArhamKhan117/Hushd";
 
 type FooterLink = { href: string; label: string };
 
