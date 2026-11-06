@@ -16,7 +16,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Near } from "near-kit";
-import { CUSTODY, type CallSpec, CustodyWallet, TESTNET, custodyPubkey, custodyView, freezeCall, hushdPolicyRules, storePolicyCall, unfreezeCall } from "@hushd/sdk";
+import { CUSTODY, type CallSpec, CustodyWallet, TESTNET, custodyPubkey, custodyView, freezeCall, hushdPolicyRules, sendEndpoints, storePolicyCall, unfreezeCall } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const ENV = join(ROOT, ".env");
@@ -34,7 +34,7 @@ const nearToYocto = (s: string) => BigInt(Math.round(Number(s) * 1e6)) * 10n ** 
 
 function ownerClient(owner: string): Near {
   const key = JSON.parse(readFileSync(join(homedir(), ".near-credentials/testnet", `${owner}.json`), "utf8")).private_key as `ed25519:${string}`;
-  return new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: key, defaultSignerId: owner, defaultWaitUntil: "FINAL" });
+  return new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key, defaultSignerId: owner, defaultWaitUntil: "FINAL" });
 }
 
 async function send(client: Near, from: string, c: CallSpec): Promise<string> {

@@ -13,7 +13,8 @@
     "mcp": "pnpm --silent --filter @hushd/mcp start",
     "verify": "pnpm --silent --filter @hushd/services verify",
     "stack": "pnpm --filter @hushd/services stack",
-    "build:packages": "pnpm --filter \"./packages/*\" run build"
+    "build:packages": "pnpm --filter \"./packages/*\" run build",
+    "publish:packages": "pnpm build:packages && pnpm --filter \"./packages/*\" publish --access public --no-git-checks"
   },
   "engines": {
     "node": ">=22"

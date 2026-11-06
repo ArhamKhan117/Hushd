@@ -21,7 +21,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
-import { accountBalance, identityFromSeed, loadPoseidon, makeNote, sealNote, shieldCall, TESTNET, view, withOverrides } from "@hushd/sdk";
+import { accountBalance, identityFromSeed, loadPoseidon, makeNote, sealNote, sendEndpoints, shieldCall, TESTNET, view, withOverrides } from "@hushd/sdk";
 import { Near } from "near-kit";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
@@ -81,7 +81,7 @@ async function main() {
 
   const key = deployerKey();
   const pub = `ed25519:${base58.encode(base58.decode(key.slice(8)).slice(32))}`;
-  const client = new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: DEPLOYER, defaultWaitUntil: "FINAL" });
+  const client = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: DEPLOYER, defaultWaitUntil: "FINAL" });
   const report: Report = { network: "testnet", deployer: DEPLOYER, deployedAt: new Date().toISOString(), contracts: {}, services: {}, steps: [] };
   const hashOf = (o: unknown) => (o as { transaction?: { hash?: string } }).transaction?.hash ?? "";
   const exists = async (acc: string) => (await accountBalance(net, acc)) !== null;
@@ -167,7 +167,7 @@ async function main() {
   if (relayerCreated && envGet("RELAYER_GAS_KEY")) {
     const gasPub = `ed25519:${base58.encode(base58.decode(envGet("RELAYER_GAS_KEY")!.slice(8)).slice(32))}`;
     // the gas key lives on the relayer's account, so the relayer moves its own NEAR into it
-    const relayer = new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: envGet("RELAYER_PRIVATE_KEY") as `ed25519:${string}`, defaultSignerId: sub("relayer"), defaultWaitUntil: "FINAL" });
+    const relayer = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: envGet("RELAYER_PRIVATE_KEY") as `ed25519:${string}`, defaultSignerId: sub("relayer"), defaultWaitUntil: "FINAL" });
     const funded = await relayer.transaction(sub("relayer")).transferToGasKey(gasPub, near(3)).send();
     report.steps.push({ what: "fund the relayer's gas key", tx: hashOf(funded) });
   }
@@ -204,7 +204,7 @@ async function main() {
       console.log(`= ${acc}: keys not in .env.testnet, inventory skipped`);
       continue;
     }
-    const maker = new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: pk as `ed25519:${string}`, defaultSignerId: acc, defaultWaitUntil: "FINAL" });
+    const maker = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: pk as `ed25519:${string}`, defaultSignerId: acc, defaultWaitUntil: "FINAL" });
     const id = identityFromSeed(Uint8Array.from(Buffer.from(seedHex, "hex")));
     await call(maker, acc, sub("board"), "storage_deposit", { account_id: acc, registration_only: null }, near(0.5), "30 Tgas");
     for (const t of TOKENS) {

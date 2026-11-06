@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { custodyView, deskView, implicitAccount, INTENTS_MAINNET, intake, MAINNET, poolView, signIntents, TESTNET, tradeDiffs, verifierView, view, withOverrides } from "@hushd/sdk";
+import { custodyView, deskView, implicitAccount, INTENTS_MAINNET, intake, MAINNET, poolView, rpcOrder, signIntents, TESTNET, tradeDiffs, verifierView, view, withOverrides } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const APP = (process.env.HUSHD_APP_URL ?? "https://hushd.net").replace(/\/$/, "");
@@ -24,7 +24,7 @@ async function rpc<T>(method: string, params: unknown): Promise<T> {
   // public RPCs rate-limit: try each endpoint, twice
   let last = "RPC error";
   for (let attempt = 0; attempt < 2; attempt++) {
-    for (const url of net.rpc) {
+    for (const url of rpcOrder(net.rpc)) {
       const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })
         .then((r) => r.json())
         .catch(() => ({ error: { message: `${url} unreachable` } }))) as { result?: T; error?: { code?: number; message?: string; cause?: { name?: string } } };

@@ -15,7 +15,7 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Near } from "near-kit";
-import { TESTNET, view } from "@hushd/sdk";
+import { sendEndpoints, TESTNET, view } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const ENV = join(ROOT, ".env");
@@ -30,7 +30,7 @@ const loadEnv = () => {
   for (const k of Object.keys(process.env)) if (/^MAKER_[ABC]_/.test(k)) delete process.env[k];
   process.loadEnvFile(ENV);
 };
-const client = (account: string, key: string) => new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
+const client = (account: string, key: string) => new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
 const ownerKey = JSON.parse(readFileSync(join(homedir(), ".near-credentials/testnet", `${owner}.json`), "utf8")).private_key as string;
 
 /** Set or remove a variable in .env, keeping every other line as it is. */
