@@ -19,6 +19,7 @@ const TOOLS: [string, string, string][] = [
   ["hushd_address", "Wallet", "The agent's hushd1… receive address"],
   ["hushd_balance", "Wallet", "Sync, then the private balance per token"],
   ["hushd_limits", "Wallet", "Its limits per payment and per day, and what it spent today"],
+  ["hushd_policy", "Wallet", "Its NEAR account: a policy wallet's owner, TEE rules and frozen state, or its own key"],
   ["hushd_faucet", "Wallet", "Testnet tokens to the agent's NEAR account"],
   ["hushd_shield", "Wallet", "Move tokens from its NEAR account into its private balance"],
   ["hushd_send", "Wallet, limited", "Pay a hushd1… address privately"],
@@ -35,7 +36,10 @@ const ENV: [string, string][] = [
   ["HUSHD_HOME", "Where the seed, notes and spending ledger live (default ~/.hushd)"],
   ["HUSHD_LIMIT_PER_PAYMENT", "Caps per payment, per token, e.g. USDC=100,wNEAR=50"],
   ["HUSHD_LIMIT_PER_DAY", "Caps per UTC day, per token, e.g. USDC=500,wNEAR=250"],
-  ["HUSHD_NEAR_ACCOUNT", "A NEAR testnet account for hushd_faucet and hushd_shield"],
+  ["HUSHD_POLICY_WALLET_KEY", "Its OutLayer policy wallet's key (wk_…): the NEAR account for hushd_faucet and hushd_shield, signed in a TEE"],
+  ["HUSHD_LIMITS_EXPIRE", "A date after which the agent may not spend at all, e.g. 2026-12-01"],
+  ["HUSHD_ALLOW_TO", "The only hushd1… addresses and NEAR accounts it may send or cash out to, comma separated"],
+  ["HUSHD_NEAR_ACCOUNT", "Or a NEAR testnet account with its own key, for hushd_faucet and hushd_shield"],
   ["HUSHD_NEAR_PRIVATE_KEY", "That account's key (ed25519:…)"],
   ["HUSHD_NETWORK", "testnet, the only network with Hushd contracts"],
   ["HUSHD_API_URL", "A self-hosted Hushd API (default https://api.hushd.net)"],
@@ -99,8 +103,8 @@ claude mcp add hushd \\
       <p>
         The server is the <code>@hushd/mcp</code> package in the repo (<code>packages/mcp</code>), which is not
         published on npm, so it runs from a checkout of the repo. With no seed it starts anyway
-        and serves the read tools only. To fund the agent, either set <code>HUSHD_NEAR_ACCOUNT</code> and{" "}
-        <code>HUSHD_NEAR_PRIVATE_KEY</code> and use <code>hushd_faucet</code> then <code>hushd_shield</code>, or pay its{" "}
+        and serves the read tools only. To fund the agent, give it a <a href="#policy-wallets">policy wallet</a> (or a NEAR
+        account with its own key) and use <code>hushd_faucet</code> then <code>hushd_shield</code>, or pay its{" "}
         <code>hushd1</code> address from your own private balance.
       </p>
 
@@ -170,6 +174,50 @@ HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250,BTC=0.01"       # the default`}</code>
         The model asks; the server decides. A prompt cannot raise a limit, since the limits are read from the
         server&apos;s environment when it starts.
       </Callout>
+
+      <h2 id="policy-wallets">Policy wallets</h2>
+      <p>
+        An agent does not need a NEAR key. Its NEAR account can be an OutLayer policy wallet: the key is made and kept
+        inside OutLayer&apos;s TEE, the agent holds only an API key, and the enclave checks the owner&apos;s policy
+        before it signs anything. The owner stores the policy on chain from their own account (on{" "}
+        <code>outlayer.testnet</code>), which makes them its only controller, and can freeze the wallet with one
+        transaction. The desk&apos;s three makers and the demo agent work this way.
+      </p>
+      <pre>
+        <code className="language-bash">{`# the owner: a wallet, its policy stored from the owner's account, funded for gas
+pnpm --filter @hushd/services policy-wallet create MY_AGENT --per-tx 0.02 --daily 0.2 --per-hour 60
+# the agent: only the wallet's key
+claude mcp add hushd -e HUSHD_POLICY_WALLET_KEY=wk_… -e HUSHD_LIMIT_PER_DAY="USDC=500" -- pnpm --silent --dir "$PWD" mcp
+# the owner, at any time
+pnpm --filter @hushd/services policy-wallet freeze MY_AGENT`}</code>
+      </pre>
+      <p>The Agents page in the app does the same from a NEAR wallet or a passkey.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Who enforces it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Contract calls only, to Hushd&apos;s contracts only</td>
+            <td>The TEE, before it signs</td>
+          </tr>
+          <tr>
+            <td>NEAR attached per call and per day, calls per hour, hours of the day</td>
+            <td>The TEE, before it signs</td>
+          </tr>
+          <tr>
+            <td>Freeze</td>
+            <td>The TEE reads it on chain for every signature; this server also stops every private payment while it is set</td>
+          </tr>
+          <tr>
+            <td>Token amounts per payment and per day, expiry, payees</td>
+            <td>This server, before it proves or pays (the TEE does not read call arguments)</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2 id="environment">Environment</h2>
       <table>

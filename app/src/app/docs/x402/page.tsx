@@ -136,7 +136,7 @@ return json(body, 200, { "x-payment-response": paymentResponse({ txHash: paid.tx
         <Link href="/docs/makers#selling-quotes-over-x402">makers</Link>.
       </p>
       <pre>
-        <code className="language-bash">{`curl -i "https://api.hushd.net/makers/maker-a.hushd.testnet/quote?sell=usdc.hushd.testnet&amount=1000000000&buy=btc.hushd.testnet"
+        <code className="language-bash">{`curl -i "https://api.hushd.net/makers/steady/quote?sell=usdc.hushd.testnet&amount=1000000000&buy=btc.hushd.testnet"
 # HTTP/1.1 402 Payment Required`}</code>
       </pre>
     </DocsLayout>

@@ -4,7 +4,7 @@ import { TransparencyView } from "@/components/transparency/TransparencyView";
 export const metadata: Metadata = {
   title: "Transparency",
   description:
-    "What anyone can see about Hushd, read live: the health of each service, what the service accounts hold, the pool's and the desk's counts on NEAR testnet, the contract accounts, and what stays private.",
+    "What anyone can see about Hushd, read live: the health of each service, what the service accounts hold, the pool's and the desk's counts on NEAR testnet, the contract accounts, the agents' trades on NEAR Intents mainnet, and what stays private.",
   alternates: { canonical: "/transparency" },
 };
 

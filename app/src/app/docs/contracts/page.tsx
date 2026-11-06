@@ -183,7 +183,8 @@ export default function ContractsPage() {
       <p>
         The pool, the desk and the board log NEP-297 events with standard <code>hushd</code>, version{" "}
         <code>1.0.0</code>. The test tokens log the standard NEP-141 events (standard <code>nep141</code>). The indexer
-        reads them from FastNEAR&apos;s neardata block stream.
+        reads them from FastNEAR&apos;s transactions API, which lists every transaction that touched each contract
+        (or, with a key, from its neardata block stream).
       </p>
       <table>
         <thead>

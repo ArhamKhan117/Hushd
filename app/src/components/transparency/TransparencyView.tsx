@@ -10,6 +10,7 @@ import { FlowField } from "@/components/ui/FlowField";
 import { SealedField } from "@/components/ui/SealedField";
 import { NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol } from "@/lib/hushd/format";
+import { intentsTrades, type IntentsTrades } from "@/lib/hushd/intents";
 
 /**
  * /transparency: what anyone can see about Hushd, read live in the browser. The
@@ -139,6 +140,23 @@ function useChain() {
   return { state: s, refresh };
 }
 
+type TradesState = { status: "loading" } | { status: "ready"; record: IntentsTrades } | { status: "error" };
+
+function useIntentsTrades() {
+  const [s, setS] = useState<TradesState>({ status: "loading" });
+  useEffect(() => {
+    let live = true;
+    intentsTrades().then(
+      (record) => live && setS({ status: "ready", record }),
+      () => live && setS({ status: "error" }),
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return s;
+}
+
 /* ---------------------------------------------------------------- pieces */
 
 function LockIcon({ size = 14 }: { size?: number }) {
@@ -233,11 +251,26 @@ const PRIVATE_FACTS = [
   },
 ];
 
+const STEP_WORDS: Record<string, string> = {
+  fund: "Fund the agents",
+  "deposit-trader": "The trader deposits",
+  "deposit-maker": "The maker deposits",
+  swap: "A swap through 1Click",
+  trade: "The direct trade",
+  withdraw: "Both withdraw",
+  return: "Back to the dev wallet",
+};
+const stepWords = (step: string) => STEP_WORDS[step] ?? step.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
+const sentence = (s: string) => s.replace(/^./, (c) => c.toUpperCase());
+const shortHash = (h: string) => (h.length > 14 ? `${h.slice(0, 6)}…${h.slice(-4)}` : h);
+const MAINNET_TX = "https://nearblocks.io/txns/";
+
 /* ---------------------------------------------------------------- view */
 
 export function TransparencyView() {
   const svc = useServices();
   const chain = useChain();
+  const trades = useIntentsTrades();
 
   const apiDown = !svc.loading && svc.api?.state !== "ok";
 
@@ -527,6 +560,70 @@ export function TransparencyView() {
                 </li>
               ))}
             </ul>
+          </div>
+        </section>
+
+        {/* mainnet NEAR Intents */}
+        <section id="intents" aria-labelledby="intents-title" className="mx-auto max-w-[1240px] scroll-mt-20 px-4 pt-20 sm:px-6 sm:pt-28">
+          <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-12">
+            <div>
+              <h2 id="intents-title" className="t-display-l">
+                On NEAR&nbsp;Intents (mainnet)
+              </h2>
+              <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
+                Two Hushd agents trade with each other on intents.near, with real tokens. Each signs its side of the trade, and one
+                call settles both sides or neither. Every transaction is listed here.
+              </p>
+              <a href="https://nearblocks.io/address/intents.near" target="_blank" rel="noreferrer" className="hd-arrowlink mt-6">
+                intents.near on NearBlocks <ArrowUpRight />
+              </a>
+            </div>
+            {trades.status === "loading" ? (
+              <div className="grid gap-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="hd-skeleton h-14" />
+                ))}
+              </div>
+            ) : trades.status === "error" ? (
+              <Notice title="Could not read the record just now">
+                The list of mainnet trades comes from the Hushd API, which is not answering right now.
+              </Notice>
+            ) : trades.record.steps.length === 0 ? (
+              <p className="self-start rounded-[14px] bg-surface px-4 py-4 text-[14.5px] leading-relaxed text-soft sm:px-5">
+                The mainnet demo trades between Hushd&apos;s agents are built and waiting for the owner&apos;s go-ahead.
+              </p>
+            ) : (
+              <ul className="self-start divide-y divide-line border-y border-line">
+                {trades.record.steps.map((st) => {
+                  const base = trades.record.explorer?.startsWith("https://") ? trades.record.explorer.replace(/\/?$/, "/") : MAINNET_TX;
+                  return (
+                    <li key={st.step} className="grid gap-2 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6">
+                      <div className="min-w-0">
+                        <p className="text-[14.5px] text-foreground">{stepWords(st.step)}</p>
+                        {st.note && <p className="mt-0.5 text-[13px] leading-relaxed text-mute [overflow-wrap:anywhere]">{sentence(st.note)}.</p>}
+                        <p className="tnum mt-1 text-[12.5px] text-faint">
+                          {new Date(st.at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-start gap-x-4 gap-y-1 sm:max-w-[260px] sm:justify-end">
+                        {st.txs.map((h) => (
+                          <a
+                            key={h}
+                            href={`${base}${encodeURIComponent(h)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Transaction ${h} on NearBlocks`}
+                            className="hd-tap tnum inline-flex items-center gap-1.5 text-[13.5px] text-foreground hover:underline"
+                          >
+                            {shortHash(h)} <ArrowUpRight className="text-faint" />
+                          </a>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </section>
 
