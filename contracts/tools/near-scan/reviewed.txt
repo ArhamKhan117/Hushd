@@ -1,0 +1,80 @@
+# Every near-scan hit and why it is safe. `detector | contract | item | reason`.
+# A hit without a line here fails the scan, and so does a line without a hit.
+
+# ---------- pool ----------
+owner-check | pool | transact | Open by design (the relayer sends it for everyone). A Groth16 proof must bind the root, both nullifiers, both new notes, the amount, the token and the hash of recipient, relayer, fee, refund note and memo; the root must be one of the last 100 and neither nullifier spent.
+owner-check | pool | apply_change | Anyone may apply a change, but only one the owner proposed and only after its timelock; takes 1 yoctoNEAR.
+gas-griefing | pool | transact: for over `[n0,n1]` | A fixed array of two nullifiers.
+gas-griefing | pool | settle_swap: for over `0..4` | Fixed bound: the four nullifiers of two legs.
+gas-griefing | pool | settle_swap: for over `(i+1)..4` | Fixed bound: pairwise check of four notes.
+gas-griefing | pool | settle_swap: for over `[(&a,&a_out),(&b,&b_out)]` | A fixed array of two legs.
+gas-griefing | pool | settle_swap: for over `nullifiers.iter().enumerate()` | A fixed array of four nullifiers.
+reentrancy | pool | transact -> on_payout | Checks, effects, then the call: the nullifiers are recorded and the asset's held amount lowered before ft_transfer. on_payout only acts on a failed transfer: a refund note (held raised back) or an amount the recipient claims.
+reentrancy | pool | claim -> on_claim | The unclaimed amount is removed before ft_transfer; on_claim puts it back only if the transfer failed.
+lock-callback | pool | on_payout | `relayer.unwrap()` runs only when fee > 0, and transact refuses a fee without a relayer; the asset unwrap is inside a match on the asset existing; the one assert is "tree is full", reachable only after 2^20 leaves.
+unhandled-promise | pool | settle_storage | Returns unused storage deposit to the caller. If that transfer fails the NEAR stays in the pool; no state depends on it.
+incorrect-argument-or-return-types | pool | Stats.shields | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | pool | Stats.transfers | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | pool | Stats.cash_outs | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | pool | Stats.swaps | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | pool | Stats.refunds | A count shown in views, far below 2^53.
+lossy-cast | pool | hash | `s.len() as u8` is an account id (at most 64 bytes on NEAR); `memo.len() as u32` is at most 256 (MAX_MEMO).
+lossy-cast | pool | leaves | `i` is below `self.leaves.len()`, itself a u32.
+lossy-cast | pool | negate | Byte subtraction with borrow: each value is in -256..=255 and is shifted into 0..=255 before the u8 cast.
+lossy-cast | pool | parse_decimal | Digits are checked ASCII (0..9); the accumulator byte is masked with 0xff before the cast.
+lossy-cast | pool | parse_u256 | Digits are checked ASCII (0..9); the accumulator byte is masked with 0xff before the cast.
+lossy-cast | pool | push_root | `(current + 1) % ROOT_HISTORY` is below 100.
+
+# ---------- desk ----------
+owner-check | desk | refresh_enclave_key | Open: the caller pays OutLayer. The key is what the attested worker returns to the private on_enclave_key, from the build pinned in matcher_project ("owner/project@<wasm hash>"); changing the build waits out the 24 h config timelock.
+owner-check | desk | open_rfq | Open by design (the relayer sends it, so the trader stays unnamed). It stores only a 32-byte commitment, the window is 1 s to 1 h, and the caller pays the storage, measured after the maps are flushed.
+owner-check | desk | request_match | Open: the caller pays OutLayer and the deal's storage. A deal is created only from the enclave's answer in the private on_match.
+owner-check | desk | submit_match | Gated by the enclave key's ed25519 signature over the match bytes, which name this desk.
+owner-check | desk | settle | Open by design (the relayer sends it), but the trader (the deal's owner key) and the maker (its quote key) must both sign the deal id and the four outputs. Proofs alone bind only the deal id, and anyone can prove empty legs for it.
+owner-check | desk | expire | Only a matched deal past its expiry; releases the bond and records a failed receipt.
+owner-check | desk | close_hedge | Gated by the deal owner key's ed25519 signature over "hushd.close:<desk>:<deal id>".
+owner-check | desk | slash_overdue | Only a hedge leg past its deadline with no fill recorded; the bond goes to the trader as a pool note.
+owner-check | desk | retry_slash_payout | Only a deal whose slash payout the pool refused; pays the same amount to the same trader note.
+owner-check | desk | redirect_slash_payout | Gated by the deal owner key's ed25519 signature over "hushd.redirect:<desk>:<deal id>:<inner>"; only a deal whose slash payout the pool refused.
+reentrancy | desk | withdraw_bond -> on_bond_withdrawn | The bond is lowered before ft_transfer; the callback raises it back only on a failed transfer.
+reentrancy | desk | settle -> on_settled | The deal moves to Settling before the pool call, so no second settle and no expiry can run in between; the callback moves it on, or back to Matched on failure.
+reentrancy | desk | mpc_sign -> on_hedge_signed | The order and attempt counters rise before the MPC call; the callback lowers them only if nothing was signed.
+reentrancy | desk | pay_slash -> on_slash_paid | The deal is Slashing before ft_transfer_call; the callback records what the pool kept and holds the rest for retry_slash_payout.
+lock-callback | desk | on_enclave_key | refresh_enclave_key changes no state before the call, so a panic on a malformed answer leaves the old key in place.
+lock-callback | desk | on_match | request_match changes no state before the call, and on_match turns every bad answer into a match_failed event; the one unwrap reads an RFQ accept_match has just found.
+lock-callback | desk | on_settled | Panics only on a broken invariant (the deal missing or not Settling, bond accounting below zero), which settle and the tests rule out.
+lock-callback | desk | on_slash_paid | Panics only on a broken invariant (the deal missing or not Slashing).
+unhandled-promise | desk | charge_storage | Returns unused storage deposit to the caller. If that transfer fails the NEAR stays in the desk; no state depends on it.
+incorrect-argument-or-return-types | desk | HedgeSpec.deadline_ms | Milliseconds since 1970 (about 1.8e12), far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.rfqs | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.deals | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.settled | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.recovered | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.failed | A count shown in views, far below 2^53.
+incorrect-argument-or-return-types | desk | Stats.unresolved | A count shown in views, far below 2^53.
+lossy-cast | desk | push_str | String lengths in consent and match bytes are a few hundred bytes, far below 2^32.
+lossy-cast | desk | str_ | msgpack strings: every string is a fixed key, or a price or size checked to be at most 24 bytes (valid_wire_decimal), so the fixstr branch (under 32) is the one taken.
+lossy-cast | desk | uint | msgpack integers: each cast is inside the branch that proves the value fits (below 0x80, 0xff, 0xffff, 0xffffffff).
+
+# ---------- board ----------
+lossy-cast | board | post | The post was just checked against max_post_bytes, a u32.
+lossy-cast | board | posts | `from_index.min(len)` is at most `len`, a u32.
+
+# ---------- token (a test NEP-141 with a faucet, testnet only) ----------
+yocto-attach | token | faucet_for | Test-token faucet for owner or operators (the relayer funds new passkey accounts with a gas key); the same per-account cooldown as faucet.
+yocto-attach | token | mint | Test token: the owner seeds the reference makers. A real token would require 1 yoctoNEAR here.
+cover-storage-cost | token | set_operator | Owner only, with 1 yoctoNEAR; the owner pays for the entry.
+unused-ret | token | set_operator: self.operators.insert | Allowing an account twice is harmless.
+unused-ret | token | set_operator: self.operators.remove | Removing an account that is not an operator is harmless.
+owner-check | token | ft_transfer | near-contract-standards: requires 1 yoctoNEAR and moves only the caller's own balance.
+owner-check | token | ft_transfer_call | near-contract-standards: requires 1 yoctoNEAR and moves only the caller's own balance.
+owner-check | token | storage_deposit | near-contract-standards storage management: the caller pays for the account it registers.
+owner-check | token | storage_withdraw | near-contract-standards storage management: requires 1 yoctoNEAR and returns only the caller's own deposit.
+owner-check | token | storage_unregister | near-contract-standards storage management: requires 1 yoctoNEAR and closes only the caller's own account.
+payable-unused | token | ft_transfer | The standard implementation checks the 1 yoctoNEAR (assert_one_yocto inside near-contract-standards).
+payable-unused | token | ft_transfer_call | The standard implementation checks the 1 yoctoNEAR (assert_one_yocto inside near-contract-standards).
+payable-unused | token | storage_deposit | The standard implementation reads and refunds the deposit.
+payable-unused | token | storage_withdraw | The standard implementation checks the 1 yoctoNEAR.
+payable-unused | token | storage_unregister | The standard implementation checks the 1 yoctoNEAR.
+non-callback-private | token | ft_resolve_transfer | It is a callback: near-contract-standards' ft_transfer_call schedules it on this contract.
+unsaved-changes | token | LazyOption | Holds the token metadata, written once in new() and never changed.

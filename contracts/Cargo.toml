@@ -5,6 +5,7 @@ members = [
     "pool",
     "token",
     "tools/gen-poseidon",
+    "tools/near-scan",
     "desk",
     "sandbox-tests",
     "sandbox-tests/doubles/outlayer",

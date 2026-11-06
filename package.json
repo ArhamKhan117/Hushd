@@ -14,10 +14,17 @@
     "verify": "pnpm --silent --filter @hushd/services verify",
     "stack": "pnpm --filter @hushd/services stack",
     "build:packages": "pnpm --filter \"./packages/*\" run build",
-    "publish:packages": "pnpm build:packages && pnpm --filter \"./packages/*\" publish --access public --no-git-checks"
+    "publish:packages": "pnpm build:packages && pnpm --filter \"./packages/*\" publish --access public --no-git-checks",
+    "security": "bash security/scan.sh"
   },
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.34.3"
+  "packageManager": "pnpm@10.34.3",
+  "pnpm": {
+    "overrides": {
+      "ws@>=8.0.0 <8.21.0": "^8.21.0",
+      "underscore@<1.13.8": "^1.13.8"
+    }
+  }
 }

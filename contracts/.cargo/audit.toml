@@ -1,0 +1,6 @@
+# cargo audit settings for the contracts workspace (`pnpm security`).
+[advisories]
+# crypto-bigint 0.5.5 (timing variability) reaches the tree only through near-sdk's host-side
+# test VM (near-vm-runner -> p256). It is not in any contract's wasm32 build, which
+# `cargo tree -p hushd-pool --target wasm32-unknown-unknown` shows.
+ignore = ["RUSTSEC-2026-0387"]
