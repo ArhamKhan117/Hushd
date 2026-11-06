@@ -17,7 +17,7 @@ const origin = (u) => {
 const SERVICES = [
   "https://va.vercel-scripts.com",
   origin(process.env.NEXT_PUBLIC_HUSHD_API_URL || "https://api.hushd.net"),
-  ...(process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com,https://rpc.testnet.near.org").split(",").map(origin),
+  ...(process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com,https://near-testnet.drpc.org").split(",").map(origin),
   "https://raw.githubusercontent.com",
 ].filter((x, i, all) => x && all.indexOf(x) === i);
 

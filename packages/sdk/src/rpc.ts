@@ -25,7 +25,9 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
           signal: AbortSignal.timeout(15_000),
         });
         if (res.status === 429 || res.status >= 500) throw new RpcError(`${url} answered ${res.status}`);
-        const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: { requested_account_id?: string } }; data?: unknown; message?: string } };
+        const body = (await res.json()) as { result?: T; error?: { code?: number; cause?: { name?: string; info?: { requested_account_id?: string } }; data?: unknown; message?: string } };
+        // some providers rate-limit inside a 200 answer: that is an outage, try the next endpoint
+        if (body.error?.code === -429) throw new RpcError(`${url} answered 429`);
         if (body.error) {
           const c = body.error.cause;
           const words = c?.name === "UNKNOWN_ACCOUNT" ? `${c.info?.requested_account_id ?? "That account"} does not exist on NEAR ${net.id} (UNKNOWN_ACCOUNT)` : c?.name ?? body.error.message ?? "RPC error";

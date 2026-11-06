@@ -31,7 +31,7 @@ export interface HushdNetwork {
 
 export const TESTNET: HushdNetwork = {
   id: "testnet",
-  rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.near.org"],
+  rpc: ["https://test.rpc.fastnear.com", "https://near-testnet.drpc.org"],
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
   board: "board.hushd.testnet",
