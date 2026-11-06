@@ -22,15 +22,16 @@ export function TokenSelect({ value, onChange, label = "Token", balances }: { va
   );
 }
 
-/** The big amount card: a number, the token beside it, and a line underneath. */
-export function AmountCard({ label, value, onChange, token, onToken, note, balances }: {
+/** The big amount card: a number, the token beside it (or another `picker`), and a line underneath. */
+export function AmountCard({ label, value, onChange, token, onToken, note, balances, picker }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  token: string;
-  onToken: (v: string) => void;
+  token?: string;
+  onToken?: (v: string) => void;
   note?: ReactNode;
   balances?: Map<string, bigint>;
+  picker?: ReactNode;
 }) {
   return (
     <div className="hd-inputcard p-4 sm:p-5">
@@ -43,9 +44,9 @@ export function AmountCard({ label, value, onChange, token, onToken, note, balan
           placeholder="0"
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ""))}
-          className="hd-amount tnum min-w-0 flex-1 bg-transparent text-[34px] font-light tracking-[-0.02em] text-foreground outline-none placeholder:text-faint sm:text-[40px]"
+          className="hd-amount tnum w-0 min-w-0 flex-1 bg-transparent text-[34px] font-light tracking-[-0.02em] text-foreground outline-none placeholder:text-faint sm:text-[40px]"
         />
-        <TokenSelect value={token} onChange={onToken} balances={balances} />
+        {picker ?? (token !== undefined && onToken && <TokenSelect value={token} onChange={onToken} balances={balances} />)}
       </div>
       {note && <div className="mt-2 text-[13px] text-mute">{note}</div>}
     </div>

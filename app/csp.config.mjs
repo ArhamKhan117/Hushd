@@ -13,12 +13,14 @@ const origin = (u) => {
   }
 };
 
-/** Hosts the app reads from the browser: analytics, the Hushd API, NEAR RPC, the NEAR Connect wallet list. */
+/** Hosts the app reads from the browser: analytics, the Hushd API, NEAR RPC, the NEAR Connect wallet list, OutLayer custody. */
 const SERVICES = [
   "https://va.vercel-scripts.com",
   origin(process.env.NEXT_PUBLIC_HUSHD_API_URL || "https://api.hushd.net"),
   ...(process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com,https://near-testnet.drpc.org").split(",").map(origin),
   "https://raw.githubusercontent.com",
+  // OutLayer custody: an owner's browser registers an agent's policy wallet and sets its policy
+  "https://testnet-api.outlayer.ai",
 ].filter((x, i, all) => x && all.indexOf(x) === i);
 
 export const CSP_CONNECT_SOURCES = ["'self'", ...SERVICES];

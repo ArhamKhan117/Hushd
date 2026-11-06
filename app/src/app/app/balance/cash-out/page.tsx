@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
+import { Segmented } from "@/components/app/desk";
 import { AmountCard, ErrorLine, Field, TxLine } from "@/components/app/forms";
+import { OtherChainPreview } from "@/components/app/intents";
 import { SignInPanel } from "@/components/app/SignInPanel";
 import { BusyLabel } from "@/components/ui/Spinner";
 import { fmt, parseAmount, symbol, TOKENS } from "@/lib/hushd/format";
@@ -12,6 +14,7 @@ const isAccount = (s: string) => /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a
 
 export default function CashOutPage() {
   const s = useHushd();
+  const [dest, setDest] = useState<"near" | "chain">("near");
   // the recipient defaults to your own account until you type another
   const [typedTo, setTo] = useState<string | null>(null);
   const to = typedTo ?? s.accountId ?? "";
@@ -41,22 +44,44 @@ export default function CashOutPage() {
   };
 
   return (
-    <AppShell title="Cash out" subtitle="Move tokens from your private balance to any NEAR account. The amount and the account are public on the way out; which notes paid for it is not.">
-      {s.status !== "ready" ? (
-        <SignInPanel />
-      ) : (
-        <div className="grid max-w-[560px] gap-4">
-          <AmountCard label="Amount" value={input} onChange={setInput} token={token} onToken={setToken} balances={s.balances} note={`Private balance: ${fmt(token, have)} ${symbol(token)}`} />
-          <Field label="To NEAR account" hint="A fresh account keeps this cash out apart from your others. The account must be registered with the token; if the payout fails, the amount comes back to you as a private note.">
-            <input className="hd-input w-full" value={to} onChange={(e) => setTo(e.target.value.trim().toLowerCase())} spellCheck={false} />
-          </Field>
-          <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!isAccount(to) || amount === null || amount > have || busy} onClick={go} aria-busy={busy}>
-            <BusyLabel busy={busy} busyText="Proving and sending…">{amount !== null && amount > have ? "More than your private balance" : "Cash out"}</BusyLabel>
-          </button>
-          {done && <TxLine hash={done.hash}>{done.text}</TxLine>}
-          <ErrorLine error={error} />
-        </div>
-      )}
+    <AppShell
+      title="Cash out"
+      subtitle={
+        dest === "near"
+          ? "Move tokens from your private balance to any NEAR account. The amount and the account are public on the way out; which notes paid for it is not."
+          : "See what a cash out to another chain would deliver there, with a live NEAR Intents quote from mainnet."
+      }
+    >
+      <div className="grid gap-5">
+        <Segmented
+          label="Cash out to"
+          value={dest}
+          onChange={setDest}
+          options={[
+            { value: "near", label: "To a NEAR account" },
+            { value: "chain", label: "To another chain" },
+          ]}
+        />
+        {dest === "chain" ? (
+          <div className="max-w-[560px]">
+            <OtherChainPreview direction="cashout" balances={s.status === "ready" ? s.balances : undefined} />
+          </div>
+        ) : s.status !== "ready" ? (
+          <SignInPanel />
+        ) : (
+          <div className="grid max-w-[560px] gap-4">
+            <AmountCard label="Amount" value={input} onChange={setInput} token={token} onToken={setToken} balances={s.balances} note={`Private balance: ${fmt(token, have)} ${symbol(token)}`} />
+            <Field label="To NEAR account" hint="A fresh account keeps this cash out apart from your others. The account must be registered with the token; if the payout fails, the amount comes back to you as a private note.">
+              <input className="hd-input w-full" value={to} onChange={(e) => setTo(e.target.value.trim().toLowerCase())} spellCheck={false} />
+            </Field>
+            <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!isAccount(to) || amount === null || amount > have || busy} onClick={go} aria-busy={busy}>
+              <BusyLabel busy={busy} busyText="Proving and sending…">{amount !== null && amount > have ? "More than your private balance" : "Cash out"}</BusyLabel>
+            </button>
+            {done && <TxLine hash={done.hash}>{done.text}</TxLine>}
+            <ErrorLine error={error} />
+          </div>
+        )}
+      </div>
     </AppShell>
   );
 }

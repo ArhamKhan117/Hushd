@@ -35,6 +35,8 @@ interface Signer {
   accountId: string;
   kind: "wallet" | "passkey";
   call(c: ChainCall): Promise<{ txHash: string }>;
+  /** Send `yocto` NEAR from the signed-in account to `to`. */
+  transfer(to: string, yocto: bigint): Promise<{ txHash: string }>;
 }
 
 export type SessionStatus = "loading" | "signed-out" | "connected" | "ready";
@@ -56,7 +58,10 @@ interface Session {
   unlock(): Promise<void>;
   signOut(): Promise<void>;
   sync(): Promise<void>;
+  /** True when this session can sign NEAR transactions now (a passkey account signs after unlock). */
+  canSign: boolean;
   call(c: ChainCall): Promise<{ txHash: string }>;
+  transfer(to: string, yocto: bigint): Promise<{ txHash: string }>;
 }
 
 const Ctx = createContext<Session | null>(null);
@@ -140,6 +145,14 @@ export function HushdProvider({ children }: { children: ReactNode }) {
         } as never)) as { transaction?: { hash?: string } };
         return { txHash: out?.transaction?.hash ?? "" };
       },
+      async transfer(to, yocto) {
+        const w = await c.wallet();
+        const out = (await w.signAndSendTransaction({
+          receiverId: to,
+          actions: [{ type: "Transfer", params: { deposit: yocto.toString() } }],
+        } as never)) as { transaction?: { hash?: string } };
+        return { txHash: out?.transaction?.hash ?? "" };
+      },
     };
   }, []);
 
@@ -156,6 +169,14 @@ export function HushdProvider({ children }: { children: ReactNode }) {
             .transaction(k.implicitAccount)
             .functionCall(x.contract, x.method, x.args, { gas: `${Number(BigInt(x.gas ?? "100000000000000") / 1_000_000_000_000n)} Tgas` as `${number} Tgas`, attachedDeposit: BigInt(x.deposit ?? "0") })
             .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+          return { txHash: out?.transaction?.hash ?? "" };
+        } catch (e) {
+          throw new Error(readableChainError(e));
+        }
+      },
+      async transfer(to, yocto) {
+        try {
+          const out = (await near.transaction(k.implicitAccount).transfer(to, yocto).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
           return { txHash: out?.transaction?.hash ?? "" };
         } catch (e) {
           throw new Error(readableChainError(e));
@@ -283,6 +304,11 @@ export function HushdProvider({ children }: { children: ReactNode }) {
     return signer.call(c);
   }, [signer]);
 
+  const transfer = useCallback(async (to: string, yocto: bigint) => {
+    if (!signer) throw new Error("Sign in first");
+    return signer.transfer(to, yocto);
+  }, [signer]);
+
   const value: Session = {
     status,
     accountId: signer?.accountId ?? (status === "connected" ? localStorage.getItem(PASSKEY_FLAG) : null),
@@ -299,7 +325,9 @@ export function HushdProvider({ children }: { children: ReactNode }) {
     unlock,
     signOut,
     sync,
+    canSign: signer !== null,
     call,
+    transfer,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

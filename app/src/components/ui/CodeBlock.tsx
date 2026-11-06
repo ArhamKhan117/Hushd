@@ -26,7 +26,7 @@ function CheckIcon() {
 }
 
 /** A copy button that confirms for a moment. */
-export function CopyButton({ text, className = "" }: { text: string; className?: string }) {
+export function CopyButton({ text, className = "", label = "Copy code" }: { text: string; className?: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -38,7 +38,7 @@ export function CopyButton({ text, className = "" }: { text: string; className?:
         });
       }}
       className={`hd-tap inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium text-mute transition-colors hover:bg-surface-2 hover:text-foreground ${className}`}
-      aria-label={copied ? "Copied" : "Copy code"}
+      aria-label={copied ? "Copied" : label}
     >
       {copied ? <CheckIcon /> : <CopyIcon />}
       <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>

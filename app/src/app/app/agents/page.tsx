@@ -1,8 +1,20 @@
 import type { Metadata } from "next";
+import deployment from "../../../../../deployments/testnet.json";
 import { AppShell } from "@/components/app/AppShell";
+import { PolicyWallets, type WalletLabel } from "@/components/app/PolicyWallets";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 
 export const metadata: Metadata = { title: "Agents" };
+
+/** Hushd's own policy wallets, named from the deployment record (read on the server; only the names reach the page). */
+const record = deployment as { deployer: string; policyWallets?: Record<string, { account: string; owner: string }> };
+const OWNER = record.deployer;
+const LABELS: WalletLabel[] = Object.entries(record.policyWallets ?? {})
+  .filter(([, w]) => w.owner === OWNER)
+  .map(([prefix, w]) => ({
+    account: w.account,
+    label: prefix === "DEMO_AGENT" ? "Demo agent" : /^MAKER_[A-Z]$/.test(prefix) ? `Maker ${prefix.slice(-1)}` : prefix.charAt(0) + prefix.slice(1).toLowerCase().replace(/_/g, " "),
+  }));
 
 const LOCAL = `# from a checkout of this repo
 pnpm install
@@ -17,7 +29,7 @@ claude mcp add hushd \\
 const HOSTED = `# read-only: status, makers, deals, proof checks
 claude mcp add --transport http hushd-read https://hushd.net/mcp`;
 
-const X402 = `curl -i "https://api.hushd.net/makers/maker-a.hushd.testnet/quote?sell=usdc.hushd.testnet&amount=1000000000&buy=btc.hushd.testnet"
+const X402 = `curl -i "https://api.hushd.net/makers/steady/quote?sell=usdc.hushd.testnet&amount=1000000000&buy=btc.hushd.testnet"
 # HTTP/1.1 402 Payment Required
 # {"x402Version":1,"accepts":[{"scheme":"hushd","network":"near-testnet",
 #   "maxAmountRequired":"10000","asset":"usdc.hushd.testnet","payTo":"hushd1…", …}]}`;
@@ -49,6 +61,8 @@ export default function AgentsPage() {
           <p className="t-label">Or connect to the hosted, read-only server</p>
           <CodeBlock code={HOSTED} lang="bash" title="Hosted MCP" />
         </section>
+
+        <PolicyWallets owner={OWNER} labels={LABELS} />
 
         <section className="grid gap-3">
           <p className="t-label">Tools</p>

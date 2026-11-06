@@ -1,6 +1,6 @@
 "use client";
 
-import { accountUrl, deskView, type MakerView } from "@hushd/sdk";
+import { accountUrl, custodyView, deskView, type MakerView } from "@hushd/sdk";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { NETWORK } from "@/lib/hushd/config";
@@ -21,15 +21,25 @@ export default function MakersPage() {
   const [makers, setMakers] = useState<[string, MakerView][] | null>(null);
   const [enclave, setEnclave] = useState<{ sign_key: string | null; enc_key: string | null; project: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // the owner of each maker's policy wallet, read on chain (an implicit account is its wallet key)
+  const [wallets, setWallets] = useState<Record<string, { owner: string; frozen: boolean }>>({});
 
   useEffect(() => {
     Promise.all([deskView.makers(NETWORK), deskView.enclave(NETWORK)])
       .then(([m, e]) => {
         setMakers(m);
         setEnclave(e);
+        return Promise.all(
+          m.filter(([acc]) => /^[0-9a-f]{64}$/.test(acc)).map(async ([acc]) => ({ acc, policy: await custodyView.policy(NETWORK, `ed25519:${acc}`).catch(() => null) })),
+        );
       })
+      .then((found) => setWallets(Object.fromEntries(found.flatMap(({ acc, policy }) => (policy ? [[acc, policy]] : [])))))
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // a maker that moved to a policy wallet leaves its old account paused with no bond: list those apart
+  const retired = makers?.filter(([, m]) => !m.active && BigInt(m.bond) === 0n) ?? [];
+  const current = makers?.filter((x) => !retired.includes(x)) ?? null;
 
   return (
     <AppShell title="Makers" subtitle="The agents that quote on the desk. Each one posts a bond on chain and signs every quote with a key the desk checks; a missed hedge costs it the bond.">
@@ -42,10 +52,10 @@ export default function MakersPage() {
             ))}
           </div>
         )}
-        {makers && makers.length === 0 && <p className="text-[14px] text-mute">No makers are registered yet.</p>}
-        {makers && makers.length > 0 && (
+        {current && current.length === 0 && <p className="text-[14px] text-mute">No makers are registered yet.</p>}
+        {current && current.length > 0 && (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {makers.map(([acc, m]) => (
+            {current.map(([acc, m]) => (
               <li key={acc} className="hd-card grid content-start gap-3 p-5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[17px] font-medium text-foreground">{m.name}</p>
@@ -75,12 +85,49 @@ export default function MakersPage() {
                     <dd className="tnum text-foreground">{fmt(BOND, BigInt(m.slashed))}</dd>
                   </div>
                 </dl>
+                <p className="flex items-start gap-2 border-t border-line pt-3 text-[13px] leading-relaxed text-soft">
+                  {wallets[acc] ? (
+                    <>
+                      {/* centred on the first line of text, and never squeezed by it */}
+                      <span className="flex h-[1lh] shrink-0 items-center">
+                        <StateDot tone={wallets[acc]!.frozen ? "wait" : "ok"} />
+                      </span>
+                      <span>
+                        Signs through a policy wallet: its key stays in OutLayer&apos;s TEE, which allows only calls to Hushd&apos;s contracts. Owner <span className="text-foreground">{wallets[acc]!.owner}</span>
+                        {wallets[acc]!.frozen ? ", frozen" : ""}.
+                      </span>
+                    </>
+                  ) : (
+                    <span>Signs with its own key.</span>
+                  )}
+                </p>
                 <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="break-all text-[12.5px] text-mute underline decoration-line-strong underline-offset-4 hover:text-foreground">
                   {acc}
                 </a>
               </li>
             ))}
           </ul>
+        )}
+
+        {retired.length > 0 && (
+          <section className="grid gap-2">
+            <p className="t-label">Retired accounts</p>
+            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">These makers moved to policy wallets. Their old accounts no longer quote and hold no bond; their deals stay on record.</p>
+            <ul className="grid gap-1.5 text-[13px]">
+              {retired.map(([acc, m]) => (
+                <li key={acc} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span className="text-foreground">{m.name}</span>
+                  <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="text-mute underline decoration-line-strong underline-offset-4 hover:text-foreground">
+                    {acc}
+                  </a>
+                  <span className="tnum text-mute">
+                    {m.deals} {m.deals === 1 ? "deal" : "deals"}
+                    {BigInt(m.slashed) > 0n ? `, ${fmt(BOND, BigInt(m.slashed))} ${symbol(BOND)} slashed` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {enclave && (
@@ -96,7 +143,7 @@ export default function MakersPage() {
         <section className="grid gap-2">
           <p className="t-label">Run your own maker</p>
           <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">
-            A maker is an agent with a NEAR account, a quote key and a bond. It reads the asks sealed to it, prices them (Hyperliquid mids and NEAR Intents quotes for reference), seals a signed quote to the enclave and settles its leg in the pool. The reference makers in this repo are a starting point:{" "}
+            A maker is an agent with a NEAR account (best a policy wallet, so it never holds a NEAR key), a quote key and a bond. It reads the asks sealed to it, prices them (Hyperliquid mids and NEAR Intents quotes for reference), seals a signed quote to the enclave and settles its leg in the pool. The reference makers in this repo are a starting point:{" "}
             <a href="/docs/makers" className="text-foreground underline decoration-line-strong underline-offset-4">
               maker guide
             </a>
