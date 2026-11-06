@@ -9,7 +9,7 @@ import { Db } from "../src/db.js";
 import { approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
 import { eventsInBlock } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
-import { priceAsk, spreadBps } from "../src/makers.js";
+import { bondFor, priceAsk, spreadBps } from "../src/makers.js";
 import { checkDelegate } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
@@ -85,7 +85,7 @@ describe("hyperliquid agent approval", () => {
       v: 27,
     });
   });
-  test("an MPC public key becomes the deal's ADDRESS address", () => {
+  test("an MPC public key becomes the deal's Hyperliquid address", () => {
     const pub = Buffer.from("466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f276728176c3c6431f8eeda4538dc37c865e2784f3a9e77d044f33e407797e1278a", "hex");
     assert.equal(evmAddress(pub), "0x1563915e194d8cfba1943570603f7606a3115508");
   });
@@ -98,6 +98,14 @@ describe("makers", () => {
     assert.equal(spreadBps("volatility", { volBps: 0, inventoryRatio: 1 }), 15);
     assert.equal(spreadBps("inventory", { volBps: 0, inventoryRatio: 1 }), 15);
     assert.equal(spreadBps("inventory", { volBps: 0, inventoryRatio: 0 }), 75);
+  });
+  test("bonds come in steps of whole USDC and respect the desk's minimum", () => {
+    const usdc = (n: number) => BigInt(n) * 1_000_000n;
+    assert.equal(bondFor(500, 6, usdc(1_000)), usdc(1_000));
+    assert.equal(bondFor(12_000, 6, usdc(1_000)), usdc(2_000));
+    assert.equal(bondFor(30_000, 6, usdc(1_000)), usdc(5_000));
+    assert.equal(bondFor(2_500_000, 6, usdc(1_000)), usdc(300_000));
+    assert.equal(bondFor(500, 6, usdc(3_000)), usdc(3_000));
   });
   test("pricing rounds in the maker's favour", () => {
     // 1,000 USDC for BTC at 60,000 with 25 bps: 0.01662499... BTC, floored to 8 decimals
@@ -156,4 +164,19 @@ describe("deal rooms (Postgres)", () => {
     const bad = await api.request(`/v1/deals/4/messages`, { method: "POST", body: JSON.stringify({ to: "nope", box: "QUJD" }), headers: { "content-type": "application/json" } });
     assert.equal(bad.status, 400);
   });
+});
+
+test("a service records the events of its own transaction", async () => {
+  const { eventsInOutcome } = await import("../src/indexer.js");
+  const ev = (event: string) => `EVENT_JSON:${JSON.stringify({ standard: "hushd", version: "1.0.0", event, data: [{ deal_id: "0" }] })}`;
+  const outcome = {
+    transaction: { hash: "tx9" },
+    receipts_outcome: [
+      { id: "r1", block_hash: "b", outcome: { executor_id: "desk.hushd.testnet", logs: [ev("deal_matched")], status: { SuccessValue: "" } } },
+      { id: "r2", block_hash: "b", outcome: { executor_id: "other.testnet", logs: [ev("deal_matched")], status: { SuccessValue: "" } } },
+      { id: "r3", block_hash: "b", outcome: { executor_id: "desk.hushd.testnet", logs: [ev("receipt")], status: { Failure: {} } } },
+    ],
+  };
+  const out = eventsInOutcome(outcome, new Set(["desk.hushd.testnet"]), { height: 5, ms: 7 });
+  assert.deepEqual(out.map((e) => [e.event, e.receiptId, e.txHash, e.blockHeight]), [["deal_matched", "r1", "tx9", 5]]);
 });

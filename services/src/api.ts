@@ -166,7 +166,7 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now()) {
   a.get("/v1/status", async (c) => {
     const accounts = settings.str("SERVICE_ACCOUNTS", "").split(",").filter(Boolean);
     const treasury = settings.str("TREASURY_ACCOUNT", "");
-    const low = BigInt(settings.str("TREASURY_LOW_YOCTO", "20000000000000000000000000"));
+    const low = BigInt(settings.str("TREASURY_LOW_YOCTO", "5000000000000000000000000"));
     const balances = await Promise.all(
       [...new Set([treasury, ...accounts].filter(Boolean))].map(async (acc) => {
         const { accountBalance } = await import("@hushd/sdk");

@@ -4,9 +4,10 @@
  */
 import { MAINNET, TESTNET, withOverrides, type HushdNetwork } from "@hushd/sdk";
 
+// unset, empty and the .env.example placeholders all count as "not configured"
 const env = (k: string, d?: string) => {
   const v = process.env[k];
-  return v === undefined || v === "" ? d : v;
+  return v === undefined || v === "" || v.includes("replace-me") ? d : v;
 };
 
 export function network(): HushdNetwork {

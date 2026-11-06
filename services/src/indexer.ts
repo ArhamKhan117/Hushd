@@ -54,7 +54,8 @@ export function eventsInBlock(b: NeardataBlock, watched: Set<string>): IndexedEv
             blockHeight: b.block.header.height,
             blockMs,
             contract: r.receipt.receiver_id,
-            event: e.standard === "nep141" ? `ft_${e.event}` : e.event,
+            // NEP-141 names already read ft_mint, ft_transfer, ft_burn
+            event: e.event,
             data: e.data?.[0] ?? null,
             txHash: r.tx_hash,
           });
@@ -74,7 +75,8 @@ export function neardataBase(net: HushdNetwork): string {
 async function getJson<T>(url: string): Promise<T | null> {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000) });
+      const key = settings.str("NEARDATA_API_KEY", "");
+      const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000), ...(key ? { headers: { authorization: `Bearer ${key}` } } : {}) });
       if (r.status === 404) return null;
       if (r.ok) return (await r.json()) as T;
     } catch {
@@ -83,6 +85,31 @@ async function getJson<T>(url: string): Promise<T | null> {
     await new Promise((res) => setTimeout(res, 500 * 2 ** attempt));
   }
   throw new Error(`neardata did not answer for ${url}`);
+}
+
+/** Hushd and NEP-141 events in a transaction's outcome (what `send` returns), for the services' own sends. */
+export function eventsInOutcome(o: OutcomeLike, watched: Set<string>, at: { height: number; ms: number }): IndexedEvent[] {
+  const out: IndexedEvent[] = [];
+  for (const r of o.receipts_outcome ?? []) {
+    const exec = r.outcome;
+    if (!exec || !watched.has(exec.executor_id ?? "") || (exec.status as { Failure?: unknown } | undefined)?.Failure) continue;
+    (exec.logs ?? []).forEach((log, i) => {
+      if (!log.startsWith("EVENT_JSON:")) return;
+      try {
+        const e = JSON.parse(log.slice(11)) as { standard: string; event: string; data?: unknown[] };
+        if (e.standard !== "hushd" && e.standard !== "nep141") return;
+        out.push({ receiptId: r.id ?? "", logIndex: i, blockHeight: at.height, blockMs: at.ms, contract: exec.executor_id!, event: e.event, data: e.data?.[0] ?? null, txHash: o.transaction?.hash ?? "" });
+      } catch {
+        /* not JSON: not ours */
+      }
+    });
+  }
+  return out;
+}
+
+export interface OutcomeLike {
+  transaction?: { hash?: string };
+  receipts_outcome?: { id?: string; block_hash?: string; outcome?: { executor_id?: string; logs?: string[]; status?: unknown } }[];
 }
 
 export class Indexer {
@@ -106,15 +133,18 @@ export class Indexer {
     if (!last) return 0;
     this.head = last.block.header.height;
     const from = Math.max(await this.startHeight(), 0);
-    let h = from;
-    while (h <= this.head && h < from + maxBlocks) {
-      const b = await getJson<NeardataBlock>(`${neardataBase(this.net)}/v0/block/${h}`);
-      if (b) await this.store(eventsInBlock(b, this.watched));
-      await this.db.setCursor("indexer", h);
-      this.cursor = h;
-      h++;
+    const to = Math.min(this.head, from + maxBlocks - 1);
+    // fetch a window of blocks at once (testnet makes about one a second), store them in order
+    for (let start = from; start <= to; start += INDEX_WINDOW) {
+      const heights = Array.from({ length: Math.min(INDEX_WINDOW, to - start + 1) }, (_, i) => start + i);
+      const blocks = await Promise.all(heights.map((h) => getJson<NeardataBlock>(`${neardataBase(this.net)}/v0/block/${h}`)));
+      for (const [i, b] of blocks.entries()) {
+        if (b) await this.store(eventsInBlock(b, this.watched));
+        await this.db.setCursor("indexer", heights[i]!);
+        this.cursor = heights[i]!;
+      }
     }
-    return h - from;
+    return to >= from ? to - from + 1 : 0;
   }
 
   private async startHeight(): Promise<number> {
@@ -129,6 +159,9 @@ export class Indexer {
     return this.head - 10;
   }
 }
+
+// neardata rate-limits bursts: a few blocks at a time is still well ahead of the chain
+const INDEX_WINDOW = 4;
 
 export function watchedContracts(net: HushdNetwork): Set<string> {
   return new Set([net.pool, net.desk, net.board, ...net.tokens.map((t) => t.id)].filter((x): x is string => !!x));

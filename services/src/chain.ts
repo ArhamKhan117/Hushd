@@ -4,6 +4,9 @@
  * nonce collisions; without one, the account's full-access key sends them in turn.
  */
 import { accountBalance, type HushdNetwork } from "@hushd/sdk";
+import { settings } from "./config.js";
+import { Db } from "./db.js";
+import { eventsInOutcome, watchedContracts, type OutcomeLike } from "./indexer.js";
 import { Near } from "near-kit";
 import type { AccountConfig } from "./config.js";
 
@@ -24,7 +27,7 @@ export class ChainError extends Error {
 type Outcome = {
   transaction?: { hash?: string };
   transaction_outcome?: { id?: string; outcome?: { gas_burnt?: number } };
-  receipts_outcome?: { outcome?: { gas_burnt?: number; status?: unknown } }[];
+  receipts_outcome?: { id?: string; block_hash?: string; outcome?: { gas_burnt?: number; status?: unknown; executor_id?: string; logs?: string[] } }[];
   status?: { SuccessValue?: string; Failure?: unknown };
 };
 
@@ -43,6 +46,47 @@ function failureText(f: unknown): string {
   const s = JSON.stringify(f);
   const m = /"(?:panic_msg|ExecutionError|message)"\s*:\s*"([^"]+)"/.exec(s);
   return m ? m[1]!.replace(/^Smart contract panicked: /, "") : s.slice(0, 400);
+}
+
+let sink: Promise<Db | null> | null = null;
+/** The services share Postgres with the API: each one records the events of its own sends. */
+function eventSink(): Promise<Db | null> {
+  sink ??= (async () => {
+    try {
+      const db = new Db(settings.databaseUrl());
+      await db.migrate();
+      return db;
+    } catch {
+      return null;
+    }
+  })();
+  return sink;
+}
+
+async function recordEvents(net: HushdNetwork, o: Outcome) {
+  const db = await eventSink();
+  const blockHash = o.receipts_outcome?.[0]?.block_hash;
+  if (!db || !blockHash) return;
+  const b = await rpcBlock(net, blockHash);
+  const at = { height: b.header.height, ms: Number(BigInt(b.header.timestamp_nanosec) / 1_000_000n) };
+  for (const e of eventsInOutcome(o as OutcomeLike, watchedContracts(net), at)) {
+    await db.q(
+      `insert into events (receipt_id, log_index, block_height, block_ms, contract, event, data, tx_hash)
+       values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing`,
+      [e.receiptId, e.logIndex, e.blockHeight, e.blockMs, e.contract, e.event, JSON.stringify(e.data), e.txHash],
+    );
+  }
+}
+
+async function rpcBlock(net: HushdNetwork, hash: string): Promise<{ header: { height: number; timestamp_nanosec: string } }> {
+  for (const url of [...net.rpc, ...net.rpc]) {
+    const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "block", params: { block_id: hash } }) })
+      .then((r) => r.json())
+      .catch(() => ({}))) as { result?: { header: { height: number; timestamp_nanosec: string } } };
+    if (j.result) return j.result;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error("no RPC answered for the block");
 }
 
 /** A refusal before broadcast (rate limit): safe to send again elsewhere. */
@@ -121,6 +165,7 @@ export class Signer {
       this.stats.failed++;
       throw new ChainError(failureText(outcome.status.Failure), txHash);
     }
+    void recordEvents(this.net, outcome).catch((e) => console.error(`events of ${txHash}: ${(e as Error).message}`));
     return { txHash, result: decodeResult(outcome), gasBurnt, lane };
   }
 
