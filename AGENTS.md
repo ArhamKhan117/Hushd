@@ -27,6 +27,9 @@ pnpm --filter @hushd/services policy-wallet create|show|freeze|unfreeze <ENV_PRE
 pnpm --filter @hushd/services intents:sandbox # the NEAR Intents trade on a local node running intents.near's code
 pnpm --filter @hushd/services intents:mainnet # plan and dry run of the mainnet Intents trades (sends nothing)
 pnpm build:packages                         # protocol, sdk and mcp to dist/ for npm
+pnpm security                               # near-scan, cargo audit and deny, Clippy, pnpm audit -> security/report.md
+pnpm --filter @hushd/services agent-api     # the NEAR Intents Agent API trader agent (mainnet; flags act, none by default)
+pnpm --filter @hushd/services exec tsx scripts/desk-config.ts  # the desk's timelocked settings (propose, apply, pin)
 ```
 
 Sandbox tests need prebuilt wasm (`cargo near build non-reproducible-wasm` in each contract and in `sandbox-tests/doubles/*`), then `cargo test -p sandbox-tests -- --test-threads=1`.

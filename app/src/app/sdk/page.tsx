@@ -128,7 +128,7 @@ const draft: PackageDraft = {
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
 };
-const { request, ask } = packageRequest(identity, TESTNET, draft);
+const { request, ask, refundBlinding } = packageRequest(identity, TESTNET, draft);
 
 // 2. Commit its hash on chain; each maker gets the ask, sealed to it.
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
@@ -137,9 +137,9 @@ const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, wind
 const match = await awaitMatch(api, identity, rfqId);
 checkMatchedTerms(match.terms, draft);
 
-// 4. Prove your leg; both legs settle in one pool call.
+// 4. Approve the four outputs, prove your leg; both legs settle in one pool call.
 await settleAsTrader({
-  net: TESTNET, api, wallet,
+  net: TESTNET, api, wallet, refundBlinding,
   dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address,
 });`;
 

@@ -149,12 +149,12 @@ const draft: PackageDraft = {
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
 };
-const { request, ask } = packageRequest(id, TESTNET, draft);
+const { request, ask, refundBlinding } = packageRequest(id, TESTNET, draft);
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
 const match = await awaitMatch(api, id, rfqId);
 checkMatchedTerms(match.terms, draft); // throws unless the match is what you asked for
 await settleAsTrader({
-  net: TESTNET, api, wallet,
+  net: TESTNET, api, wallet, refundBlinding, // re-derives the deal's owner key, which approves the outputs
   dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address,
 });`}</code>
       </pre>

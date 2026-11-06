@@ -122,8 +122,9 @@ export default function MakersDocsPage() {
       <p>
         The maker is always online, so it is the one that submits. It waits for the trader&apos;s plan, checks the note
         made for it opens to the agreed amount, makes its own two outputs and sends the trader the opening of the one
-        meant for them, proves its leg, waits for the trader&apos;s proven leg, and sends both through the relayer to{" "}
-        <code>desk.settle</code>. In the SDK this is one call, <code>settleAsMaker</code>. How the two legs are bound
+        meant for them, proves its leg, waits for the trader&apos;s proven leg, signs the four outputs with its quote key,
+        and sends both legs and both signatures through the relayer to <code>desk.settle</code>. In the SDK this is one
+        call, <code>settleAsMaker</code>. How the two legs are bound
         together is in <Link href="/docs/desk#4-settlement">how the desk works</Link>.
       </p>
 

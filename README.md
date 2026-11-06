@@ -83,7 +83,7 @@ Who you trust, and for what:
 - **The maker** sees the pair, side and size of your ask and, after a match, the deal terms.
 - **NEAR AI Cloud** decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext.
 
-Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review, not an external audit.
+Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review and automated scans ([SECURITY.md](SECURITY.md)), not an external audit.
 
 ## Agents
 
@@ -127,10 +127,27 @@ Deploy your own copy to testnet from one funded account: `pnpm --filter @hushd/s
 pnpm test                           # circuits, protocol, SDK, services, MCP
 cd contracts && cargo test -p hushd-pool -p hushd-desk -p hushd-board -p hushd-token   # with real proofs
 pnpm verify                         # the live deployment, claim by claim
+pnpm security                       # near-scan, cargo audit and deny, Clippy, pnpm audit (see SECURITY.md)
 pnpm --filter @hushd/services intents:sandbox   # the NEAR Intents trade on a local node running intents.near's code
 ```
 
 The contract sandbox tests run the whole flow on a local nearcore: build the wasm with `cargo near build non-reproducible-wasm` in each contract and in `contracts/sandbox-tests/doubles/*`, then `cargo test -p sandbox-tests -- --test-threads=1`.
+
+## Security checks
+
+`pnpm security` runs every check and writes [security/report.md](security/report.md); all of them pass.
+
+| Check | What it looks at |
+| --- | --- |
+| [near-scan](contracts/tools/near-scan) | 22 NEAR detector classes (the checklist BlockSec's Rustle reports) on the parsed contract source; each of its 70 hits has a written reason, listed in [security/near-scan.md](security/near-scan.md) |
+| cargo audit, cargo deny | RustSec advisories, licenses and crate sources for the contracts and the matcher enclave |
+| Clippy | Rust lints, warnings as errors |
+| pnpm audit | npm advisories in the production JavaScript dependencies |
+| `pnpm verify` | The contracts on testnet run the recorded code hashes, and your own build hashes the same |
+
+The contract review of 6 November 2026 found one High: anyone could settle a matched deal with empty legs of their own.
+It is fixed: `desk.settle` now needs both parties' signatures over the deal's four outputs.
+That finding, the three Medium and six Low, and what changed for each are in [SECURITY.md](SECURITY.md).
 
 ## Repository
 

@@ -137,13 +137,20 @@ export default function DeskDocsPage() {
           paired with another.
         </li>
         <li>
-          The maker submits both legs through the relayer to <code>desk.settle</code>, and the desk calls{" "}
+          Each signs <code>hushd.settle.v1:&lt;desk&gt;:&lt;deal id&gt;:&lt;the four outputs&gt;</code>: the trader with the
+          deal&apos;s owner key, the maker with its quote key. A proof only says a leg belongs to this deal, and anyone can
+          prove empty legs; the two signatures say both parties agreed to exactly these outputs.
+        </li>
+        <li>
+          The maker submits both legs and both signatures through the relayer to <code>desk.settle</code>, which checks
+          the signatures, and the desk calls{" "}
           <code>pool.settle_swap</code>: both proofs and both bindings are checked, and all four spends and four new
           notes are applied in one receipt. Both happen or neither does.
         </li>
       </ol>
       <p>
-        The relayer checks both proofs off chain, and that every note is unspent, before it sends anything. A bad
+        The relayer checks both proofs and both signatures off chain, and that every note is unspent, before it sends
+        anything. A bad
         submission does not end the deal: the two sides can try again until it expires.
       </p>
 

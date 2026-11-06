@@ -184,6 +184,7 @@ export default function DeskPage() {
         dealId: match.dealId,
         terms: match.terms,
         makerAddress: match.maker_address,
+        refundBlinding,
         onStep: (step) => set({ settleStep: step }),
       });
       await s.wallet.rememberDeal({ ...record, settledAtMs: Date.now() });

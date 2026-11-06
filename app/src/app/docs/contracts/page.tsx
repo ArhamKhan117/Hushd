@@ -142,18 +142,20 @@ export default function ContractsPage() {
           with the enclave&apos;s signature. Either way the desk checks the maker&apos;s quote key signed the terms.
         </li>
         <li>
-          <strong>Settlement</strong>: <code>settle</code> forwards both legs to <code>pool.settle_swap</code>;{" "}
-          <code>expire</code> closes a deal nobody settled.
+          <strong>Settlement</strong>: <code>settle</code> checks that the trader (the deal&apos;s owner key) and the
+          maker (its quote key) both signed the deal&apos;s four outputs, then forwards both legs to{" "}
+          <code>pool.settle_swap</code>; <code>expire</code> closes a deal nobody settled.
         </li>
         <li>
           <strong>Hedges</strong>: <code>sign_hedge_order</code> (the keeper or the deal&apos;s maker, up to three
           opening orders per deal) and <code>close_hedge</code> through Chain Signatures, <code>record_hedge</code> from
-          the keeper, <code>slash_overdue</code> for anyone after the deadline, and <code>retry_slash_payout</code> for
-          anyone when the pool refused a slashed bond.
+          the keeper, <code>slash_overdue</code> for anyone after the deadline (ten minutes later when an order was signed
+          and not yet reported), and <code>retry_slash_payout</code> for anyone, or <code>redirect_slash_payout</code>{" "}
+          signed by the deal&apos;s owner key, when the pool refused a slashed bond.
         </li>
         <li>
           <strong>Rules</strong>: the pool, the bond token and the MPC are fixed at init. The other settings (the owner,
-          OutLayer, the matcher project and its secrets owner, the keeper, the OutLayer fee and <code>min_bond</code>)
+          OutLayer, the matcher project (which can name one build, <code>owner/project@&lt;wasm hash&gt;</code>) and its secrets owner, the keeper, the OutLayer fee and <code>min_bond</code>)
           change only through <code>propose_config</code> and then <code>apply_config</code> after a one-day timelock,
           so makers can withdraw first. <code>min_bond</code> is 1,000 USDC.
         </li>

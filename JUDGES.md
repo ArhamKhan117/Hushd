@@ -24,6 +24,8 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 | --- | --- |
 | Groth16 verified on chain with `alt_bn128` | `contracts/pool/src/groth16.rs`, `contracts/pool/src/lib.rs` (`transact`, `settle_swap`) |
 | Both legs settle or neither | `contracts/pool/src/lib.rs` (`settle_swap`), `contracts/desk/src/lib.rs` (`settle`, `on_settled`) |
+| Only the two parties can settle a deal: both sign its four outputs | `contracts/desk/src/lib.rs` (`settle`, `settle_message`), `packages/sdk/src/desk.ts` (`settleMessage`, `settleAsTrader`, `settleAsMaker`) |
+| NEAR-specific static checks on every contract | `contracts/tools/near-scan`, [security/near-scan.md](security/near-scan.md) |
 | A match must come from the enclave, and each quote carries its maker's consent | `contracts/desk/src/lib.rs` (`on_match`, `submit_match`, `accept_match`), `matcher/src/main.rs` |
 | Makers never see the limit | `packages/sdk/src/desk.ts` (`packageRequest`, `openRfq`) |
 | The hedge is signed by Chain Signatures per deal; a missed hedge pays the bond to the trader privately | `contracts/desk/src/hedge.rs`, `contracts/desk/src/lib.rs` (`sign_hedge_order`, `slash_overdue`), `services/src/keeper.ts` |
@@ -42,4 +44,6 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 - The hedge leg trades on Hyperliquid testnet.
 - A policy wallet's TEE checks which contracts an agent calls and the NEAR it attaches, not the token amounts inside a call; those limits are the MCP server's.
 - NEAR Intents has no testnet: the direct trade is tested on a local node running `intents.near`'s code, and the mainnet run (about 3 USD, mostly returned) waits for the owner's go-ahead.
+- The NEAR Intents Agent API (mainnet only) is wired (`services/src/agent-api.ts`, `scripts/agent-api.ts`: an agent owned by the demo's dev wallet, its policy signed by that key, swaps through a grant) and checked against the live API's public endpoints; creating the agent waits for a partner key and the owner's go-ahead.
+- The contract review and automated scans, with every finding and fix: [SECURITY.md](SECURITY.md).
 - Deposits and cash outs are public, and timing can link them; the docs say how to reduce that.
