@@ -52,7 +52,8 @@ services:
     environment: { <<: *env, SERVICE: matcher, PORT: "8790" }
   makers:
     <<: *service
-    environment: { <<: *env, SERVICE: makers, PORT: "8791" }
+    # pinned here: a MAKERS_DATA_DIR from .env would otherwise move the notes off the volume
+    environment: { <<: *env, SERVICE: makers, PORT: "8791", MAKERS_DATA_DIR: /data/makers }
     volumes: [makers:/data]
   keeper:
     <<: *service
@@ -60,6 +61,11 @@ services:
   topup:
     <<: *service
     environment: { <<: *env, SERVICE: topup, PORT: "8793" }
+  # the Agent Market worker: idle until MARKET_AGENT_TOKEN is set (scripts/market-listing.ts --register)
+  market:
+    <<: *service
+    environment: { <<: *env, SERVICE: market, PORT: "8794", MAKERS_DATA_DIR: /data/makers }
+    volumes: [makers:/data]
 
   caddy:
     image: caddy:2.10.2-alpine

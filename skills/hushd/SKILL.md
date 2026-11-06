@@ -21,7 +21,11 @@ claude mcp add hushd -e HUSHD_LIMIT_PER_PAYMENT="USDC=100" -e HUSHD_LIMIT_PER_DA
 
 Hosted, read-only (status, makers, deals, proof checks): `https://hushd.net/mcp` (Streamable HTTP).
 
-To add tokens the agent also needs a NEAR testnet account: set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
+To add tokens the agent also needs a NEAR testnet account.
+Best is a policy wallet, so the agent holds no NEAR key: the owner runs `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or uses the Agents page) and the agent gets `HUSHD_POLICY_WALLET_KEY`.
+OutLayer's TEE then signs only calls to Hushd's contracts within the owner's caps, and the owner can freeze it on chain.
+Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
+`hushd_policy` tells the agent which it has, the TEE's rules and whether it is frozen.
 
 ## Typical flow
 

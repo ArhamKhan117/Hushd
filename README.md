@@ -15,7 +15,7 @@ Everything runs on NEAR testnet with test tokens.
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
 - **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
 - **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
-- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts and their code, the enclave key, bonded makers, settled deals, the services, the intake attestation, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
+- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts and their code, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a trade checked by `intents.near` on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
 
 ## What you can do
 
@@ -26,6 +26,8 @@ Everything runs on NEAR testnet with test tokens.
 - **Describe the trade in plain words.** A NEAR AI Cloud model inside a TEE drafts the request. Your words are encrypted to the model's attested key in the browser, and the answer's TEE signature is checked in the browser too. You confirm every number.
 - **Prove one fact to one reader.** An exact payment, a payment of at least an amount, funds held above a threshold, or your total desk volume. Each proof names its reader and expires, and the pool contract checks it again on chain.
 - **Let agents do all of it** through MCP, inside per-payment and per-day limits, including paying x402 resources privately.
+- **Give each agent a policy wallet.** The agent's NEAR key lives in OutLayer's TEE, which signs only calls to Hushd's contracts within the owner's NEAR, rate and hour caps. The owner can freeze it with one transaction, and a frozen agent stops spending privately too. The desk's own makers work this way.
+- **Trade on NEAR Intents.** Two agents settle a trade on `intents.near` with one transaction: each signs its side as a `token_diff`, and the verifier executes both or neither. 1Click quotes from 39 chains price the makers and preview deposits from, and cash-outs to, other chains.
 
 ## How a deal works
 
@@ -51,7 +53,10 @@ Everything runs on NEAR testnet with test tokens.
 | Passkeys that derive an implicit account, opened by the relayer with 0.2 testnet NEAR for its own gas | Sign in with a passkey |
 | Gas keys give the relayer parallel nonce lanes; it also relays NEP-366 meta transactions for allowlisted calls | Settings page, "Relayer" |
 | NEP-141 `ft_transfer_call` deposits straight into the pool | Balance, "Add privately" |
-| NEP-297 events read from FastNEAR's neardata by the indexer | A deal page's "On chain" list |
+| OutLayer agent custody: each agent's NEAR account is a policy wallet whose key stays in a TEE; the owner stores the policy on chain and can freeze it | Agents page, "Policy wallets"; Makers page |
+| NEAR Intents direct trades: complementary `token_diff` intents signed by two agents, one `execute_intents`, simulated first with `simulate_intents` | Transparency, "On NEAR Intents (mainnet)" |
+| 1Click quotes across 39 chains, as the makers' second price and for deposits from and cash-outs to other chains | Balance, Add and Cash out, "another chain" |
+| NEP-297 events read from FastNEAR's free transactions API by the indexer (or its neardata block stream) | A deal page's "On chain" list |
 
 ## Contracts
 
@@ -91,9 +96,11 @@ claude mcp add hushd \
   -- pnpm --silent --dir "$PWD" mcp
 ```
 
-- 17 tools: balance and address, faucet and shield, send and cash out, `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, deals and payments, and the read tools.
+- 18 tools: balance and address, faucet and shield, send and cash out, `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
+- A policy wallet instead of a NEAR key: `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or the Agents page) stores the policy from the owner's account, then the agent gets `HUSHD_POLICY_WALLET_KEY`. The TEE enforces which contracts it may call and the NEAR it may attach; this server adds token limits, `HUSHD_LIMITS_EXPIRE` and `HUSHD_ALLOW_TO` (payees), and refuses to spend while the wallet is frozen.
 - Read-only, hosted: `claude mcp add --transport http hushd-read https://hushd.net/mcp`.
 - Private x402: a resource answers 402 with scheme `hushd`; the agent pays a private note to the resource's `hushd1...` address and sends the note's opening sealed to it; the server checks the pool created exactly that note. The reference makers sell indicative quotes this way.
+- NEAR's Agent Market: [`deploy/agent-market/`](deploy/agent-market/) holds Hushd's listing, a "price check" agent (`services/src/market-agent.ts`) that answers a hire with the live NEAR Intents quote, the Hyperliquid mid and the quotes of Hushd's makers, paying each maker over private x402. `pnpm --filter @hushd/services exec tsx scripts/market-listing.ts --try "sell 2500 USDC for NEAR"` runs one check; the listing goes live with the owner.
 - An agent skill for coding agents lives at [`skills/hushd/SKILL.md`](skills/hushd/SKILL.md), and [`llms.txt`](https://hushd.net/llms.txt) maps the site.
 
 ## Run it
@@ -120,6 +127,7 @@ Deploy your own copy to testnet from one funded account: `pnpm --filter @hushd/s
 pnpm test                           # circuits, protocol, SDK, services, MCP
 cd contracts && cargo test -p hushd-pool -p hushd-desk -p hushd-board -p hushd-token   # with real proofs
 pnpm verify                         # the live deployment, claim by claim
+pnpm --filter @hushd/services intents:sandbox   # the NEAR Intents trade on a local node running intents.near's code
 ```
 
 The contract sandbox tests run the whole flow on a local nearcore: build the wasm with `cargo near build non-reproducible-wasm` in each contract and in `contracts/sandbox-tests/doubles/*`, then `cargo test -p sandbox-tests -- --test-threads=1`.

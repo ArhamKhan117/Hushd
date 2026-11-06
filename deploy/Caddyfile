@@ -37,6 +37,10 @@
 		rewrite * /health
 		reverse_proxy topup:8793
 	}
+	handle /health/market {
+		rewrite * /health
+		reverse_proxy market:8794
+	}
 	handle {
 		reverse_proxy api:8788
 	}

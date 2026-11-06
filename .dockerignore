@@ -1,0 +1,18 @@
+# The services image needs only the workspace manifests, packages/*, services/, deployments/
+# and the circuits the Dockerfile names. Keys come from env_file at run time, never the image.
+.git
+.env
+.env.*
+!.env.example
+internal/
+CLAUDE.local.md
+**/node_modules
+**/.next
+**/dist
+**/target
+**/test-results
+**/playwright-report
+services/data/
+contracts/
+circuits/build/
+matcher/target/

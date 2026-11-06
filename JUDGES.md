@@ -12,7 +12,9 @@ A five-minute path through Hushd, then where to look in the code.
 
 Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC), both for `judge.testnet` until 6 December 2026. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.
 
-Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools: deposit, a private x402 payment, a cash out, a spot trade, proofs and a hedged trade.
+Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools through the agent's policy wallet: a deposit signed in OutLayer's TEE, a call outside its policy refused by the TEE, the owner freezing it (and the agent refusing to spend) then unfreezing it, a private x402 payment, a cash out, a spot trade, proofs and a hedged trade.
+
+The NEAR Intents trade between two agents, end to end with no funds: `pnpm --filter @hushd/services intents:sandbox` deploys the exact code of `intents.near` (read from mainnet, hash checked) on a local node, and two agents deposit, trade with signed `token_diff`s, see a replay refused and withdraw. `intents:mainnet` prints the budgeted mainnet run and dry-runs it against `intents.near`.
 
 Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the README's live claims against the deployment, one PASS or FAIL each.
 
@@ -29,6 +31,8 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 | NEAR AI intake is end-to-end encrypted and verified | `packages/sdk/src/intake.ts`, `services/src/intake.ts` |
 | Private x402 | `packages/sdk/src/x402.ts` and its tests, `services/src/makers.ts` |
 | Agents spend only inside limits | `packages/mcp/src/limits.ts`, `packages/mcp/test/mcp.test.ts` |
+| Agents and makers hold no NEAR key: policy wallets on OutLayer custody, policy stored and frozen on chain by the owner | `packages/sdk/src/custody.ts`, `services/scripts/policy-wallet.ts`, `services/src/makers.ts` (`makerAccount`), `packages/mcp/src/agent.ts` |
+| Direct trades on NEAR Intents: NEP-413 signed `token_diff`s, simulated, then one `execute_intents` | `packages/sdk/src/intents.ts` and its tests, `services/src/intents-trade.ts`, `services/scripts/intents-sandbox.ts` |
 | Bytes agree across TypeScript and both Rust codebases | `packages/protocol/test/protocol.test.ts`, `matcher/tests/interop.json`, `contracts/desk/src/hedge.rs` tests |
 
 ## Honest limits
@@ -36,4 +40,6 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 - Testnet only, with test tokens and development proving keys.
 - The contracts had an internal review, not an external audit.
 - The hedge leg trades on Hyperliquid testnet.
+- A policy wallet's TEE checks which contracts an agent calls and the NEAR it attaches, not the token amounts inside a call; those limits are the MCP server's.
+- NEAR Intents has no testnet: the direct trade is tested on a local node running `intents.near`'s code, and the mainnet run (about 3 USD, mostly returned) waits for the owner's go-ahead.
 - Deposits and cash outs are public, and timing can link them; the docs say how to reduce that.

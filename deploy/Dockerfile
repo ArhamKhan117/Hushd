@@ -9,6 +9,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/sdk/package.json packages/sdk/
 COPY packages/protocol/package.json packages/protocol/
+COPY packages/mcp/package.json packages/mcp/
 COPY services/package.json services/
 RUN pnpm install --frozen-lockfile --filter "@hushd/services..."
 
@@ -17,7 +18,10 @@ RUN groupadd -r hushd && useradd -r -g hushd -d /repo hushd
 COPY --from=deps /repo /repo
 COPY packages/sdk packages/sdk
 COPY packages/protocol packages/protocol
+COPY packages/mcp packages/mcp
 COPY services services
+# The API serves the mainnet NEAR Intents record (deployments/mainnet-intents.json) once it exists.
+COPY deployments deployments
 # The relayer verifies with the vkeys; makers prove their swap legs with joinsplit.
 COPY app/public/circuits/manifest.json app/public/circuits/*.vkey.json app/public/circuits/joinsplit.wasm app/public/circuits/joinsplit.zkey app/public/circuits/
 RUN mkdir -p /data && chown hushd:hushd /data
