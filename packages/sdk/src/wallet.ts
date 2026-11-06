@@ -323,6 +323,7 @@ export class PrivateWallet {
     const have = inputs.reduce((s, n) => s + n.amount, 0n);
     const payment = makeNote(dest.pk, token, amount);
     const change = makeNote(this.id.pk, token, have - amount);
+    // the payment goes first: the pool's receipt and volume checks count only output 0
     const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs, outputs: [payment, change] });
     const r = await this.relayer().transact(transactRequest(j, 0n, null));
     await this.relayer().post(sealNote(dest, payment, memo ? { memo } : {}), "note");
@@ -348,7 +349,7 @@ export class PrivateWallet {
     return { txHash: r.txHash };
   }
 
-  /** Step 1 of a swap leg: choose inputs and make your two outputs (the counterparty's note and your change). */
+  /** Step 1 of a swap leg: choose inputs and make your two outputs (the counterparty's note first, then your change). */
   async planLeg(dealId: bigint, give: { token: string; amount: bigint }, counterparty: string | ReceiveAddress): Promise<LegPlan> {
     const dest = typeof counterparty === "string" ? decodeAddress(counterparty) : counterparty;
     const inputs = await this.ensureCovered(give.token, give.amount);

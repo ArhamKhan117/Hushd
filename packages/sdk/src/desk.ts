@@ -21,7 +21,7 @@ import { bytesToHex as bytesHex, fromB64, hexToBytes, toB64 } from "./bytes.js";
 import { noteMessage, type NoteMessage } from "./board.js";
 import type { Identity } from "./keys.js";
 import { decodeAddress } from "./keys.js";
-import type { HushdNetwork } from "./network.js";
+import { TESTNET, type HushdNetwork } from "./network.js";
 import { be32, randomField } from "./field.js";
 import { makeNote, noteInner, type Note } from "./note.js";
 import { swapLeg } from "./pool.js";
@@ -54,9 +54,15 @@ export interface DealView {
   expires_at_ms: string;
   bond: string;
   hedge: null | { asset: number; coin: string; is_buy: boolean; size: string; limit_px: string; deadline_ms: number; testnet: boolean };
-  status: "matched" | "hedge_pending" | "closed";
+  status: "matched" | "settling" | "hedge_pending" | "slashing" | "slash_refused" | "closed";
   settle_attempts: number;
+  /** 1 while the opening order is out or filled, 2 once closed. */
   hedge_orders: number;
+  /** Opening orders signed so far (at most 3). */
+  hedge_attempts: number;
+  bond_released: boolean;
+  /** Slashed bond the desk still holds for the trader (the pool refused it). */
+  slash_held: string;
   attested_by: string;
   receipt: null | { outcome: "settled" | "recovered" | "failed" | "unresolved"; evidence: { kind: string; reference: string }[]; recorded_at_ms: string };
 }
@@ -67,13 +73,18 @@ export interface DeskConfig {
   bond_token: string;
   outlayer: string;
   matcher_project: string;
+  secrets_owner: string;
   mpc: string;
   keeper: string;
+  outlayer_fee: string;
   min_bond: string;
+  /** How long a config change waits; pool, bond token and MPC never change. */
+  config_timelock_ns: string;
 }
 
 export const deskView = {
   config: (net: HushdNetwork) => view<DeskConfig>(net, net.desk!, "config"),
+  pendingConfig: (net: HushdNetwork) => view<{ id: string; change: Omit<DeskConfig, "pool" | "bond_token" | "mpc" | "config_timelock_ns">; apply_after_ns: string } | null>(net, net.desk!, "pending_config"),
   enclave: (net: HushdNetwork) => view<{ sign_key: string | null; enc_key: string | null; project: string }>(net, net.desk!, "enclave"),
   makers: (net: HushdNetwork) => view<[string, MakerView][]>(net, net.desk!, "makers"),
   deal: (net: HushdNetwork, id: number) => view<DealView | null>(net, net.desk!, "deal", { deal_id: String(id) }),
@@ -169,9 +180,15 @@ export function ownerKeyFor(id: Identity, refundBlinding: bigint): { secret: Uin
   return { secret: seed, publicKey: `ed25519:${base58.encode(ed25519.getPublicKey(seed))}` };
 }
 
-/** Sign "hushd.close:<deal id>" with the deal's owner key, for `desk.close_hedge`. */
-export function closeHedgeSignature(id: Identity, refundBlinding: bigint, dealId: number): Uint8Array {
-  return ed25519.sign(new TextEncoder().encode(`hushd.close:${dealId}`), ownerKeyFor(id, refundBlinding).secret);
+/** The message the deal's owner key signs to close its hedge on `net`'s desk. */
+export function closeHedgeMessage(net: HushdNetwork, dealId: number): string {
+  if (!net.desk) throw new Error(`No desk on ${net.id}`);
+  return `hushd.close:${net.desk}:${dealId}`;
+}
+
+/** Sign "hushd.close:<desk>:<deal id>" with the deal's owner key, for `desk.close_hedge`. */
+export function closeHedgeSignature(id: Identity, refundBlinding: bigint, dealId: number, net: HushdNetwork = TESTNET): Uint8Array {
+  return ed25519.sign(new TextEncoder().encode(closeHedgeMessage(net, dealId)), ownerKeyFor(id, refundBlinding).secret);
 }
 
 /**
@@ -224,6 +241,23 @@ export async function openRfq(p: {
   const makerBoxes = Object.fromEntries(makers.map(([acc, m]) => [acc, toB64(sealJson(hexToBytes(m.enc_key), { ...p.ask, v: 1, rfqId, closesAtMs }))]));
   await p.api.postRfq(rfqId, toB64(rfqBox), makerBoxes);
   return { rfqId, closesAtMs };
+}
+
+/**
+ * The trader's own check of a match before settling anything: the enclave is trusted to
+ * pick the best quote, but never to go below what the trader asked for. Throws in plain
+ * words when the terms are not what the draft asked; the deal then simply expires.
+ */
+export function checkMatchedTerms(terms: AgreedTerms, d: PackageDraft): void {
+  if (terms.traderGives.token !== d.sell.token || BigInt(terms.traderGives.amount) !== d.sell.amount) {
+    throw new Error("The match asks you to give something other than what you offered; not settling");
+  }
+  if (terms.makerGives.token !== d.buy.token) throw new Error("The match pays a different token than you asked for; not settling");
+  if (BigInt(terms.makerGives.amount) < d.buy.minAmount) throw new Error("The match pays less than the least you accept; not settling");
+  const hedged = d.kind !== "spot";
+  if (hedged !== Boolean(terms.hedge) || (hedged ? terms.class !== "bonded_hedge" : terms.class !== "atomic_pool")) {
+    throw new Error("The match is a different package than you asked for; not settling");
+  }
 }
 
 /** Wait for the enclave's answer to an RFQ (the matcher runs when the window closes). */
@@ -284,7 +318,9 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
   const start = Date.now();
   for (;;) {
     const d = await deskView.deal(p.net, p.dealId);
-    if (d && d.status !== "matched") break;
+    // "settling" is the pool call in flight; a refused one goes back to "matched"
+    if (d?.status === "closed" && d.receipt?.outcome === "failed") throw new Error("The deal expired before it settled");
+    if (d && d.status !== "matched" && d.status !== "settling") break;
     if (Date.now() - start > 180_000) throw new Error("The deal did not settle in time");
     await new Promise((res) => setTimeout(res, 2_000));
   }

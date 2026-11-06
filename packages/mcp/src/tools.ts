@@ -6,6 +6,7 @@
 import { formatUnits, parseUnits } from "@hushd/protocol";
 import {
   awaitMatch,
+  checkMatchedTerms,
   decodeProof,
   deskView,
   encodeProof,
@@ -192,9 +193,11 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         const buy = tokenInfo(net, buy_token);
         a.limits.check(sell.token, sell.amount);
         await wallet.sync();
-        const { request, ask, refundBlinding } = packageRequest(a.id, net, { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: min_receive ? parseUnits(min_receive, buy.decimals) : 0n } });
+        const draft = { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: min_receive ? parseUnits(min_receive, buy.decimals) : 0n } };
+        const { request, ask, refundBlinding } = packageRequest(a.id, net, draft);
         const opened = await openRfq({ net, api: a.api, relayer: a.relayer, request, ask, windowMs: window_seconds * 1000 });
         const match = await awaitMatch(a.api, a.id, opened.rfqId, window_seconds * 1000 + 120_000);
+        checkMatchedTerms(match.terms, draft);
         if (BigInt(match.terms.bond) > 0n && net.bondToken) await wallet.expect(makeNote(a.id.pk, net.bondToken, BigInt(match.terms.bond), refundBlinding), { memo: "Bond paid to you", dealId: String(match.dealId) });
         const record = { dealId: match.dealId, rfqId: opened.rfqId, role: "trader" as const, kind, maker: match.terms.maker, class: match.terms.class, gave: match.terms.traderGives, got: match.terms.makerGives, bond: match.terms.bond, refundBlinding: refundBlinding.toString(), atMs: Date.now() };
         await wallet.rememberDeal(record);

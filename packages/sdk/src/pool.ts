@@ -14,11 +14,13 @@ import { MerkleTree } from "./tree.js";
 export interface AssetView {
   token: string;
   field: string;
-  limits: { per_deposit: string; total: string };
+  /** Base units; a shield below `min_deposit` or above `per_deposit` is returned. */
+  limits: { per_deposit: string; total: string; min_deposit: string };
   held: string;
 }
 
 export interface SpendView {
+  /** [the note paid to the other side, the spender's change]: reader proofs count only the first. */
   outputs: [string, string];
   deal_id: string | null;
   block_height: string;

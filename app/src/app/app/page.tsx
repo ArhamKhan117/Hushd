@@ -2,6 +2,7 @@
 
 import {
   awaitMatch,
+  checkMatchedTerms,
   DeskApi,
   deskView,
   intake,
@@ -148,15 +149,12 @@ export default function DeskPage() {
     };
     set({});
     try {
-      const { request, ask: makerAsk, refundBlinding } = packageRequest(s.identity, NETWORK, {
-        kind,
-        sell: { token: sellToken, amount: sellAmount },
-        buy: { token: buyToken, minAmount },
-        ...(drafted ? { text } : {}),
-      });
+      const draft = { kind, sell: { token: sellToken, amount: sellAmount }, buy: { token: buyToken, minAmount }, ...(drafted ? { text } : {}) };
+      const { request, ask: makerAsk, refundBlinding } = packageRequest(s.identity, NETWORK, draft);
       const opened = await openRfq({ net: NETWORK, api, relayer: s.relayer, request, ask: makerAsk, windowMs: Number(windowMs) });
       set({ phase: "quoting", rfqId: opened.rfqId, closesAtMs: opened.closesAtMs, quotes: 0 });
       const match = await awaitMatch(api, s.identity, opened.rfqId, Number(windowMs) + 120_000, (t) => set({ quotes: t.quotes }));
+      checkMatchedTerms(match.terms, draft);
       const makers = await deskView.makers(NETWORK).catch(() => []);
       const makerName = makers.find(([acc]) => acc === match.terms.maker)?.[1].name ?? match.terms.maker;
       set({ phase: "matched", dealId: match.dealId, matchTx: match.txHash, terms: match.terms, makerName });
