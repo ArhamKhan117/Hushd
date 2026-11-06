@@ -11,11 +11,12 @@
 //! ```
 
 use near_api::types::transaction::result::ExecutionFinalResult;
-use near_api::{AccountId, Chain, Contract, NearGas, NearToken, NetworkConfig, Signer};
+use near_api::{Account, AccountId, Chain, Contract, NearGas, NearToken, NetworkConfig, Reference, Signer};
 use near_sandbox::Sandbox;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use testresult::TestResult;
 
 /// Real Groth16 proofs made with the dev keys by `circuits/scripts/gen-fixtures.mjs`.
@@ -80,7 +81,21 @@ impl Env {
     pub async fn account(&self, name: &str) -> TestResult<AccountId> {
         let id: AccountId = format!("{name}.{}", near_sandbox::config::DEFAULT_GENESIS_ACCOUNT).parse()?;
         self.sandbox.create_account(id.clone()).initial_balance(NearToken::from_near(100)).send().await?;
+        self.wait_for_key(&id).await?;
         Ok(id)
+    }
+
+    /// A patched-in account appears a block later, and the signer reads nonces at the
+    /// final block: wait until its key is there, or the next transaction may not find it.
+    async fn wait_for_key(&self, id: &AccountId) -> TestResult<()> {
+        let key = self.signer.get_public_key().await?;
+        for _ in 0..100 {
+            if Account(id.clone()).access_key(key).at(Reference::Final).fetch_from(&self.net).await.is_ok() {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        Err(format!("the access key of {id} never reached a final block").into())
     }
 
     /// Create `<name>.sandbox`, deploy `wasm` there and call `new(args)` in the same transaction.

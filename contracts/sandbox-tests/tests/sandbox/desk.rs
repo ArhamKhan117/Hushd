@@ -1,11 +1,12 @@
 //! The desk and the pool together on a real node: enclave key and matches through
 //! the OutLayer double, settlement of the fixture's swap (deal 7) through the pool,
-//! reader proofs against the result, a bad settlement, and a bonded hedge leg signed
-//! through the MPC double.
+//! reader proofs against the result, a bad settlement, a bonded hedge leg signed
+//! through the MPC double, and a slashed bond the pool refused, retried into it.
 
 use crate::common::*;
 use near_api::{AccountId, NearToken};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use testresult::TestResult;
 
 const SIGN_KEY: &str = "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a";
@@ -43,6 +44,7 @@ async fn desk_world(title: &str) -> TestResult<DeskWorld> {
         "keeper": keeper,
         "outlayer_fee": OUTLAYER_FEE.as_yoctonear().to_string(),
         "min_bond": "10",
+        "config_timelock_ns": "1000000000",
     });
     let (desk, _) = w.env.deploy("desk", &DESK, json!({ "config": config })).await?;
     w.deploy_pool(Some(&desk)).await?;
@@ -96,23 +98,48 @@ fn quote_key() -> String {
     format!("ed25519:{}", bs58::encode(quote_signer().verifying_key().to_bytes()).into_string())
 }
 
-/// The maker's consent to these terms: "hushd.quote.v1" ‖ rfq id ‖ terms hash ‖ bond ‖ expiry.
-fn maker_sig(rfq_id: u64, terms_hash: &str, bond: u128, expires_at_ms: u64) -> String {
+fn put_str(b: &mut Vec<u8>, s: &str) {
+    b.extend_from_slice(&(s.len() as u32).to_le_bytes());
+    b.extend_from_slice(s.as_bytes());
+}
+
+/// sha256 of the hedge spec's borsh bytes (asset u32, coin, is_buy, size, limit_px,
+/// deadline u64, testnet), written out by hand here; 32 zero bytes for no hedge.
+fn hedge_hash(h: Option<&Value>) -> [u8; 32] {
+    let Some(h) = h else { return [0u8; 32] };
+    let mut b = (h["asset"].as_u64().unwrap() as u32).to_le_bytes().to_vec();
+    put_str(&mut b, h["coin"].as_str().unwrap());
+    b.push(h["is_buy"].as_bool().unwrap() as u8);
+    put_str(&mut b, h["size"].as_str().unwrap());
+    put_str(&mut b, h["limit_px"].as_str().unwrap());
+    b.extend_from_slice(&h["deadline_ms"].as_u64().unwrap().to_le_bytes());
+    b.push(h["testnet"].as_bool().unwrap() as u8);
+    Sha256::digest(&b).into()
+}
+
+/// The maker's consent v2: "hushd.quote.v2" ‖ desk ‖ rfq id ‖ terms hash ‖ bond ‖ expiry ‖
+/// class ‖ hedge hash ‖ maker, account ids as u32 LE length ‖ utf8.
+fn maker_sig(desk: &AccountId, rfq_id: u64, terms_hash: &str, bond: u128, expires_at_ms: u64, hedge: Option<&Value>, maker: &AccountId) -> String {
     use base64::Engine;
     use ed25519_dalek::Signer;
-    let mut msg = b"hushd.quote.v1".to_vec();
+    let mut msg = b"hushd.quote.v2".to_vec();
+    put_str(&mut msg, desk.as_str());
     msg.extend_from_slice(&rfq_id.to_le_bytes());
     msg.extend_from_slice(&hex::decode(&terms_hash[2..]).unwrap());
     msg.extend_from_slice(&bond.to_le_bytes());
     msg.extend_from_slice(&expires_at_ms.to_le_bytes());
+    msg.push(if hedge.is_some() { 1 } else { 0 });
+    msg.extend_from_slice(&hedge_hash(hedge));
+    put_str(&mut msg, maker.as_str());
     base64::engine::general_purpose::STANDARD.encode(quote_signer().sign(&msg).to_bytes())
 }
 
 /// The matcher's answer for one RFQ, as the OutLayer double hands it back.
-fn match_answer(rfq_id: u64, maker: &AccountId, expires_at_ms: u64, hedge: Option<Value>) -> String {
+fn match_answer(desk: &AccountId, rfq_id: u64, maker: &AccountId, expires_at_ms: u64, hedge: Option<Value>) -> String {
     let bonded = hedge.is_some();
     let terms_hash = format!("0x{:064x}", 0xfeed_0000 + rfq_id);
     let bond: u128 = if bonded { HEDGE_BOND } else { 0 };
+    let maker_sig = maker_sig(desk, rfq_id, &terms_hash, bond, expires_at_ms, hedge.as_ref(), maker);
     json!({
         "success": true,
         "result": {
@@ -127,11 +154,17 @@ fn match_answer(rfq_id: u64, maker: &AccountId, expires_at_ms: u64, hedge: Optio
                 "trader_inner": if bonded { Some(format!("0x00{}", "33".repeat(31))) } else { None },
                 "owner_key": null,
                 "hedge": hedge,
-                "maker_sig": maker_sig(rfq_id, &terms_hash, bond, expires_at_ms),
+                "maker_sig": maker_sig,
             },
         },
     })
     .to_string()
+}
+
+/// A hedge leg for deal 7 whose deadline is after the deal's expiry (open_deals: one hour).
+async fn hedge_leg(d: &DeskWorld) -> TestResult<Value> {
+    let deadline = d.w.env.now_ms().await? + 7_200_000;
+    Ok(json!({ "asset": 4, "coin": "NEAR", "is_buy": false, "size": "100", "limit_px": "2.1", "deadline_ms": deadline, "testnet": true }))
 }
 
 /// Open RFQs 0..=7 and have each matched through OutLayer, so deals 0..=7 exist
@@ -148,7 +181,7 @@ async fn open_deals(d: &mut DeskWorld, hedge7: Option<Value>) -> TestResult<()> 
         assert_eq!(r.json::<Value>()?, i.to_string());
 
         let hedge = if i == DEAL { hedge7.clone() } else { None };
-        let args = json!({ "rfq_id": i.to_string(), "sealed_batch": match_answer(i, &w.maker, expires, hedge) });
+        let args = json!({ "rfq_id": i.to_string(), "sealed_batch": match_answer(&d.desk, i, &w.maker, expires, hedge) });
         let deposit = OUTLAYER_FEE.saturating_add(NearToken::from_millinear(10));
         let r = w.env.call_ok(&w.relayer, &d.desk, "request_match", args, deposit).await?;
         assert!(event(&r, "deal_matched").is_some(), "no deal_matched: {:#?}", r.logs());
@@ -265,8 +298,7 @@ async fn a_settle_with_legs_for_another_deal_changes_nothing() -> TestResult {
 async fn bonded_hedge_signs_through_the_mpc_and_closes_on_the_fill() -> TestResult {
     let mut d = desk_world("desk + pool + MPC: bonded hedge").await?;
     fixture_until_maker_shield(&mut d.w).await?;
-    let deadline = d.w.env.now_ms().await? + 1_800_000;
-    let hedge = json!({ "asset": 4, "coin": "NEAR", "is_buy": false, "size": "100", "limit_px": "2.1", "deadline_ms": deadline, "testnet": true });
+    let hedge = hedge_leg(&d).await?;
     open_deals(&mut d, Some(hedge)).await?;
     let w = &mut d.w;
     let maker = w.env.view(&d.desk, "maker", json!({ "account_id": w.maker })).await?;
@@ -281,7 +313,10 @@ async fn bonded_hedge_signs_through_the_mpc_and_closes_on_the_fill() -> TestResu
     assert_eq!(dl["receipt"]["outcome"], "unresolved");
 
     let w = &mut d.w;
-    let r = w.env.call_ok(&w.relayer, &d.desk, "sign_hedge_order", json!({ "deal_id": DEAL.to_string() }), NearToken::from_yoctonear(0)).await?;
+    // only the keeper or the deal's maker may have the order signed
+    let r = w.env.call(&w.relayer, &d.desk, "sign_hedge_order", json!({ "deal_id": DEAL.to_string() }), NearToken::from_yoctonear(0)).await?;
+    assert!(failures(&r).join(" ").contains("Only the keeper or the deal's maker"), "{:?}", failures(&r));
+    let r = w.env.call_ok(&d.keeper, &d.desk, "sign_hedge_order", json!({ "deal_id": DEAL.to_string() }), NearToken::from_yoctonear(0)).await?;
     w.gas.add("sign_hedge_order (MPC round trip)", &r);
     let signed = r.json::<Value>()?;
     assert_eq!(signed["signature"]["Secp256k1"]["recovery_id"], 0, "{signed}");
@@ -305,5 +340,74 @@ async fn bonded_hedge_signs_through_the_mpc_and_closes_on_the_fill() -> TestResu
     let maker = d.w.env.view(&d.desk, "maker", json!({ "account_id": d.w.maker })).await?;
     assert_eq!(maker["locked"], "0");
     assert_eq!(maker["bond"], MAKER_BOND.to_string());
+    Ok(())
+}
+
+/// Deal 7 as a bonded hedge whose leg misses three times while the pool's deposits are
+/// paused. The slashed bond comes back from the pool (the token refunds the desk), the
+/// deal waits as `slash_refused` and cannot be slashed again; once deposits reopen,
+/// anyone's retry lands the bond in the pool as the trader's note.
+#[tokio::test]
+async fn a_refused_slash_payout_is_retried_into_the_pool() -> TestResult {
+    let mut d = desk_world("desk + pool: refused slash payout, retried").await?;
+    fixture_until_maker_shield(&mut d.w).await?;
+    let hedge = hedge_leg(&d).await?;
+    open_deals(&mut d, Some(hedge)).await?;
+    let w = &mut d.w;
+    let args = json!({ "deal_id": DEAL.to_string(), "legs": legs(&w.f) });
+    let _ = w.env.call_ok(&w.relayer, &d.desk, "settle", args, NearToken::from_millinear(20)).await?;
+    let r = w.env.call(&w.owner, &w.pool, "set_deposits_paused", json!({ "paused": true }), NearToken::from_yoctonear(0)).await?;
+    assert!(failures(&r).join(" ").contains("exactly 1 yoctoNEAR"), "{:?}", failures(&r));
+    let _ = w.env.call_ok(&w.owner, &w.pool, "set_deposits_paused", json!({ "paused": true }), ONE_YOCTO).await?;
+    let held_before = w.held(&w.usdc).await?;
+
+    let deal_id = json!({ "deal_id": DEAL.to_string() });
+    for attempt in 1..=3 {
+        let w = &mut d.w;
+        let _ = w.env.call_ok(&d.keeper, &d.desk, "sign_hedge_order", deal_id.clone(), NearToken::from_yoctonear(0)).await?;
+        let evidence = json!([{ "kind": "hyperliquid_reject", "reference": format!("attempt {attempt}") }]);
+        let args = json!({ "deal_id": DEAL.to_string(), "filled": false, "evidence": evidence });
+        let r = w.env.call(&d.keeper, &d.desk, "record_hedge", args, NearToken::from_yoctonear(0)).await?;
+        assert!(r.is_success(), "{:?}", failures(&r));
+        if attempt < 3 {
+            assert!(event(&r, "hedge_retry").is_some(), "{:#?}", r.logs());
+            assert_eq!(deal(&d, DEAL).await?["status"], "hedge_pending");
+            continue;
+        }
+        w.gas.add("record_hedge missed, slash refused by the paused pool", &r);
+        assert!(event(&r, "bond_slashed").is_some());
+        let refused = event(&r, "shield_refused").ok_or("the pool did not refuse")?;
+        assert_eq!(refused["reason"], "Deposits are paused");
+        assert_eq!(event(&r, "slash_refused").ok_or("no slash_refused")?["held"], HEDGE_BOND.to_string());
+    }
+    let dl = deal(&d, DEAL).await?;
+    assert_eq!(dl["status"], "slash_refused");
+    assert_eq!(dl["slash_held"], HEDGE_BOND.to_string());
+    assert_eq!(dl["hedge_attempts"], 3);
+    let w = &mut d.w;
+    let maker = w.env.view(&d.desk, "maker", json!({ "account_id": w.maker })).await?;
+    assert_eq!((maker["bond"].clone(), maker["locked"].clone(), maker["slashed"].clone()), (json!((MAKER_BOND - HEDGE_BOND).to_string()), json!("0"), json!(HEDGE_BOND.to_string())));
+    assert_eq!(w.env.ft_balance(&w.usdc, &d.desk).await?, MAKER_BOND, "the refused bond is back with the desk");
+
+    // no second slash of the same bond, and no retry while deposits stay paused succeeds
+    let r = w.env.call(&w.alice, &d.desk, "slash_overdue", deal_id.clone(), NearToken::from_yoctonear(0)).await?;
+    assert!(failures(&r).join(" ").contains("No open hedge leg"), "{:?}", failures(&r));
+    let r = w.env.call_ok(&w.alice, &d.desk, "retry_slash_payout", deal_id.clone(), NearToken::from_yoctonear(0)).await?;
+    assert!(event(&r, "slash_refused").is_some());
+    assert_eq!(deal(&d, DEAL).await?["status"], "slash_refused");
+
+    let w = &mut d.w;
+    let _ = w.env.call_ok(&w.owner, &w.pool, "set_deposits_paused", json!({ "paused": false }), ONE_YOCTO).await?;
+    let r = w.env.call_ok(&w.alice, &d.desk, "retry_slash_payout", deal_id, NearToken::from_yoctonear(0)).await?;
+    w.gas.add("retry_slash_payout (paid into the pool)", &r);
+    assert!(event(&r, "shield").is_some(), "{:#?}", r.logs());
+    assert_eq!(event(&r, "receipt").ok_or("no receipt")?["receipt"]["outcome"], "recovered");
+    let dl = deal(&d, DEAL).await?;
+    assert_eq!(dl["status"], "closed");
+    assert_eq!(dl["slash_held"], "0");
+    let w = &d.w;
+    assert_eq!(w.held(&w.usdc).await?, held_before + HEDGE_BOND);
+    assert_eq!(w.env.ft_balance(&w.usdc, &d.desk).await?, MAKER_BOND - HEDGE_BOND);
+    assert_eq!(w.env.view(&d.desk, "stats", json!({})).await?["slashed"], HEDGE_BOND.to_string());
     Ok(())
 }
