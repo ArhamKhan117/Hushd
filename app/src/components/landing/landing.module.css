@@ -95,8 +95,7 @@
   }
 }
 
-/* Low-end phones (html.hd-lite): a live backdrop blur over moving cards is the
-   most expensive thing on the page, so the slab goes nearly opaque instead. */
+/* html.hd-lite (slow devices): no backdrop blur behind the moving cards; an almost opaque slab costs far less. */
 :global(html.hd-lite) .slab {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

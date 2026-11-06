@@ -60,8 +60,8 @@ function useHeadings(rootRef: RefObject<HTMLDivElement | null>, pathname: string
 
     // Honour a deep link that arrived before the ids existed, including search
     // links that point at a heading's text slug rather than its explicit id.
-    // A fragment that is not valid percent-encoding (a link cut short, say
-    // #%E0%A4) is read as it is: decoding it threw here, and the page broke.
+    // A malformed percent-encoded fragment (a truncated link) is used raw, since
+    // decodeURIComponent would throw on it.
     const raw = window.location.hash.slice(1);
     let hash = raw;
     try {

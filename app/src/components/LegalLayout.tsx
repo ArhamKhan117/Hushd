@@ -10,10 +10,7 @@ const DOCS = [
   { href: "/security", label: "Security", title: "Security" },
 ];
 
-/**
- * Shared shell for the legal pages: the marketing header and footer around a
- * calm reading column. Typography comes from `.prose-legal` in globals.
- */
+/** Layout for the privacy, terms, security and cookies pages; text styles live in `.prose-legal`. */
 export function LegalLayout({
   title,
   label = "Legal",

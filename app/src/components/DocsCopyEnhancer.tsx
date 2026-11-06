@@ -57,10 +57,9 @@ function labelOf(lang: CodeLang, src: string) {
 }
 
 /**
- * Turns every server-rendered `<pre><code>` in the docs prose into a coloured,
- * copyable block. React's own `<code>` is left untouched (only marked and
- * hidden by CSS); the highlighted copy is a sibling we own and remove again on
- * navigation, so reconciliation never meets a node it did not render.
+ * Adds highlighting and a copy button to the docs' code blocks. The original `<code>`
+ * stays in React's tree (hidden by CSS); the highlighted version is a sibling this
+ * component inserts and removes on navigation, so React never sees a node it did not make.
  */
 export function DocsCopyEnhancer() {
   const pathname = usePathname();
