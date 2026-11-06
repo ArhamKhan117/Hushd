@@ -75,8 +75,8 @@ export default function ThreatModelPage() {
       <ul>
         <li>read requests, limits and quotes, and</li>
         <li>
-          match you with a quote other than the best, or below your limit: the limit never goes on chain, so nothing
-          there checks it.
+          match you with a quote other than the best. A match below your limit, in another token or for another
+          package is refused by your own client before it proves anything, so the deal just expires.
         </li>
       </ul>
       <p>
@@ -112,8 +112,9 @@ export default function ThreatModelPage() {
           timelock, and anyone can apply them after. The owner can pause new deposits at once, never cash outs.
         </li>
         <li>
-          The desk&apos;s owner can change its configuration at once: the keeper, the matcher project, the minimum
-          bond. That can affect matching and bonds, never notes in the pool.
+          The desk&apos;s pool, bond token and Chain Signatures signer are fixed when it is created. Its other
+          settings (the keeper, the matcher project, the minimum bond) change only after a public one-day timelock,
+          and never touch notes in the pool.
         </li>
         <li>
           A cash out the token refuses comes back as a refund note, and a failed swap applies nothing. Failed bond

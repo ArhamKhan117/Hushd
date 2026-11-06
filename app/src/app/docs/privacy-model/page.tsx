@@ -145,7 +145,7 @@ export default function PrivacyModelPage() {
           </tr>
           <tr>
             <td>The matcher enclave</td>
-            <td>Keeping your request, your limit and the quotes private, and applying your limit</td>
+            <td>Keeping your request, your limit and the quotes private, and picking the best quote (your client refuses one below your limit)</td>
             <td>Your notes: it never sees a spending key</td>
           </tr>
           <tr>

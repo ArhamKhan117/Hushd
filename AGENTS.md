@@ -31,6 +31,6 @@ Sandbox tests need prebuilt wasm (`cargo near build non-reproducible-wasm` in ea
 
 - Testnet only. Never deploy to mainnet or sign a mainnet transaction.
 - Privacy is real or absent: never fake a proof, a match or a settlement, and never show invented numbers in the app.
-- Bytes are pinned across languages (TS, Rust contracts, Rust matcher): change `packages/protocol`, `contracts/desk/src/hedge.rs` and `matcher/src/terms.rs` together and keep their vector tests passing.
+- Bytes are pinned across languages (TS, Rust contracts, Rust matcher): change `packages/protocol`, `contracts/desk/src/lib.rs` (consent and match bytes), `contracts/desk/src/hedge.rs` and `matcher/src/terms.rs` together and keep their vector tests passing.
 - Keys live in gitignored `.env` files only. `.env.example` lists every variable.
 - Plain language in the UI and docs; light and dark themes; no em dashes.
