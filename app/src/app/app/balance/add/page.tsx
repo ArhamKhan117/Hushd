@@ -24,12 +24,22 @@ export default function AddPage() {
 
   const readBalance = useCallback(async () => {
     if (!s.accountId) return null;
-    return BigInt(await view<string>(NETWORK, token, "ft_balance_of", { account_id: s.accountId }).catch(() => "0"));
+    // a failed read keeps the last balance shown rather than showing 0
+    const raw = await view<string>(NETWORK, token, "ft_balance_of", { account_id: s.accountId }).catch(() => null);
+    return raw === null ? null : BigInt(raw);
   }, [s.accountId, token]);
-  const refresh = useCallback(async () => {
-    const b = await readBalance();
-    if (b !== null) setPublicBal(b);
-  }, [readBalance]);
+  /** After a send, reads until the balance moves: the read can reach an RPC node a block behind the send. */
+  const refresh = useCallback(
+    async (before?: bigint | null) => {
+      for (let tries = 0; ; tries++) {
+        const b = await readBalance();
+        if (b !== null) setPublicBal(b);
+        if (before === undefined || (b !== null && b !== before) || tries >= 7) return;
+        await new Promise((r) => setTimeout(r, 2_000));
+      }
+    },
+    [readBalance],
+  );
   useEffect(() => {
     let live = true;
     readBalance().then((b) => live && b !== null && setPublicBal(b));
@@ -47,7 +57,7 @@ export default function AddPage() {
     try {
       const r = s.kind === "passkey" ? await s.relayer.faucet(s.accountId!, token) : await s.call({ contract: token, method: "faucet", args: {}, gas: "30000000000000" });
       setDone({ hash: r.txHash, text: `Test ${symbol(token)} sent to ${s.accountId}.` });
-      await refresh();
+      await refresh(publicBal);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -67,7 +77,7 @@ export default function AddPage() {
       const r = await s.call({ contract: call.contract, method: call.method, args: call.args, gas: call.gas, deposit: call.deposit });
       setDone({ hash: r.txHash, text: `${fmt(token, amount)} ${symbol(token)} is now private.` });
       setInput("");
-      await Promise.all([refresh(), s.sync()]);
+      await Promise.all([refresh(publicBal), s.sync()]);
     } catch (e) {
       setError((e as Error).message);
     } finally {

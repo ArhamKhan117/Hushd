@@ -10,10 +10,12 @@
 import {
   artifactsAt,
   identityFromSeed,
+  keepRpcErrorBodies,
   loadPoseidon,
   PrivateWallet,
   RelayerClient,
   SEED_MESSAGE,
+  sendEndpoints,
   seedFromSignature,
   type Identity,
   type NoteStore,
@@ -159,7 +161,8 @@ export function HushdProvider({ children }: { children: ReactNode }) {
   const passkeySigner = useCallback(async (seed: Uint8Array): Promise<Signer> => {
     const k = nearKeyFromSeed(seed);
     const { Near } = await import("near-kit");
-    const near = new Near({ network: { networkId: NETWORK.id, rpcUrl: NETWORK.rpc[0]! }, privateKey: k.secretKey as `ed25519:${string}`, defaultSignerId: k.implicitAccount });
+    keepRpcErrorBodies(NETWORK.rpc);
+    const near = new Near({ network: { networkId: NETWORK.id, rpcUrl: sendEndpoints(NETWORK)[0]! }, privateKey: k.secretKey as `ed25519:${string}`, defaultSignerId: k.implicitAccount });
     return {
       accountId: k.implicitAccount,
       kind: "passkey",

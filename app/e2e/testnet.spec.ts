@@ -42,10 +42,12 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await go("/app/balance");
   await expect(page.locator("li", { hasText: "USDC" }).getByText("500")).toBeVisible({ timeout: 120_000 });
 
-  // 3. ask the desk with the form, and settle
+  // 3. describe the trade to the NEAR AI intake, check its signed draft in the form, and settle
   await go("/app");
-  await page.getByRole("button", { name: "Fill the form" }).click();
-  await page.locator("#amount").fill("200");
+  await page.locator("#intake").fill("Sell 200 USDC for BTC at the best price.");
+  await page.getByRole("button", { name: "Draft my request" }).click();
+  await expect(page.getByText("Answer signed inside the TEE and checked in this browser")).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator("#amount")).toHaveValue("200");
   await page.getByRole("button", { name: "Ask for quotes" }).click();
   await expect(page.getByText(/committed on the desk/)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 4 * 60_000 });

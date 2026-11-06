@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 const TOOLS: [string, string, string][] = [
   ["hushd_status", "Read", "The pool and the desk: listed tokens and deposit limits, pool counts, desk counts"],
-  ["hushd_makers", "Read", "Registered makers: name, pricing style, bond, deals and slashed amount"],
+  ["hushd_makers", "Read", "Makers taking requests now: name, pricing style, bond, deals and slashed amount (retired accounts with include_inactive)"],
   ["hushd_desk_deals", "Read", "Recent deals as the chain sees them: class, maker, state and receipt"],
   ["hushd_deal", "Read", "One deal's public record and receipt"],
   ["hushd_verify_proof", "Read", "Check a hushdproof1… string, as a named reader if given"],
