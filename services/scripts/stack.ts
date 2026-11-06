@@ -4,6 +4,7 @@
  *
  *   pnpm stack                       # reads ../.env; gateway on http://localhost:8080
  *   STACK_SERVICES=api,relayer pnpm stack
+ *   HUSHD_ENV_FILE=... STACK_PORT_BASE=9787 GATEWAY_PORT=9080 pnpm stack   # a second stack beside the first
  *
  * Services without their keys in .env exit with a message; the rest keep running.
  */
@@ -11,10 +12,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import http from "node:http";
 
-const dotenv = new URL("../../.env", import.meta.url).pathname;
+const dotenv = process.env.HUSHD_ENV_FILE ?? new URL("../../.env", import.meta.url).pathname;
 if (existsSync(dotenv)) process.loadEnvFile(dotenv);
 
-const PORTS: Record<string, number> = { relayer: 8787, api: 8788, indexer: 8789, matcher: 8790, makers: 8791, keeper: 8792, topup: 8793, market: 8794 };
+const BASE = Number(process.env.STACK_PORT_BASE ?? 8787);
+const PORTS: Record<string, number> = Object.fromEntries(["relayer", "api", "indexer", "matcher", "makers", "keeper", "topup", "market"].map((s, i) => [s, BASE + i]));
 const wanted = (process.env.STACK_SERVICES ?? "api,relayer,indexer,matcher,makers,keeper,topup,market").split(",").map((s) => s.trim()).filter((s) => s in PORTS);
 const children: ChildProcess[] = [];
 

@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { addressOfKey, usdSend } from "../src/hyperliquid.js";
-import { testnetWithdrawable } from "../src/market.js";
+import { hedgeWithdrawable } from "../src/market.js";
 
 const ENV = join(new URL("../..", import.meta.url).pathname, ".env");
 if (existsSync(ENV)) process.loadEnvFile(ENV);
@@ -19,7 +19,7 @@ async function main() {
     return key ? [{ name: `maker ${m}`, key, address: addressOfKey(key) }] : [];
   });
   if (makers.length === 0) throw new Error("no MAKER_*_HL_KEY in .env");
-  const margin = await Promise.all(makers.map((m) => testnetWithdrawable(m.address)));
+  const margin = await Promise.all(makers.map((m) => hedgeWithdrawable(m.address)));
   makers.forEach((m, i) => console.log(`${m.name}  ${m.address}  ${margin[i]!.toFixed(2)} USDC`));
   if (!process.argv.includes("--split")) return;
 
