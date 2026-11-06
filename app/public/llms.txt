@@ -1,0 +1,52 @@
+# Hushd
+
+> Hushd (https://hushd.net) is a private OTC desk run by AI agents on NEAR testnet. A trader states a deal in plain words or a form; the request, with its limit, is sealed to a matcher enclave (an OutLayer project in a TEE) and only its sha256 goes on chain. Maker agents see the pair, side and size, and answer with quotes sealed to the enclave and signed by a quote key the desk checks. The enclave picks the best quote inside the limit, and both legs settle privately in one pool call (settle_swap): both happen or neither. Every deal ends with a receipt: settled, recovered, failed or unresolved. A trader can prove one fact (an exact payment, a payment of at least an amount, funds above a threshold, or total desk volume) to one named NEAR account, with an expiry.
+
+Status: NEAR testnet only, test tokens with no value (USDC, wNEAR, BTC from a faucet), development proving keys (not a multi-party ceremony), not audited. No Hushd contract is on NEAR mainnet.
+
+Public on chain: deposits and cash outs with their amounts; that a desk deal happened, its maker, bond, hedge order and outcome. Private: amounts and parties inside the pool, balances, the trader's limit and words, who the trader on a deal was.
+
+## Site
+
+- [Desk](https://hushd.net/app): the app. Sign in with a NEAR wallet (NEAR Connect) or a passkey; add test tokens privately; ask the desk; send, receive, cash out; prove.
+- [Verify a proof](https://hushd.net/verify): checks a hushdproof1… string in the browser and through the pool contract's verify_disclosure view. Proof links put the proof after the #: https://hushd.net/verify#p=hushdproof1…
+- [Agents](https://hushd.net/agents): Hushd for AI agents.
+- [Developers](https://hushd.net/sdk): the SDK and the MCP server.
+- [Transparency](https://hushd.net/transparency): live service health and contract counts.
+- [Security](https://hushd.net/security), [Privacy](https://hushd.net/privacy), [Terms](https://hushd.net/terms), [Cookies](https://hushd.net/cookies)
+
+## Docs
+
+- [Overview](https://hushd.net/docs): what Hushd is and what works today
+- [Quickstart](https://hushd.net/docs/quickstart): sign in, get test tokens, add privately, ask the desk
+- [How the desk works](https://hushd.net/docs/desk): sealed request, enclave match, settlement, receipt, NEAR AI intake
+- [Packages and settlement](https://hushd.net/docs/packages): spot, spot + hedge, cash and carry; Hyperliquid testnet hedge signed by NEAR Chain Signatures per deal (path hushd/hedge/<deal id>); bonds and slashing
+- [Proofs](https://hushd.net/docs/proofs): the four kinds, the named reader, expiry, checking
+- [Agents and MCP](https://hushd.net/docs/agents): tools, local and hosted setup, spending limits (HUSHD_LIMIT_PER_PAYMENT, HUSHD_LIMIT_PER_DAY)
+- [Private x402](https://hushd.net/docs/x402): scheme "hushd", the X-PAYMENT header, server-side checks
+- [Makers](https://hushd.net/docs/makers): reference makers, pricing, quoting, bonds, running one
+- [SDK](https://hushd.net/docs/sdk): @hushd/sdk exports and examples
+- [Privacy model](https://hushd.net/docs/privacy-model): who sees what, what can leak, who you trust
+- [Security and threat model](https://hushd.net/docs/threat-model)
+- [Contracts](https://hushd.net/docs/contracts): accounts, methods and NEP-297 events
+
+## MCP
+
+- Hosted, read-only: https://hushd.net/mcp (Streamable HTTP, stateless). Tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
+- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. Adds wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_faucet, hushd_shield, hushd_send, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
+
+## Contracts (NEAR testnet)
+
+- pool.hushd.testnet: shielded pool (Poseidon notes, depth-20 Merkle tree, Groth16 verified on chain with alt_bn128)
+- desk.hushd.testnet: makers, bonds, requests, deals, receipts
+- board.hushd.testnet: encrypted board where payers leave word of a payment
+- usdc.hushd.testnet (6 decimals), wnear.hushd.testnet (24), btc.hushd.testnet (8): test tokens with a faucet
+- Explorer: https://testnet.nearblocks.io
+- API: https://api.hushd.net (health at /health, status at /v1/status)
+
+## Repository
+
+- https://github.com/ArhamKhan117/hushd (MIT)
+- AGENTS.md: how to work on the repo
+- skills/hushd/SKILL.md: an agent skill for using Hushd
+- contracts/ (Rust, near-sdk), circuits/ (Circom, Groth16), matcher/ (Rust, OutLayer WASI module), services/ (relayer, API, indexer, matcher client, makers, keeper, top-up), packages/sdk, packages/mcp, packages/protocol, app/ (Next.js)
