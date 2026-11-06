@@ -55,3 +55,6 @@ next-env.d.ts
 
 # package test builds
 .test-build/
+
+# service runtime data (makers' encrypted notes, x402 replay lists)
+services/data/

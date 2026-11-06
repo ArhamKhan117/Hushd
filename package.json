@@ -11,7 +11,8 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "mcp": "pnpm --silent --filter @hushd/mcp start",
-    "verify": "pnpm --silent --filter @hushd/services verify"
+    "verify": "pnpm --silent --filter @hushd/services verify",
+    "stack": "pnpm --filter @hushd/services stack"
   },
   "engines": {
     "node": ">=22"

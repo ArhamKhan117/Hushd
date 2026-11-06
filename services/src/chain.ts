@@ -3,7 +3,7 @@
  * spread over its nonce lanes so many transactions are in flight at once without
  * nonce collisions; without one, the account's full-access key sends them in turn.
  */
-import type { HushdNetwork } from "@hushd/sdk";
+import { accountBalance, type HushdNetwork } from "@hushd/sdk";
 import { Near } from "near-kit";
 import type { AccountConfig } from "./config.js";
 
@@ -97,9 +97,9 @@ export class Signer {
     return { txHash, result: decodeResult(outcome), gasBurnt, lane };
   }
 
+  /** The account's balance in yoctoNEAR. */
   async balance(): Promise<bigint> {
-    const b = await this.near.getBalance(this.cfg.accountId);
-    return BigInt(String((b as unknown as { total?: string }).total ?? b));
+    return (await accountBalance(this.net, this.cfg.accountId)) ?? 0n;
   }
 
   snapshot() {

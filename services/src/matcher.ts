@@ -24,13 +24,17 @@ export function outlayerHttps(): EnclaveCall {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (key.startsWith("wk_")) headers.authorization = `Bearer ${key}`;
     else headers["x-payment-key"] = key;
-    const res = await fetch(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: false }), signal: AbortSignal.timeout(120_000) });
+    // the matcher's key is a protected secret of the project owner, locked to the deployed build
+    const secretsRef = { profile: "default", account_id: settings.str("OUTLAYER_SECRETS_OWNER", project.split("/")[0]!) };
+    const res = await fetch(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: false, secrets_ref: secretsRef }), signal: AbortSignal.timeout(120_000) });
     const text = await res.text();
     if (!res.ok) throw new Error(`OutLayer answered ${res.status}: ${text.slice(0, 300)}`);
-    const body = JSON.parse(text) as Record<string, unknown>;
+    const body = JSON.parse(text) as { output?: unknown; result?: unknown; error?: string; status?: string; attestation_url?: string };
+    if (body.error) throw new Error(`The matcher failed in OutLayer: ${body.error}`);
     // The module's stdout comes back as `output` (a string or parsed JSON) or `result`.
     const out = body.output ?? body.result ?? body;
-    return (typeof out === "string" ? JSON.parse(out) : out) as Record<string, unknown>;
+    const parsed = (typeof out === "string" ? JSON.parse(out) : out) as Record<string, unknown>;
+    return body.attestation_url ? { ...parsed, attestation_url: body.attestation_url } : parsed;
   };
 }
 
@@ -64,7 +68,7 @@ export class Matcher {
       }
       const r = await this.signer.call(this.net.desk!, "submit_match", { result: out.match, signature: out.signature }, { gas: "50 Tgas", deposit: 10_000_000_000_000_000_000_000n });
       const dealId = Number(r.result);
-      await this.finish(rfqId, "matched", dealId, { matched: true, match: out.match, for_trader: out.for_trader, for_maker: out.for_maker, quotes: out.quotes, refused: out.refused }, r.txHash);
+      await this.finish(rfqId, "matched", dealId, { matched: true, match: out.match, for_trader: out.for_trader, for_maker: out.for_maker, quotes: out.quotes, refused: out.refused, attestation_url: out.attestation_url ?? null }, r.txHash);
     } catch (e) {
       await this.finish(rfqId, "failed", null, { matched: false, reason: (e as Error).message }, null);
     }

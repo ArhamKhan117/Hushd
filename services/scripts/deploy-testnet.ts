@@ -67,12 +67,14 @@ const MAKER_BOND = 20_000n * 10n ** 6n;
 type Report = { network: string; deployer: string; deployedAt: string; contracts: Record<string, { account: string; codeHash: string; tx: string }>; services: Record<string, string>; steps: { what: string; tx: string }[] };
 
 async function main() {
-  const total = Object.values(FUND).reduce((a, b) => a + b, 0n) + near(2);
+  // only accounts that do not exist yet still need their NEAR (a rerun skips the rest)
+  const missing = (await Promise.all(Object.keys(FUND).map(async (k) => ((await accountBalance(net, sub(k))) === null ? k : null)))).filter((k): k is string => k !== null);
+  const total = missing.reduce((a, k) => a + FUND[k]!, 0n) + near(2);
   console.log(`Deployer ${DEPLOYER}; needs about ${total / NEAR} NEAR (accounts, storage, gas).`);
   const bal = await accountBalance(net, DEPLOYER);
   console.log(`Balance: ${bal === null ? "account does not exist" : `${Number(bal / 10n ** 21n) / 1000} NEAR`}`);
   if (DRY) {
-    for (const [k, v] of Object.entries(FUND)) console.log(`  ${sub(k)}: ${Number(v / 10n ** 21n) / 1000} NEAR`);
+    for (const [k, v] of Object.entries(FUND).filter(([k]) => missing.includes(k))) console.log(`  ${sub(k)}: ${Number(v / 10n ** 21n) / 1000} NEAR`);
     return;
   }
   if (bal === null || bal < total) throw new Error(`Fund ${DEPLOYER} with at least ${total / NEAR} NEAR first`);
@@ -133,6 +135,7 @@ async function main() {
     if (!envHas(k)) envLines.push(`${k}=${v}`);
   };
   const envGet = (k: string) => envLines.find((l) => l.startsWith(`${k}=`))?.slice(k.length + 1);
+  let relayerCreated = false;
   for (const s of SERVICES) {
     const acc = sub(s);
     const prefix = s.replace("-", "_").toUpperCase();
@@ -144,6 +147,7 @@ async function main() {
     const kp = keypair();
     let tx = client.transaction(DEPLOYER).createAccount(acc).transfer(acc, FUND[s]!).addKey(kp.publicKey, { type: "fullAccess" });
     if (s === "relayer") {
+      relayerCreated = true;
       const gas = keypair();
       tx = tx.addKey(gas.publicKey, { type: "gasKeyFullAccess", numNonces: 8 } as never);
       setEnv("RELAYER_GAS_KEY", gas.privateKey);
@@ -154,16 +158,18 @@ async function main() {
     setEnv(`${prefix}_PRIVATE_KEY`, kp.privateKey);
     if (s.startsWith("maker-")) {
       setEnv(`${prefix}_SEED`, randomBytes(32).toString("hex"));
-      setEnv(`${prefix}_QUOTE_KEY`, base58.encode(ed25519.utils.randomSecretKey()));
+      setEnv(`${prefix}_QUOTE_KEY`, Buffer.from(ed25519.utils.randomSecretKey()).toString("hex"));
     }
     report.steps.push({ what: `create ${acc}`, tx: hashOf(out) });
     console.log(`+ ${acc} created`);
   }
   writeFileSync(envPath, `${envLines.join("\n")}\n`, { mode: 0o600 });
-  if (envGet("RELAYER_GAS_KEY")) {
+  if (relayerCreated && envGet("RELAYER_GAS_KEY")) {
     const gasPub = `ed25519:${base58.encode(base58.decode(envGet("RELAYER_GAS_KEY")!.slice(8)).slice(32))}`;
-    const funded = await client.transaction(DEPLOYER).transferToGasKey(gasPub, near(3)).send().catch(() => null);
-    if (funded) report.steps.push({ what: "fund the relayer's gas key", tx: hashOf(funded) });
+    // the gas key lives on the relayer's account, so the relayer moves its own NEAR into it
+    const relayer = new Near({ network: { networkId: "testnet", rpcUrl: net.rpc[0]! }, privateKey: envGet("RELAYER_PRIVATE_KEY") as `ed25519:${string}`, defaultSignerId: sub("relayer"), defaultWaitUntil: "FINAL" });
+    const funded = await relayer.transaction(sub("relayer")).transferToGasKey(gasPub, near(3)).send();
+    report.steps.push({ what: "fund the relayer's gas key", tx: hashOf(funded) });
   }
 
   // ---------- storage, inventory, bonds ----------
@@ -209,6 +215,14 @@ async function main() {
       await call(maker, acc, sub("board"), "post", { ciphertext: sealNote(id, note), tag: "note" }, 0n, "30 Tgas");
       const c = shieldCall(shieldNet, note);
       await call(maker, acc, c.contract, c.method, c.args, 1n, "120 Tgas");
+    }
+    // the desk takes a bond only from a registered maker, so register first (the maker service keeps it current)
+    const quoteKeyHex = envGet(`${prefix}_QUOTE_KEY`)!;
+    const quoteKey = `ed25519:${base58.encode(ed25519.getPublicKey(Uint8Array.from(Buffer.from(quoteKeyHex, "hex"))))}`;
+    const style = { "maker-a": "fixed", "maker-b": "volatility", "maker-c": "inventory" }[m];
+    const name = { "maker-a": "Steady", "maker-b": "Weather", "maker-c": "Ledger" }[m];
+    if ((await view<unknown>(net, sub("desk"), "maker", { account_id: acc })) === null) {
+      await call(maker, acc, sub("desk"), "register_maker", { name, enc_key: `0x${Buffer.from(id.encPublic).toString("hex")}`, quote_url: `https://api.hushd.net/makers/${acc}/quote`, style, quote_key: quoteKey }, 10n ** 22n, "30 Tgas");
     }
     await call(maker, acc, sub("usdc"), "ft_transfer_call", { receiver_id: sub("desk"), amount: MAKER_BOND.toString(), memo: null, msg: "bond" }, 1n, "100 Tgas");
     console.log(`+ ${acc}: inventory shielded, bond posted`);
