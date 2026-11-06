@@ -15,7 +15,8 @@
     "stack": "tsx scripts/stack.ts",
     "intents:sandbox": "tsx scripts/intents-sandbox.ts",
     "intents:mainnet": "tsx scripts/intents-mainnet.ts",
-    "policy-wallet": "tsx scripts/policy-wallet.ts"
+    "policy-wallet": "tsx scripts/policy-wallet.ts",
+    "agent-api": "tsx scripts/agent-api.ts"
   },
   "devDependencies": {
     "@msgpack/msgpack": "^3.1.3",
@@ -26,8 +27,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
+    "@hushd/mcp": "workspace:*",
     "@hushd/protocol": "workspace:*",
     "@hushd/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@near-intents-agent-api/sdk": "0.8.0",
     "@nearai/inference-sdk": "0.2.1",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
@@ -35,8 +39,6 @@
     "hono": "^4.13.16",
     "near-kit": "0.20.2",
     "pg": "^8.23.1",
-    "snarkjs": "0.7.5",
-    "@hushd/mcp": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.32.2"
+    "snarkjs": "0.7.5"
   }
 }

@@ -2,8 +2,12 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { encode } from "@msgpack/msgpack";
-import { TESTNET } from "@hushd/sdk";
+import { nep413Hash, TESTNET } from "@hushd/sdk";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { base64 } from "@scure/base";
 import { decodeSignedDelegateAction, encodeSignedDelegateAction } from "near-kit";
+import { AGENT_API_USDC, AGENT_API_WNEAR, hushdAgentPolicy, ownerKey, signOwnerIntent } from "../src/agent-api.js";
 import { buildApi } from "../src/api.js";
 import { Db } from "../src/db.js";
 import { addressOfKey, approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
@@ -383,5 +387,52 @@ describe("agent market worker", () => {
     assert.match(md, /\| Hushd maker Steady \(testnet, indicative\) \| 249 NEAR \| -40\.0 bps \|/);
     assert.match(md, /private x402.*\[Steady\]\(https:\/\/testnet\.nearblocks\.io\/txns\/tx1\)/);
     assert.match(md, /- Weather had no quote/);
+  });
+});
+
+describe("NEAR Intents Agent API owner", () => {
+  const owner = ownerKey(new Uint8Array(32).fill(7));
+  const policy = hushdAgentPolicy({ transferTo: ["maker.near"], withdrawTo: [owner.accountId], dailyUsd: "5", perTransaction: { [AGENT_API_WNEAR]: "200000000000000000000000" } });
+
+  test("the demo policy allows only wNEAR and USDC, and pays only the listed accounts", () => {
+    assert.deepEqual(policy.assets, [AGENT_API_WNEAR, AGENT_API_USDC]);
+    assert.equal(policy.destinations.mode, "only");
+    assert.deepEqual(policy.destinations.list, [
+      { action: "transfer", address: "maker.near", confidential: false },
+      { action: "withdraw", chain: "near", address: owner.accountId, memo: null },
+    ]);
+    assert.equal(policy.budget.daily_usd, "5");
+    assert.equal(policy.frozen, false);
+  });
+
+  test("a NEP-413 owner signature verifies against the owner's key", async () => {
+    const nonce = new Uint8Array(32).fill(3);
+    const intent = { standard: "nep413" as const, payload: { message: '{"policy":"x"}', recipient: "outlayer.near", nonce: base64.encode(nonce) } };
+    const signed = await signOwnerIntent(intent, owner, TESTNET);
+    assert.equal(signed.standard, "nep413");
+    if (signed.standard !== "nep413") return;
+    assert.equal(signed.public_key, owner.publicKey);
+    assert.ok(ed25519.verify(base64.decode(signed.signature), nep413Hash(intent.payload.message, nonce, intent.payload.recipient), ed25519.getPublicKey(owner.secret)));
+  });
+
+  test("a NEP-366 owner delegate action carries the calls as given and a valid signature", async () => {
+    const intent = {
+      standard: "nep366" as const,
+      payload: { receiverId: "outlayer.near", actions: [{ type: "FunctionCall" as const, params: { methodName: "store_wallet_policy", args: { wallet_id: "w1" }, gas: "30000000000000", deposit: "10000000000000000000000" } }] },
+    };
+    const signed = await signOwnerIntent(intent, owner, TESTNET, { nonce: 5n, maxBlockHeight: 1000n });
+    assert.equal(signed.standard, "nep366");
+    if (signed.standard !== "nep366") return;
+    const bytes = base64.decode(signed.signed_delegate);
+    const decoded = decodeSignedDelegateAction(bytes) as unknown as { signedDelegate: { delegateAction: { senderId: string; receiverId: string; nonce: bigint; maxBlockHeight: bigint } } };
+    const action = decoded.signedDelegate.delegateAction;
+    assert.equal(action.senderId, owner.accountId);
+    assert.equal(action.receiverId, "outlayer.near");
+    assert.equal(BigInt(action.nonce), 5n);
+    // the signature (key type byte, 64 bytes) closes the payload; it signs sha256(2^30 + 366 as u32 LE ‖ the delegate action)
+    const actionBytes = bytes.slice(0, bytes.length - 65);
+    const prefix = new Uint8Array(new Uint32Array([2 ** 30 + 366]).buffer);
+    assert.equal(bytes[bytes.length - 65], 0);
+    assert.ok(ed25519.verify(bytes.slice(bytes.length - 64), sha256(new Uint8Array([...prefix, ...actionBytes])), ed25519.getPublicKey(owner.secret)));
   });
 });

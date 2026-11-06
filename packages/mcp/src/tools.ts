@@ -230,7 +230,7 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         if (BigInt(match.terms.bond) > 0n && net.bondToken) await wallet.expect(makeNote(a.id.pk, net.bondToken, BigInt(match.terms.bond), refundBlinding), { memo: "Bond paid to you", dealId: String(match.dealId) });
         const record = { dealId: match.dealId, rfqId: opened.rfqId, role: "trader" as const, kind, maker: match.terms.maker, class: match.terms.class, gave: match.terms.traderGives, got: match.terms.makerGives, bond: match.terms.bond, refundBlinding: refundBlinding.toString(), atMs: Date.now() };
         await wallet.rememberDeal(record);
-        await settleAsTrader({ net, api: a.api, wallet, dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address });
+        await settleAsTrader({ net, api: a.api, wallet, dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address, refundBlinding });
         await wallet.rememberDeal({ ...record, settledAtMs: Date.now() });
         a.limits.record(sell.token, sell.amount);
         return {
