@@ -13,8 +13,8 @@ Why it is built this way (each rule exists because the alternative was measured 
 - Translucent washes are pre-composited (`blend`): ImageDraw overwrites alpha.
 - Drawn at 2x and reduced with LANCZOS at 960 wide; canvas heights are even.
 - One `flow` pass feeds both measurement and drawing; gutters widen to fit arrow labels.
-- SF Pro is a variable font: weights are set on the Weight axis, and a missing font exits 2
-  rather than letting Pillow substitute one (a substitute invalidates every measurement).
+- Type is Geist, the app's own face, from node_modules (run `pnpm install` first); a missing
+  font exits 2 rather than letting Pillow substitute one (a substitute invalidates every measurement).
 """
 
 from __future__ import annotations
@@ -33,16 +33,17 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "readme"
 MARK = ROOT / "app" / "src" / "app" / "icon.png"
 TOKENS = ROOT / "app" / "src" / "app" / "globals.css"
+# Geist, the app's own typeface (OFL), from the `geist` package the app already installs
+_GEIST = next(iter(sorted((ROOT / "node_modules" / ".pnpm").glob("geist@*/node_modules/geist/dist/fonts"))), ROOT / "missing-geist")
 FONTS = {
-    "sans": "/System/Library/Fonts/SFNS.ttf",
-    "mono": "/System/Library/Applications/Terminal.app/Contents/Resources/Fonts/SF-Mono-Regular.otf",
+    "regular": str(_GEIST / "geist-sans" / "Geist-Regular.ttf"),
+    "semibold": str(_GEIST / "geist-sans" / "Geist-SemiBold.ttf"),
+    "bold": str(_GEIST / "geist-sans" / "Geist-Bold.ttf"),
+    "mono": str(_GEIST / "geist-mono" / "GeistMono-Regular.ttf"),
 }
-if not Path(FONTS["mono"]).is_file():
-    FONTS["mono"] = "/System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-Mono-Regular.otf"
 
 SCALE = 2
 FIGURE_WIDTH = 960
-WEIGHTS = {"regular": 400, "semibold": 590, "bold": 700}
 
 
 def px(value: float) -> int:
@@ -196,12 +197,7 @@ _font_cache: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
 def font(kind: str, size: int) -> ImageFont.FreeTypeFont:
     key = (kind, size)
     if key not in _font_cache:
-        if kind == "mono":
-            _font_cache[key] = ImageFont.truetype(FONTS["mono"], size * SCALE)
-        else:
-            f = ImageFont.truetype(FONTS["sans"], size * SCALE)
-            f.set_variation_by_axes([100, max(17, min(96, size)), 400, WEIGHTS[kind]])
-            _font_cache[key] = f
+        _font_cache[key] = ImageFont.truetype(FONTS[kind], size * SCALE)
     return _font_cache[key]
 
 
