@@ -50,6 +50,18 @@ export type Style = "fixed" | "volatility" | "inventory";
 const hexBytes = (h: string) => new Uint8Array(Buffer.from(h.replace(/^0x/, ""), "hex"));
 const toHexStr = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 
+/** Bond sizes in whole USDC: a bond says roughly how big a deal is, so it comes from a few fixed steps. */
+export const BOND_STEPS = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000];
+
+/** A tenth of the notional, rounded up to the next step, never below the desk's minimum (base units). */
+export function bondFor(notionalUsd: number, usdcDecimals: number, minBond: bigint): bigint {
+  const unit = 10n ** BigInt(usdcDecimals);
+  const tenth = notionalUsd * 0.1;
+  const step = BOND_STEPS.find((s) => s >= tenth) ?? Math.ceil(tenth / 100_000) * 100_000;
+  const bond = BigInt(step) * unit;
+  return bond < minBond ? minBond : bond;
+}
+
 /** Spread in basis points for a style. */
 export function spreadBps(style: Style, ctx: { volBps: number; inventoryRatio: number }): number {
   if (style === "fixed") return 25;
@@ -155,9 +167,12 @@ export class Maker {
       if (!coin || !perp || !px) return null;
       const size = Number(give) / 10 ** buy.decimals;
       q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: now + 10 * 60_000, testnet: true };
-      // a tenth of the trade's value in USDC, held by the desk until the hedge leg is done
+      // about a tenth of the trade's value in USDC, held by the desk until the hedge leg is done
       const usdc = this.net.tokens.find((t) => t.symbol === "USDC")!;
-      q.bond = BigInt(Math.max(1, Math.round(notionalUsd * 0.1))) * 10n ** BigInt(usdc.decimals);
+      const minBond = await this.minBond();
+      q.bond = bondFor(notionalUsd, usdc.decimals, minBond);
+      // a hedged quote locks bond: skip it when this maker's free bond cannot cover it
+      if (q.bond > (await this.freeBond())) return null;
     }
     // consent v2: this desk, these terms, this class and exactly this hedge leg
     q.signature = toB64(ed25519.sign(quoteConsent(this.net.desk!, q, ask.kind), this.quoteSecret));
@@ -166,6 +181,19 @@ export class Maker {
 
   /** One round: answer new asks, settle new wins. */
   private enclaveCache: { at: number; encKey: string | null } = { at: 0, encKey: null };
+  private minBondCache: { at: number; value: bigint } = { at: 0, value: 0n };
+
+  /** The desk's minimum bond, read every ten minutes (it changes only through a timelock). */
+  private async minBond(): Promise<bigint> {
+    if (Date.now() - this.minBondCache.at > 600_000) this.minBondCache = { at: Date.now(), value: BigInt((await deskView.config(this.net)).min_bond) };
+    return this.minBondCache.value;
+  }
+
+  /** Bond posted on the desk and not locked in a deal. */
+  private async freeBond(): Promise<bigint> {
+    const me = await view<{ bond: string; locked: string } | null>(this.net, this.net.desk!, "maker", { account_id: this.account });
+    return me ? BigInt(me.bond) - BigInt(me.locked) : 0n;
+  }
 
   async step() {
     // the enclave key changes only on refresh_enclave_key: read it once a minute, not every step

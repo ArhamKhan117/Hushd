@@ -1,10 +1,12 @@
 /**
- * `pnpm verify`: check each claim the README makes against the live testnet
- * deployment, read-only, and print PASS or FAIL per claim. No keys needed.
+ * `pnpm verify`: check the README's live claims against the testnet deployment,
+ * read-only, and print PASS or FAIL per claim. No keys needed.
  *
  *   HUSHD_APP_URL (default https://hushd.net)   HUSHD_API_URL (default https://api.hushd.net)
  */
 import { existsSync, readFileSync } from "node:fs";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { base58 } from "@scure/base";
 import { deskView, poolView, TESTNET, view, withOverrides } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
@@ -45,16 +47,25 @@ const deployed = existsSync(`${ROOT}deployments/testnet.json`)
 
 const checks: Check[] = [
   {
-    claim: "The pool, desk, board and token contracts are deployed on NEAR testnet with the code in this repo",
+    claim: "The pool, desk, board and token contracts on NEAR testnet run the recorded builds (and yours, if you built them)",
     run: async () => {
       if (!deployed) fail("deployments/testnet.json is missing");
       const out: string[] = [];
+      let local = 0;
       for (const [name, c] of Object.entries(deployed!.contracts)) {
         const a = await rpc<{ code_hash: string }>("query", { request_type: "view_account", finality: "final", account_id: c.account });
-        if (a.code_hash !== c.codeHash) fail(`${c.account} runs code ${a.code_hash}, not ${c.codeHash}`);
+        if (a.code_hash !== c.codeHash) fail(`${c.account} runs code ${a.code_hash}, not the recorded ${c.codeHash}`);
+        // a local `cargo near build` of the same commit should give the same bytes
+        const crate = ["usdc", "wnear", "btc"].includes(name) ? "token" : name;
+        const wasm = `${ROOT}contracts/target/near/hushd_${crate}/hushd_${crate}.wasm`;
+        if (existsSync(wasm)) {
+          const mine = base58.encode(sha256(readFileSync(wasm)));
+          if (mine !== a.code_hash) fail(`${c.account} runs ${a.code_hash}; your build of ${crate} hashes to ${mine}`);
+          local++;
+        }
         out.push(name);
       }
-      return `${out.join(", ")} match their recorded code hashes`;
+      return `${out.join(", ")} match the recorded hashes${local ? `; ${local} also match your local build` : " (build the contracts to compare with your own build)"}`;
     },
   },
   {
@@ -106,7 +117,7 @@ const checks: Check[] = [
     },
   },
   {
-    claim: "Plain-language intake runs on a NEAR AI Cloud model whose TDX and GPU attestation verifies",
+    claim: "The intake model's NEAR AI Cloud attestation (Intel TDX and NVIDIA GPU) verifies",
     run: async () => {
       const r = await getJson<{ model: string; tcb_status: string; gpu_evidence: string; enabled: boolean; error?: string }>(`${API}/v1/intake/attestation`);
       if (r.status !== 200) fail(r.body?.error ?? `HTTP ${r.status}`);
@@ -115,7 +126,7 @@ const checks: Check[] = [
     },
   },
   {
-    claim: "Makers sell quotes over private x402 (scheme hushd)",
+    claim: "Makers ask for a private x402 payment (scheme hushd) before quoting",
     run: async () => {
       const makers = await deskView.makers(net);
       const m = makers[0] ?? fail("no maker");

@@ -6,17 +6,17 @@
     "usdc": {
       "account": "usdc.hushd.testnet",
       "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": ""
+      "tx": "CyQLoPKkC72QtEs2AEAkbcW4GAdcYP8LgQ7PhqvmLhvV"
     },
     "wnear": {
       "account": "wnear.hushd.testnet",
       "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": ""
+      "tx": "BFGCSYqhbNkzRyUPTPUkaSYq3P1juexadEpZSH5hSqPx"
     },
     "btc": {
       "account": "btc.hushd.testnet",
       "codeHash": "tYD68saibYvyF1exjSe9yhuu45mvY7ujZLU2CLGedp3",
-      "tx": ""
+      "tx": "3oVfnMH7HKih8AFrWsFM5KE4HXvTsRQXjhd91aXQVqA8"
     },
     "pool": {
       "account": "pool.hushd.testnet",

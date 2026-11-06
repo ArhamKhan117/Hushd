@@ -32,6 +32,8 @@
     "hono": "^4.13.16",
     "near-kit": "0.20.2",
     "pg": "^8.23.1",
-    "snarkjs": "0.7.5"
+    "snarkjs": "0.7.5",
+    "@hushd/mcp": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2"
   }
 }

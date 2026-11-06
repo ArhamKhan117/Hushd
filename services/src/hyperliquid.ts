@@ -18,7 +18,7 @@ const k = (b: Uint8Array) => keccak_256(b);
 const word = (n: bigint) => unhex(n.toString(16).padStart(64, "0"));
 const concat = (...parts: Uint8Array[]) => Uint8Array.from(parts.flatMap((p) => [...p]));
 
-/** The 20-byte address of an uncompressed secp256k1 public key (64 bytes x || y, or 65 with 0x04). */
+/** The 20-byte address Hyperliquid uses (keccak of the key) for an uncompressed secp256k1 public key (64 bytes x || y, or 65 with 0x04). */
 export function evmAddress(publicKey: Uint8Array): string {
   const xy = publicKey.length === 65 ? publicKey.slice(1) : publicKey;
   if (xy.length !== 64) throw new Error("expected an uncompressed secp256k1 public key");
