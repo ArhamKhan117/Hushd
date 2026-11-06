@@ -68,7 +68,8 @@ fn desk() -> Desk {
     }})
     .to_string();
     with_result(ctx("desk.test", NearToken::from_yoctonear(0), T0), PromiseResult::Successful(serde_json::to_vec(&out).unwrap()));
-    d.on_enclave_key(Ok(Some(out)));
+    // the live OutLayer resumes with the worker's JSON as an object
+    d.on_enclave_key(Ok(serde_json::from_str(&out).unwrap()));
     set(ctx("maker.test", NearToken::from_millinear(20), T0));
     d.register_maker("Maker".into(), format!("0x{}", "cd".repeat(32)), "https://maker.test/quote".into(), "fixed".into(), ed_key(&quote_signer()));
     set(ctx("usdc.test", NearToken::from_yoctonear(0), T0));
@@ -116,7 +117,7 @@ fn sign(m: &MatchResult) -> Base64VecU8 {
 fn via_outlayer(d: &mut Desk, m: &MatchResult, ms: u64) -> Result<U64, String> {
     let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
     set(ctx("desk.test", NearToken::from_yoctonear(0), ms));
-    d.on_match(U64(0), Ok(Some(out))).ok_or_else(|| get_logs().join("\n"))
+    d.on_match(U64(0), Ok(serde_json::Value::String(out))).ok_or_else(|| get_logs().join("\n"))
 }
 
 fn maker(d: &Desk) -> Maker {
@@ -180,7 +181,7 @@ fn the_outlayer_callback_creates_a_deal() {
     let m = matched(SettlementClass::AtomicPool, 0);
     let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
     with_result(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000), PromiseResult::Successful(vec![]));
-    let id = d.on_match(U64(0), Ok(Some(out))).unwrap();
+    let id = d.on_match(U64(0), Ok(serde_json::Value::String(out))).unwrap();
     assert_eq!(d.deal(id).unwrap().attested_by, "outlayer");
     assert_eq!(d.rfq(U64(0)).unwrap().deal_id, Some(id));
 }
@@ -191,7 +192,7 @@ fn a_failed_or_empty_enclave_run_makes_no_deal() {
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000));
     assert!(d.on_match(U64(0), Err(PromiseError::Failed)).is_none());
     let none = json!({ "success": true, "result": { "matched": false, "reason": "no quote inside the limit" } }).to_string();
-    assert!(d.on_match(U64(0), Ok(Some(none))).is_none());
+    assert!(d.on_match(U64(0), Ok(serde_json::Value::String(none))).is_none());
     assert_eq!(d.stats().deals, 0);
 }
 
@@ -201,7 +202,7 @@ fn a_match_beyond_free_bond_is_refused() {
     let m = matched(SettlementClass::BondedHedge, 200_000_000);
     let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000));
-    assert!(d.on_match(U64(0), Ok(Some(out))).is_none());
+    assert!(d.on_match(U64(0), Ok(serde_json::Value::String(out))).is_none());
     assert!(get_logs().iter().any(|l| l.contains("free bond")));
 }
 
@@ -542,7 +543,7 @@ fn a_match_the_maker_did_not_sign_is_refused() {
     m.maker_sig = Base64VecU8(SigningKey::from_bytes(&[6u8; 32]).sign(b"something else").to_bytes().to_vec());
     let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
     set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000));
-    assert!(d.on_match(U64(0), Ok(Some(out))).is_none());
+    assert!(d.on_match(U64(0), Ok(serde_json::Value::String(out))).is_none());
     assert!(get_logs().iter().any(|l| l.contains("did not sign these terms")));
 }
 

@@ -300,12 +300,13 @@ pub struct Stats {
 trait OutLayer {
     fn request_execution(
         &mut self,
-        code_source: Value,
+        source: Value,
         resource_limits: Value,
         input_data: String,
         secrets_ref: Option<Value>,
         response_format: String,
         payer_account_id: Option<AccountId>,
+        params: Option<Value>,
     );
 }
 
@@ -404,7 +405,7 @@ impl Desk {
     }
 
     #[private]
-    pub fn on_enclave_key(&mut self, #[callback_result] result: Result<Option<String>, PromiseError>) {
+    pub fn on_enclave_key(&mut self, #[callback_result] result: Result<Value, PromiseError>) {
         let out = Self::outlayer_output(result).unwrap_or_else(|e| env::panic_str(&e));
         let sign = out["sign_key"].as_str().and_then(parse_hex32).unwrap_or_else(|| env::panic_str("No signing key"));
         let enc = out["enc_key"].as_str().filter(|k| k.len() == 66 && k.starts_with("0x")).unwrap_or_else(|| env::panic_str("No encryption key"));
@@ -514,7 +515,7 @@ impl Desk {
     }
 
     #[private]
-    pub fn on_match(&mut self, rfq_id: U64, #[callback_result] result: Result<Option<String>, PromiseError>) -> Option<U64> {
+    pub fn on_match(&mut self, rfq_id: U64, #[callback_result] result: Result<Value, PromiseError>) -> Option<U64> {
         let out = match Self::outlayer_output(result) {
             Ok(v) => v,
             Err(e) => {
@@ -880,23 +881,30 @@ impl Desk {
             .with_static_gas(Gas::from_tgas(60))
             .with_unused_gas_weight(1)
             .request_execution(
-                json!({ "Project": { "project_id": self.config.matcher_project } }),
+                // the project's active version; its secret opens only for the build it is locked to
+                json!({ "Project": { "project_id": self.config.matcher_project, "version_key": null } }),
                 json!({ "max_instructions": 10_000_000_000u64, "max_memory_mb": 128, "max_execution_seconds": 60 }),
                 input,
                 Some(json!({ "profile": "default", "account_id": self.config.secrets_owner })),
                 "Json".into(),
                 Some(env::predecessor_account_id()),
+                None,
             )
     }
 
-    /// OutLayer resumes with `{"success": bool, "result": ..., "error": ...}`.
-    fn outlayer_output(result: Result<Option<String>, PromiseError>) -> Result<Value, String> {
-        let text = result.map_err(|_| "OutLayer execution failed".to_string())?.ok_or("Empty OutLayer result")?;
-        let v: Value = serde_json::from_str(&text).map_err(|_| "Unreadable OutLayer result".to_string())?;
+    /// OutLayer resumes with the worker's JSON output (an object), or with that JSON as a
+    /// string, or wrapped as `{"success": bool, "result": ..., "error": ...}`.
+    fn outlayer_output(result: Result<Value, PromiseError>) -> Result<Value, String> {
+        let raw = result.map_err(|_| "OutLayer execution failed".to_string())?;
+        let v = match raw {
+            Value::Null => return Err("Empty OutLayer result".into()),
+            Value::String(text) => serde_json::from_str(&text).map_err(|_| "Unreadable OutLayer result".to_string())?,
+            other => other,
+        };
         if v.get("success") == Some(&json!(false)) {
             return Err(format!("Matcher error: {}", v["error"].as_str().unwrap_or("unknown")));
         }
-        Ok(v.get("result").cloned().unwrap_or(v))
+        Ok(if v.get("success").is_some() { v.get("result").cloned().unwrap_or(Value::Null) } else { v })
     }
 
     fn accept_match(&mut self, m: MatchResult, rfq_id: U64, attested_by: &str) -> Result<U64, String> {

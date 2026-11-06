@@ -36,12 +36,13 @@ impl OutLayerDouble {
     #[allow(unused_variables)]
     pub fn request_execution(
         &mut self,
-        code_source: Value,
+        source: Value,
         resource_limits: Value,
         input_data: String,
         secrets_ref: Option<Value>,
         response_format: String,
         payer_account_id: Option<AccountId>,
+        params: Option<Value>,
     ) -> String {
         let input: Value = serde_json::from_str(&input_data).unwrap_or_else(|_| env::panic_str("input_data is not JSON"));
         self.requests += 1;
