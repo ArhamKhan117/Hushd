@@ -13,8 +13,13 @@ export interface TokenInfo {
 
 export interface HushdNetwork {
   id: "testnet" | "mainnet";
-  /** RPC endpoints, tried in order. */
+  /** Free RPC endpoints; calls rotate across them and fail over (`rpcOrder`). */
   rpc: string[];
+  /**
+   * The ones among `rpc` that take transactions (`sendEndpoints`). Free dRPC refuses a
+   * transaction with more than about 2 KB of arguments, which every pool `transact` has.
+   */
+  rpcSend?: string[];
   pool: string | null;
   desk: string | null;
   board: string | null;
@@ -31,7 +36,8 @@ export interface HushdNetwork {
 
 export const TESTNET: HushdNetwork = {
   id: "testnet",
-  rpc: ["https://test.rpc.fastnear.com", "https://near-testnet.drpc.org"],
+  rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org"],
+  rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
   board: "board.hushd.testnet",
@@ -50,7 +56,8 @@ export const TESTNET: HushdNetwork = {
 
 export const MAINNET: HushdNetwork = {
   id: "mainnet",
-  rpc: ["https://free.rpc.fastnear.com"],
+  rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
+  rpcSend: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
   pool: null,
   desk: null,
   board: null,
@@ -66,6 +73,12 @@ export const MAINNET: HushdNetwork = {
 /** Override any field (a local sandbox, a self-hosted API). */
 export function withOverrides(base: HushdNetwork, o: Partial<HushdNetwork>): HushdNetwork {
   return { ...base, ...o };
+}
+
+/** The endpoints to send transactions through: `rpcSend` where it overlaps `rpc` (an override of `rpc` alone, like a sandbox, sends there). */
+export function sendEndpoints(net: HushdNetwork): string[] {
+  const send = (net.rpcSend ?? []).filter((u) => net.rpc.includes(u));
+  return send.length ? send : net.rpc;
 }
 
 export function tokenInfo(net: HushdNetwork, id: string): TokenInfo {

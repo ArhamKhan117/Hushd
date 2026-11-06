@@ -10,8 +10,9 @@ import { openJson, sealJson } from "../src/box.ts";
 import { closeHedgeMessage, closeHedgeSignature, ownerKeyFor } from "../src/desk.ts";
 import { extHash } from "../src/field.ts";
 import { decodeAddress, identityFromSeed, isAddress } from "../src/keys.ts";
-import { TESTNET, withOverrides } from "../src/network.ts";
+import { sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
 import { makeNote, own } from "../src/note.ts";
+import { keepRpcErrorBodies, restEndpoint, rpcOrder } from "../src/rpc.ts";
 import { loadPoseidon } from "../src/poseidon.ts";
 import { proveJoinsplit, type ArtifactSource } from "../src/prove.ts";
 import { MerkleTree } from "../src/tree.ts";
@@ -137,4 +138,46 @@ test("an agent starts while the artifact host is unreachable; the first proof sa
   const { cachedArtifacts } = await import("../src/node.ts");
   const a = await cachedArtifacts({ baseUrl: "http://127.0.0.1:9/circuits", cacheDir: join(import.meta.dirname, "../.cache-test") });
   await assert.rejects(Promise.resolve(a.wasm("funds")), /Could not load the proving artifacts from http:\/\/127\.0\.0\.1:9\/circuits/);
+});
+
+test("RPC calls rotate across endpoints and put a resting one last", () => {
+  const urls = ["https://a.example", "https://b.example", "https://c.example"];
+  const firsts = new Set([0, 1, 2].map(() => rpcOrder(urls)[0]));
+  assert.equal(firsts.size, 3);
+  restEndpoint("https://b.example", 60_000);
+  for (let i = 0; i < 3; i++) {
+    const order = rpcOrder(urls);
+    assert.equal(order.length, 3);
+    assert.equal(order[2], "https://b.example");
+  }
+  // once its rest is over it takes its turn again
+  const later = Date.now() + 61_000;
+  assert.equal([0, 1, 2].filter(() => rpcOrder(urls, later)[0] === "https://b.example").length, 1);
+  assert.deepEqual(rpcOrder(["https://only.example"]), ["https://only.example"]);
+});
+
+test("an RPC's HTTP 400 with a JSON-RPC error reaches near-kit as an answer; other 400s stay", async () => {
+  const real = globalThis.fetch;
+  const bodies: Record<string, string> = {
+    "https://rpc.example": JSON.stringify({ jsonrpc: "2.0", id: 1, error: { name: "HANDLER_ERROR", cause: { name: "INVALID_TRANSACTION" } } }),
+    "https://other.example": "bad request",
+  };
+  globalThis.fetch = (async (input: RequestInfo | URL) => new Response(bodies[String(input)], { status: 400, statusText: "Bad Request" })) as typeof fetch;
+  try {
+    keepRpcErrorBodies(["https://rpc.example/"]);
+    const rpc = await fetch("https://rpc.example", { method: "POST" });
+    assert.equal(rpc.status, 200);
+    assert.match(await rpc.text(), /INVALID_TRANSACTION/);
+    const other = await fetch("https://other.example", { method: "POST" });
+    assert.equal(other.status, 400);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test("transactions go only through endpoints that take them; an RPC override sends where it reads", () => {
+  assert.ok(sendEndpoints(TESTNET).length >= 1);
+  assert.ok(sendEndpoints(TESTNET).every((u) => !u.includes("drpc")));
+  assert.deepEqual(sendEndpoints(withOverrides(TESTNET, { rpc: ["http://127.0.0.1:3030"] })), ["http://127.0.0.1:3030"]);
+  assert.deepEqual(sendEndpoints(withOverrides(TESTNET, { rpc: ["https://near-testnet.drpc.org", "https://rpc.testnet.fastnear.com"] })), ["https://rpc.testnet.fastnear.com"]);
 });

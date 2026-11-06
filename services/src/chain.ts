@@ -3,7 +3,7 @@
  * spread over its nonce lanes so many transactions are in flight at once without
  * nonce collisions; without one, the account's full-access key sends them in turn.
  */
-import { accountBalance, type HushdNetwork } from "@hushd/sdk";
+import { accountBalance, keepRpcErrorBodies, restEndpoint, rpcOrder, sendEndpoints, type HushdNetwork } from "@hushd/sdk";
 import { settings } from "./config.js";
 import { Db } from "./db.js";
 import { eventsInOutcome, watchedContracts, type OutcomeLike } from "./indexer.js";
@@ -79,48 +79,58 @@ async function recordEvents(net: HushdNetwork, o: Outcome) {
 }
 
 async function rpcBlock(net: HushdNetwork, hash: string): Promise<{ header: { height: number; timestamp_nanosec: string } }> {
-  for (const url of [...net.rpc, ...net.rpc]) {
+  const order = rpcOrder(net.rpc);
+  for (const url of [...order, ...order]) {
     const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "block", params: { block_id: hash } }) })
       .then((r) => r.json())
       .catch(() => ({}))) as { result?: { header: { height: number; timestamp_nanosec: string } } };
     if (j.result) return j.result;
+    restEndpoint(url);
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error("no RPC answered for the block");
 }
 
-/** A refusal before broadcast (rate limit): safe to send again elsewhere. */
-const rateLimited = (e: { message?: string; transactionHash?: string }) => !e.transactionHash && /429|too many|rate.?limit/i.test(e.message ?? "");
+/** A refusal before broadcast (rate limit, or a gateway that does not take the call): safe to send again elsewhere. */
+const rateLimited = (e: { message?: string; transactionHash?: string }) => !e.transactionHash && /429|too many|rate.?limit|method is not available/i.test(e.message ?? "");
 
 export class Signer {
-  /** One client per RPC endpoint; transactions fail over when an endpoint rate-limits. */
-  private readonly clients: Near[];
+  /** One client per endpoint that takes transactions; sends rotate across them and fail over when one rate-limits. */
+  private readonly clients: Map<string, Near>;
+  private readonly sendUrls: string[];
   private lane = 0;
   private stats = { sent: 0, failed: 0, gasBurnt: 0n, perLane: new Map<number, number>() };
 
   constructor(readonly net: HushdNetwork, readonly cfg: AccountConfig) {
-    this.clients = net.rpc.map(
-      (rpcUrl) =>
+    keepRpcErrorBodies(net.rpc);
+    this.sendUrls = sendEndpoints(net);
+    this.clients = new Map(
+      this.sendUrls.map((rpcUrl) => [
+        rpcUrl,
         new Near({
           network: { networkId: net.id, rpcUrl },
           privateKey: cfg.privateKey as `ed25519:${string}`,
           defaultSignerId: cfg.accountId,
           defaultWaitUntil: "EXECUTED_OPTIMISTIC",
         }),
+      ]),
     );
   }
 
   get near(): Near {
-    return this.clients[0]!;
+    return this.clients.get(rpcOrder(this.sendUrls)[0]!)!;
   }
 
   /** Send any transaction made with a client, failing over on rate limits like `call`. */
   async send<T>(build: (client: Near) => Promise<T>): Promise<T> {
+    const order = rpcOrder(this.sendUrls);
     for (let attempt = 0; ; attempt++) {
+      const url = order[attempt % order.length]!;
       try {
-        return await build(this.clients[attempt % this.clients.length]!);
+        return await build(this.clients.get(url)!);
       } catch (e) {
-        if (!rateLimited(e as { message?: string; transactionHash?: string }) || attempt >= this.clients.length * 3) throw e;
+        if (!rateLimited(e as { message?: string; transactionHash?: string }) || attempt >= order.length * 3) throw e;
+        restEndpoint(url);
         await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
       }
     }
@@ -139,8 +149,10 @@ export class Signer {
     this.stats.sent++;
     if (lane !== null) this.stats.perLane.set(lane, (this.stats.perLane.get(lane) ?? 0) + 1);
     let outcome: Outcome | null = null;
+    const order = rpcOrder(this.sendUrls);
     for (let attempt = 0; outcome === null; attempt++) {
-      const client = this.clients[attempt % this.clients.length]!;
+      const url = order[attempt % order.length]!;
+      const client = this.clients.get(url)!;
       let tx = client.transaction(this.cfg.accountId).functionCall(contract, method, args, {
         gas: (opts.gas ?? "300 Tgas") as `${number} Tgas`,
         attachedDeposit: BigInt(opts.deposit ?? 0),
@@ -150,12 +162,14 @@ export class Signer {
         outcome = (await tx.send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as Outcome;
       } catch (e) {
         const err = e as { message?: string; data?: unknown; transactionHash?: string };
-        if (rateLimited(err) && attempt < this.clients.length * 3) {
+        if (rateLimited(err) && attempt < order.length * 3) {
+          restEndpoint(url);
           await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
           continue;
         }
         this.stats.failed++;
-        throw new ChainError(err.data ? failureText(err.data) : err.message ?? String(e), err.transactionHash);
+        const onlyStatus = typeof err.data === "object" && err.data !== null && Object.keys(err.data).join() === "statusCode";
+        throw new ChainError(err.data && !onlyStatus ? failureText(err.data) : err.message ?? String(e), err.transactionHash);
       }
     }
     const txHash = outcome.transaction?.hash ?? outcome.transaction_outcome?.id ?? "";

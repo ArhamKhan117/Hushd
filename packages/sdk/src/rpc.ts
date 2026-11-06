@@ -13,9 +13,57 @@ export class RpcError extends Error {
 
 const b64 = utf8ToB64;
 
+// Free endpoints share the load: each call starts at the next one, and one that
+// rate-limits, errors or times out rests a while before it is asked first again.
+const resting = new Map<string, number>();
+let turn = 0;
+const REST_MS = 30_000;
+
+/** The endpoints in the order to try them: rotated per call, resting ones last. */
+export function rpcOrder(urls: readonly string[], now = Date.now()): string[] {
+  if (urls.length < 2) return [...urls];
+  const start = turn++ % urls.length;
+  const rotated = [...urls.slice(start), ...urls.slice(0, start)];
+  const until = (u: string) => resting.get(u) ?? 0;
+  return [...rotated.filter((u) => until(u) <= now), ...rotated.filter((u) => until(u) > now).sort((a, b) => until(a) - until(b))];
+}
+
+/** Rest an endpoint that rate-limited or failed. */
+export function restEndpoint(url: string, ms = REST_MS): void {
+  resting.set(url, Date.now() + ms);
+}
+
+const errorBodyHosts = new Set<string>();
+
+/**
+ * FastNEAR answers a rejected transaction with HTTP 400 and the JSON-RPC error in the body.
+ * near-kit drops the body of any non-2xx answer, and with it the reason and its own retry on
+ * a stale nonce. After this call, POSTs to these endpoints that fail with a JSON-RPC error body
+ * reach near-kit as ordinary answers. Patches `fetch` once; other requests are untouched.
+ */
+export function keepRpcErrorBodies(urls: readonly string[]): void {
+  const first = errorBodyHosts.size === 0;
+  for (const u of urls) errorBodyHosts.add(u.replace(/\/$/, ""));
+  if (!first) return;
+  const base = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const res = await base(input, init);
+    const url = (typeof input === "string" ? input : input instanceof URL ? input.href : input.url).replace(/\/$/, "");
+    if (res.status !== 400 || !errorBodyHosts.has(url)) return res;
+    const text = await res.text();
+    let rpcError = false;
+    try {
+      rpcError = Boolean((JSON.parse(text) as { error?: unknown }).error);
+    } catch {
+      /* not JSON-RPC: keep the 400 */
+    }
+    return new Response(text, { status: rpcError ? 200 : 400, statusText: rpcError ? "OK" : res.statusText, headers: res.headers });
+  };
+}
+
 async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): Promise<T> {
   let last: unknown;
-  for (const url of net.rpc) {
+  for (const url of rpcOrder(net.rpc)) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const res = await fetch(url, {
@@ -38,6 +86,7 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
         last = e;
         // contract errors are answers, not outages: no point asking another endpoint
         if (e instanceof RpcError && e.cause && !String(e.message).includes("answered")) throw e;
+        restEndpoint(url);
         await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
       }
     }
