@@ -17,6 +17,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { quoteConsent, type PackageQuote } from "@hushd/protocol";
 import {
+  CUSTODY,
+  CustodyWallet,
   DeskApi,
   deskView,
   fromB64,
@@ -35,15 +37,16 @@ import {
   view,
   x402Network,
   type AgreedTerms,
+  type CallSpec,
   type HushdNetwork,
   type MakerAsk,
 } from "@hushd/sdk";
 import { EncryptedFileStore } from "@hushd/sdk/node";
-import { approveDealAgent, dealAddress } from "./hyperliquid.js";
+import { addressOfKey, approveDealAgent, dealAddress } from "./hyperliquid.js";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
-import { capByMarket, hourVolBps, intentsQuote, mids, testnetPerps, wirePrice, wireSize } from "./market.js";
+import { type PerpMeta, capByMarket, hourVolBps, intentsQuote, mids, testnetPerps, testnetWithdrawable, wirePrice, wireSize } from "./market.js";
 
 export type Style = "fixed" | "volatility" | "inventory";
 
@@ -52,6 +55,11 @@ const toHexStr = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 
 /** Bond sizes in whole USDC: a bond says roughly how big a deal is, so it comes from a few fixed steps. */
 export const BOND_STEPS = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000];
+
+/** USDC of margin a hedge of this notional needs: at half the coin's maximum leverage, so a move does not liquidate it at once. */
+export function hedgeMargin(notionalUsd: number, maxLeverage: number): number {
+  return notionalUsd / Math.max(1, maxLeverage / 2);
+}
 
 /** A tenth of the notional, rounded up to the next step, never below the desk's minimum (base units). */
 export function bondFor(notionalUsd: number, usdcDecimals: number, minBond: bigint): bigint {
@@ -90,7 +98,7 @@ export class Maker {
     readonly net: HushdNetwork,
     readonly name: string,
     readonly style: Style,
-    readonly signer: Signer,
+    readonly near: MakerAccount,
     seedHex: string,
     quoteKeyHex: string,
     readonly api: DeskApi,
@@ -98,6 +106,8 @@ export class Maker {
     dataDir: string,
     /** The maker's Hyperliquid account key (0x hex): approves each hedged deal's MPC address as its agent. */
     private readonly hlKey: string | null = null,
+    /** Names the maker's note file, so it survives a change of NEAR account (default: the account). */
+    slot: string = near.accountId,
   ) {
     const id = identityFromSeed(hexBytes(seedHex));
     this.quoteSecret = hexBytes(quoteKeyHex);
@@ -105,12 +115,12 @@ export class Maker {
     this.wallet = new PrivateWallet(net, id, {
       artifacts: { wasm: (n) => join(settings.circuitsDir(), `${n}.wasm`), zkey: (n) => join(settings.circuitsDir(), `${n}.zkey`) },
       relayer,
-      store: new EncryptedFileStore(join(dataDir, `${signer.accountId}.notes.enc`), hexBytes(seedHex)),
+      store: new EncryptedFileStore(join(dataDir, `${slot}.notes.enc`), hexBytes(seedHex)),
     });
   }
 
   get account() {
-    return this.signer.accountId;
+    return this.near.accountId;
   }
 
   get quoteKey(): string {
@@ -122,7 +132,19 @@ export class Maker {
     const me = await view<{ quote_key: string; enc_key: string } | null>(this.net, this.net.desk!, "maker", { account_id: this.account });
     const enc = toHexStr(this.wallet.id.encPublic);
     if (me && me.quote_key === this.quoteKey && me.enc_key === enc) return;
-    await this.signer.call(this.net.desk!, "register_maker", { name: this.name, enc_key: enc, quote_url: quoteUrl, style: this.style, quote_key: this.quoteKey }, { gas: "30 Tgas", deposit: 10_000_000_000_000_000_000_000n });
+    await this.near.call({ receiver: this.net.desk!, method: "register_maker", args: { name: this.name, enc_key: enc, quote_url: quoteUrl, style: this.style, quote_key: this.quoteKey }, gas: 30n * TGAS, deposit: 10_000_000_000_000_000_000_000n });
+  }
+
+  /** Bond up to `target` on the desk from the maker's public USDC (what the owner funded it with). */
+  async ensureBonded(target: bigint) {
+    const usdc = this.net.bondToken!;
+    const me = await view<{ bond: string } | null>(this.net, this.net.desk!, "maker", { account_id: this.account });
+    const short = target - BigInt(me?.bond ?? "0");
+    if (short <= 0n) return;
+    const have = BigInt(await view<string>(this.net, usdc, "ft_balance_of", { account_id: this.account }));
+    const amount = have < short ? have : short;
+    if (amount <= 0n) return;
+    await this.near.call({ receiver: usdc, method: "ft_transfer_call", args: { receiver_id: this.net.desk!, amount: amount.toString(), memo: null, msg: "bond" }, gas: 100n * TGAS, deposit: 1n });
   }
 
   /** Price an ask and sign the quote, or null when the maker will not quote it. */
@@ -160,11 +182,14 @@ export class Maker {
       signature: "",
     };
     if (ask.kind !== "spot") {
+      // never promise a hedge this maker cannot place: it needs a Hyperliquid account with the margin
+      if (!this.hlKey) return null;
       const coin = ask.hedge?.coin ?? buy.hedgeCoin;
-      const perps = await testnetPerps().catch(() => ({}) as Record<string, { asset: number; szDecimals: number }>);
+      const perps = await testnetPerps().catch(() => ({}) as Record<string, PerpMeta>);
       const perp = coin ? perps[coin] : undefined;
       const px = coin ? m[coin] : undefined;
       if (!coin || !perp || !px) return null;
+      if ((await this.hlMargin()) < hedgeMargin(notionalUsd, perp.maxLeverage)) return null;
       const size = Number(give) / 10 ** buy.decimals;
       q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: now + 10 * 60_000, testnet: true };
       // about a tenth of the trade's value in USDC, held by the desk until the hedge leg is done
@@ -187,6 +212,14 @@ export class Maker {
   private async minBond(): Promise<bigint> {
     if (Date.now() - this.minBondCache.at > 600_000) this.minBondCache = { at: Date.now(), value: BigInt((await deskView.config(this.net)).min_bond) };
     return this.minBondCache.value;
+  }
+
+  /** Margin free on this maker's Hyperliquid testnet account, read at most every 30 seconds. */
+  private hlMarginCache: { at: number; value: number } = { at: 0, value: 0 };
+  private async hlMargin(): Promise<number> {
+    if (!this.hlKey) return 0;
+    if (Date.now() - this.hlMarginCache.at > 30_000) this.hlMarginCache = { at: Date.now(), value: await testnetWithdrawable(addressOfKey(this.hlKey)).catch(() => 0) };
+    return this.hlMarginCache.value;
   }
 
   /** Bond posted on the desk and not locked in a deal. */
@@ -274,7 +307,8 @@ function x402Routes(a: ReturnType<typeof app>, makers: Maker[], net: HushdNetwor
   const price = settings.str("X402_QUOTE_PRICE", "10000");
   const seen = new Map(makers.map((m) => [m.account, new SeenFile(join(dataDir, `${m.account}.x402-seen`))]));
   a.get("/makers/:account/quote", async (c) => {
-    const m = makers.find((x) => x.account === c.req.param("account"));
+    const id = c.req.param("account");
+    const m = makers.find((x) => x.account === id || x.name.toLowerCase() === id.toLowerCase());
     if (!m) return c.json({ error: "No such maker here" }, 404);
     const sell = c.req.query("sell");
     const buy = c.req.query("buy");
@@ -292,6 +326,28 @@ function x402Routes(a: ReturnType<typeof app>, makers: Maker[], net: HushdNetwor
   });
 }
 
+/** A maker's NEAR account: an OutLayer policy wallet (the key stays in a TEE), or its own key. */
+export interface MakerAccount {
+  accountId: string;
+  kind: "policy-wallet" | "key";
+  call(c: CallSpec): Promise<string>;
+}
+
+const TGAS = 1_000_000_000_000n;
+
+export function makerAccount(net: HushdNetwork, prefix: string): MakerAccount | null {
+  const walletKey = process.env[`${prefix}_POLICY_WALLET_KEY`];
+  const walletAccount = process.env[`${prefix}_POLICY_WALLET_ACCOUNT`];
+  if (walletKey && walletAccount) {
+    const w = new CustodyWallet(walletKey, settings.str("CUSTODY_URL", CUSTODY[net.id].api));
+    return { accountId: walletAccount, kind: "policy-wallet", call: async (c) => (await w.call(c)).txHash };
+  }
+  const acc = account(prefix);
+  if (!acc) return null;
+  const signer = new Signer(net, acc);
+  return { accountId: acc.accountId, kind: "key", call: async (c) => (await signer.call(c.receiver, c.method, c.args, { gas: `${Number(c.gas / TGAS)} Tgas`, deposit: c.deposit })).txHash };
+}
+
 export async function startMakers() {
   const net = network();
   await loadPoseidon();
@@ -300,17 +356,20 @@ export async function startMakers() {
   const publicUrl = settings.str("MAKERS_PUBLIC_URL", "https://api.hushd.net");
   const makers: Maker[] = [];
   for (const [prefix, style] of [["MAKER_A", "fixed"], ["MAKER_B", "volatility"], ["MAKER_C", "inventory"]] as const) {
-    const acc = account(prefix);
+    const near = makerAccount(net, prefix);
     const seed = process.env[`${prefix}_SEED`];
     const quoteKey = process.env[`${prefix}_QUOTE_KEY`];
-    if (!acc || !seed || !quoteKey) continue;
+    if (!near || !seed || !quoteKey) continue;
     const name = settings.str(`${prefix}_NAME`, { fixed: "Steady", volatility: "Weather", inventory: "Ledger" }[style]);
-    makers.push(new Maker(net, name, style, new Signer(net, acc), seed, quoteKey, api, relayer, settings.str("MAKERS_DATA_DIR", "./data/makers"), process.env[`${prefix}_HL_KEY`] || null));
+    const slot = prefix.toLowerCase().replace("_", "-");
+    makers.push(new Maker(net, name, style, near, seed, quoteKey, api, relayer, settings.str("MAKERS_DATA_DIR", "./data/makers"), process.env[`${prefix}_HL_KEY`] || null, slot));
   }
-  if (makers.length === 0) throw new Error("No maker configured (MAKER_A_ACCOUNT, _PRIVATE_KEY, _SEED, _QUOTE_KEY)");
+  if (makers.length === 0) throw new Error("No maker configured (MAKER_A_SEED, _QUOTE_KEY, and _POLICY_WALLET_KEY or _ACCOUNT with _PRIVATE_KEY)");
+  const bondTarget = BigInt(settings.str("MAKER_BOND", "20000000000"));
   for (const m of makers) {
     await m.wallet.restore();
     await m.ensureRegistered(`${publicUrl}/makers/${m.account}/quote`).catch((e) => console.error(`${m.name} register:`, (e as Error).message));
+    await m.ensureBonded(bondTarget).catch((e) => console.error(`${m.name} bond:`, (e as Error).message));
   }
   const a = app("makers", async () => ({ makers: makers.map((m) => ({ account: m.account, style: m.style, ...m.stats, balances: Object.fromEntries([...m.wallet.balances()].map(([k, v]) => [k, v.toString()])) })) }));
   x402Routes(a, makers, net, settings.str("MAKERS_DATA_DIR", "./data/makers"));

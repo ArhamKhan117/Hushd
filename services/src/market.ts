@@ -5,6 +5,7 @@
  * Prices come from mainnet (public data, no account, nothing is traded); hedge orders
  * go to Hyperliquid testnet.
  */
+import { OneClick, quoteRequest } from "@hushd/sdk";
 import { settings } from "./config.js";
 
 const HL_MAIN = () => settings.str("HYPERLIQUID_INFO_URL", "https://api.hyperliquid.xyz/info");
@@ -43,15 +44,22 @@ export async function hourVolBps(coin: string): Promise<number> {
 export interface PerpMeta {
   asset: number;
   szDecimals: number;
+  maxLeverage: number;
 }
 
 let metaCache: Record<string, PerpMeta> | null = null;
 /** Hyperliquid testnet perp universe: asset index and size decimals by coin. */
 export async function testnetPerps(): Promise<Record<string, PerpMeta>> {
   if (metaCache) return metaCache;
-  const m = await info<{ universe: { name: string; szDecimals: number }[] }>(HL_TEST(), { type: "meta" });
-  metaCache = Object.fromEntries(m.universe.map((u, i) => [u.name, { asset: i, szDecimals: u.szDecimals }]));
+  const m = await info<{ universe: { name: string; szDecimals: number; maxLeverage: number }[] }>(HL_TEST(), { type: "meta" });
+  metaCache = Object.fromEntries(m.universe.map((u, i) => [u.name, { asset: i, szDecimals: u.szDecimals, maxLeverage: u.maxLeverage }]));
   return metaCache;
+}
+
+/** USDC an account on Hyperliquid testnet can still put up as margin (0 when the account does not exist). */
+export async function testnetWithdrawable(address: string): Promise<number> {
+  const s = await info<{ withdrawable?: string }>(HL_TEST(), { type: "clearinghouseState", user: address });
+  return Number(s.withdrawable ?? 0);
 }
 
 /** Hyperliquid wire format: no trailing zeros, no exponent. */
@@ -103,29 +111,10 @@ export async function intentsQuote(sellSymbol: string, buySymbol: string, amount
   const key = `${sellSymbol}>${buySymbol}:${amount}`;
   const hit = intentsCache.get(key);
   if (hit && Date.now() - hit.at < 15_000) return hit.out;
-  const jwt = settings.str("ONECLICK_JWT", "");
-  const r = await fetch(`${ONECLICK()}/v0/quote`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(jwt ? { authorization: `Bearer ${jwt}` } : {}) },
-    body: JSON.stringify({
-      dry: true,
-      swapType: "EXACT_INPUT",
-      slippageTolerance: 100,
-      originAsset: origin,
-      depositType: "INTENTS",
-      destinationAsset: destination,
-      amount: amount.toString(),
-      refundTo: "intents.near",
-      refundType: "INTENTS",
-      recipient: "intents.near",
-      recipientType: "INTENTS",
-      deadline: new Date(Date.now() + 10 * 60_000).toISOString(),
-      quoteWaitingTimeMs: 2_000,
-    }),
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!r.ok) throw new Error(`1Click answered ${r.status}`);
-  const out = BigInt(((await r.json()) as { quote: { amountOut: string } }).quote.amountOut);
+  const q = await new OneClick(ONECLICK(), settings.str("ONECLICK_API_KEY", "") || undefined, undefined, 8_000).quote(
+    quoteRequest({ originAsset: origin, destinationAsset: destination, amount: amount.toString(), recipient: "intents.near", refundTo: "intents.near", depositType: "INTENTS", refundType: "INTENTS", recipientType: "INTENTS", quoteWaitingTimeMs: 2_000 }),
+  );
+  const out = BigInt(q.quote.amountOut);
   intentsCache.set(key, { at: Date.now(), out });
   return out;
 }

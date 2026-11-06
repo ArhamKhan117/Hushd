@@ -6,13 +6,14 @@ import { TESTNET } from "@hushd/sdk";
 import { decodeSignedDelegateAction, encodeSignedDelegateAction } from "near-kit";
 import { buildApi } from "../src/api.js";
 import { Db } from "../src/db.js";
-import { approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
-import { eventsInBlock } from "../src/indexer.js";
+import { addressOfKey, approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
+import { eventsInBlock, eventsInTx } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
-import { bondFor, priceAsk, spreadBps } from "../src/makers.js";
+import { bondFor, hedgeMargin, priceAsk, spreadBps } from "../src/makers.js";
 import { checkDelegate } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
+import { parseAsk, report } from "../src/market-agent.js";
 
 describe("indexer", () => {
   const block = (status: Record<string, unknown>, receiver: string, logs: string[]) => ({
@@ -25,6 +26,12 @@ describe("indexer", () => {
     const out = eventsInBlock(block({ SuccessValue: "" }, "desk.hushd.testnet", [ev("deal_matched"), "plain log"]), new Set(["desk.hushd.testnet"]));
     assert.equal(out.length, 1);
     assert.deepEqual([out[0]!.event, out[0]!.contract, out[0]!.blockMs, out[0]!.logIndex, out[0]!.txHash], ["deal_matched", "desk.hushd.testnet", 1_800_000_000_000, 0, "tx1"]);
+  });
+  test("reads the same events from the transactions API", () => {
+    const rcpt = (executor: string, status: Record<string, unknown>, logs: string[]) => ({ execution_outcome: { id: `r-${executor}`, block_height: 9, block_timestamp: 1_800_000_000_123_456_789, outcome: { logs, executor_id: executor, status } } });
+    const tx = { transaction: { hash: "tx2" }, receipts: [rcpt("desk.hushd.testnet", { SuccessReceiptId: "x" }, ["plain", ev("bond_slashed")]), rcpt("desk.hushd.testnet", { Failure: {} }, [ev("x")]), rcpt("other.testnet", { SuccessValue: "" }, [ev("y")])] };
+    const out = eventsInTx(tx, new Set(["desk.hushd.testnet"]));
+    assert.deepEqual(out.map((e) => [e.event, e.logIndex, e.blockHeight, e.blockMs, e.txHash, e.receiptId]), [["bond_slashed", 1, 9, 1_800_000_000_123, "tx2", "r-desk.hushd.testnet"]]);
   });
   test("ignores failed receipts and other contracts", () => {
     assert.equal(eventsInBlock(block({ Failure: {} }, "desk.hushd.testnet", [ev("x")]), new Set(["desk.hushd.testnet"])).length, 0);
@@ -89,6 +96,10 @@ describe("hyperliquid agent approval", () => {
     const pub = Buffer.from("466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f276728176c3c6431f8eeda4538dc37c865e2784f3a9e77d044f33e407797e1278a", "hex");
     assert.equal(evmAddress(pub), "0x1563915e194d8cfba1943570603f7606a3115508");
   });
+  test("a maker's key gives its Hyperliquid address", () => {
+    // the well-known address of private key 1
+    assert.equal(addressOfKey(`0x${"00".repeat(31)}01`), "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf");
+  });
 });
 
 describe("makers", () => {
@@ -106,6 +117,11 @@ describe("makers", () => {
     assert.equal(bondFor(30_000, 6, usdc(1_000)), usdc(5_000));
     assert.equal(bondFor(2_500_000, 6, usdc(1_000)), usdc(300_000));
     assert.equal(bondFor(500, 6, usdc(3_000)), usdc(3_000));
+  });
+  test("a hedge needs margin at half the coin's maximum leverage", () => {
+    assert.equal(hedgeMargin(10_000, 40), 500);
+    assert.equal(hedgeMargin(10_000, 20), 1_000);
+    assert.equal(hedgeMargin(10_000, 1), 10_000);
   });
   test("pricing rounds in the maker's favour", () => {
     // 1,000 USDC for BTC at 60,000 with 25 bps: 0.01662499... BTC, floored to 8 decimals
@@ -179,4 +195,193 @@ test("a service records the events of its own transaction", async () => {
   };
   const out = eventsInOutcome(outcome, new Set(["desk.hushd.testnet"]), { height: 5, ms: 7 });
   assert.deepEqual(out.map((e) => [e.event, e.receiptId, e.txHash, e.blockHeight]), [["deal_matched", "r1", "tx9", 5]]);
+});
+
+describe("NEAR Intents routes (1Click stubbed, no network)", () => {
+  const ZERO = "0".repeat(64);
+  const USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+  const APTOS_USDC = "nep141:aptos-usdc.omft.near";
+  const STELLAR_USDC = "nep245:v2_1.omni.hot.tg:1100_usdc";
+  const ADDRESS = `0x${"11".repeat(20)}`;
+  const LIST = [
+    { assetId: USDC, decimals: 6, blockchain: "near", symbol: "USDC", price: 0.9995 },
+    { assetId: "nep141:wrap.near", decimals: 24, blockchain: "near", symbol: "wNEAR", price: 3.74 },
+    { assetId: "nep141:nbtc.bridge.near", decimals: 8, blockchain: "near", symbol: "BTC", price: 76_048 },
+    { assetId: "nep141:eth.bridge.near", decimals: 18, blockchain: "near", symbol: "ETH", price: 2_240 },
+    { assetId: "nep141:aptos.omft.near", decimals: 8, blockchain: "aptos", symbol: "APT", price: 0.61 },
+    { assetId: APTOS_USDC, decimals: 6, blockchain: "aptos", symbol: "USDC", price: 0.9995 },
+    { assetId: "nep141:avax-aave.omft.near", decimals: 18, blockchain: "avax", symbol: "AAVE", price: 129 },
+    { assetId: "nep141:avax-usdt.omft.near", decimals: 6, blockchain: "avax", symbol: "USDT", price: 0.999 },
+    { assetId: STELLAR_USDC, decimals: 7, blockchain: "stellar", symbol: "USDC", price: 0.9995 },
+    { assetId: "nep245:v2_1.omni.hot.tg:9745_xpl", decimals: 18, blockchain: "plasma", symbol: "XPL_(DEPRECATED)", price: 0.058 },
+    { assetId: "nep141:qtc.omft.near", decimals: 8, blockchain: "qtc", symbol: "QTC", price: 70 },
+    { assetId: "nep141:zeta.omft.near", decimals: 18, blockchain: "zetachain", symbol: "ZETA", price: 0.2 },
+  ];
+  type Call = { path: string; body: Record<string, unknown> | undefined; headers: Record<string, string> };
+  type Answer = { status?: number; body: unknown };
+  const echo = (body: Record<string, unknown>): Answer => ({
+    status: 201,
+    body: {
+      quote: { amountIn: body.amount, amountInFormatted: "25.0", amountInUsd: "24.98", amountOut: "24997517", amountOutFormatted: "24.997517", amountOutUsd: "24.98", minAmountOut: "24747541", timeEstimate: 35, withdrawFee: "0" },
+      quoteRequest: { ...body, confidentiality: body.confidentiality ?? "public", appFees: [{ recipient: "fees.near", fee: 1 }] },
+      signature: "ed25519:stub",
+      timestamp: "2026-11-06T12:00:00.000Z",
+    },
+  });
+  const dbs: Db[] = [];
+  after(() => Promise.all(dbs.map((d) => d.close())));
+  const keyBefore = process.env.ONECLICK_API_KEY;
+  after(() => {
+    if (keyBefore === undefined) delete process.env.ONECLICK_API_KEY;
+    else process.env.ONECLICK_API_KEY = keyBefore;
+  });
+
+  function setup(o: { quote?: (body: Record<string, unknown>, headers: Record<string, string>) => Answer; recordPath?: string; clock?: { t: number } } = {}) {
+    const calls: Call[] = [];
+    const stub: typeof fetch = async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined;
+      const headers = Object.fromEntries(new Headers(init?.headers).entries());
+      calls.push({ path, body, headers });
+      const r: Answer = path === "/v0/tokens" ? { status: 200, body: LIST } : (o.quote ?? echo)(body!, headers);
+      return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { "content-type": "application/json" } });
+    };
+    const db = new Db("postgres://localhost:1/unused");
+    dbs.push(db);
+    const clock = o.clock ?? { t: 1_000 };
+    const api = buildApi(TESTNET, db, () => clock.t, { fetch: stub, recordPath: o.recordPath ?? "/nonexistent/mainnet-intents.json" });
+    const quote = (b: Record<string, unknown>) => api.request("/v1/intents/quote", { method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json" } });
+    return { api, calls, quote, quotes: () => calls.filter((c) => c.path === "/v0/quote") };
+  }
+  const deposit = { direction: "deposit", asset: APTOS_USDC, token: "USDC", amount: "25000000", address: ADDRESS };
+
+  test("the token list comes by chain, named and sorted, without NEAR or deprecated assets, and is cached ten minutes", async () => {
+    const clock = { t: 1_000 };
+    const { api, calls } = setup({ clock });
+    const body = (await (await api.request("/v1/intents/tokens")).json()) as { chains: { id: string; name: string; tokens: { symbol: string }[] }[]; hushd: { symbol: string; assetId: string; decimals: number }[] };
+    assert.deepEqual(
+      body.chains.map((c) => [c.id, c.name, c.tokens.map((t) => t.symbol)]),
+      [["aptos", "Aptos", ["USDC", "APT"]], ["avax", "Avalanche", ["USDT", "AAVE"]], ["qtc", "QTC", ["QTC"]], ["stellar", "Stellar", ["USDC"]], ["zetachain", "Zetachain", ["ZETA"]]],
+    );
+    assert.deepEqual(body.hushd.map((t) => [t.symbol, t.assetId, t.decimals]), [["USDC", USDC, 6], ["wNEAR", "nep141:wrap.near", 24], ["BTC", "nep141:nbtc.bridge.near", 8]]);
+    clock.t += 9 * 60_000;
+    await api.request("/v1/intents/tokens");
+    assert.equal(calls.length, 1);
+    clock.t += 2 * 60_000;
+    await api.request("/v1/intents/tokens");
+    assert.equal(calls.length, 2);
+  });
+
+  test("a deposit quote is always dry, public without a partner key, and pays the all-zero NEAR account", async () => {
+    delete process.env.ONECLICK_API_KEY;
+    const { quote, quotes } = setup();
+    const r = await quote({ ...deposit, dry: false });
+    assert.equal(r.status, 200);
+    const sent = quotes()[0]!;
+    assert.equal(sent.body!.dry, true);
+    assert.deepEqual(
+      [sent.body!.originAsset, sent.body!.destinationAsset, sent.body!.amount, sent.body!.refundTo, sent.body!.recipient, sent.body!.depositType, sent.body!.recipientType, sent.body!.confidentiality],
+      [APTOS_USDC, USDC, "25000000", ADDRESS, ZERO, "ORIGIN_CHAIN", "DESTINATION_CHAIN", undefined],
+    );
+    assert.equal(sent.headers["x-api-key"], undefined);
+    const body = (await r.json()) as { confidential: boolean; nearAccount: string; from: { chainName: string; symbol: string }; to: { chainName: string }; quote: { amountOut: string } };
+    assert.deepEqual([body.confidential, body.nearAccount, body.from.chainName, body.from.symbol, body.to.chainName, body.quote.amountOut], [false, ZERO, "Aptos", "USDC", "NEAR", "24997517"]);
+  });
+
+  test("with a partner key a cash out asks for confidentiality and says it got it", async () => {
+    process.env.ONECLICK_API_KEY = "partner-key";
+    try {
+      const { quote, quotes } = setup();
+      const r = await quote({ direction: "cashout", asset: APTOS_USDC, token: "USDC", amount: "1000000", address: ADDRESS });
+      assert.equal(r.status, 200);
+      const sent = quotes()[0]!;
+      assert.deepEqual([sent.body!.originAsset, sent.body!.destinationAsset, sent.body!.refundTo, sent.body!.recipient, sent.body!.confidentiality, sent.headers["x-api-key"]], [USDC, APTOS_USDC, ZERO, ADDRESS, "basic", "partner-key"]);
+      assert.equal(((await r.json()) as { confidential: boolean }).confidential, true);
+    } finally {
+      delete process.env.ONECLICK_API_KEY;
+    }
+  });
+
+  test("a refused partner key falls back to a public quote that says it is public", async () => {
+    process.env.ONECLICK_API_KEY = "stale-key";
+    try {
+      const { quote, quotes } = setup({ quote: (b, h) => (h["x-api-key"] ? { status: 401, body: { message: "Unauthorized" } } : echo(b)) });
+      const r = await quote(deposit);
+      assert.equal(r.status, 200);
+      assert.equal(((await r.json()) as { confidential: boolean }).confidential, false);
+      assert.deepEqual(quotes().map((c) => c.body!.confidentiality), ["basic", undefined]);
+    } finally {
+      delete process.env.ONECLICK_API_KEY;
+    }
+  });
+
+  test("Stellar deposits ask for a memo deposit", async () => {
+    const { quote, quotes } = setup();
+    assert.equal((await quote({ ...deposit, asset: STELLAR_USDC, amount: "250000000", address: "GABC" })).status, 200);
+    assert.equal(quotes()[0]!.body!.depositMode, "MEMO");
+  });
+
+  test("bad input is refused before 1Click is asked", async () => {
+    const { quote, quotes } = setup();
+    for (const bad of [
+      { ...deposit, direction: "swap" },
+      { ...deposit, amount: "1.5" },
+      { ...deposit, amount: "0" },
+      { ...deposit, address: " " },
+      { ...deposit, asset: USDC },
+      { ...deposit, token: "DOGE" },
+    ]) {
+      const r = await quote(bad);
+      assert.equal(r.status, 400, JSON.stringify(bad));
+    }
+    assert.equal(quotes().length, 0);
+  });
+
+  test("1Click's refusals come back in plain words", async () => {
+    const say = (message: string) => setup({ quote: () => ({ status: 400, body: { message } }) }).quote;
+    const words = async (message: string, b = deposit) => {
+      const r = await say(message)(b);
+      assert.equal(r.status, 400);
+      return ((await r.json()) as { error: string }).error;
+    };
+    assert.match(await words("refundTo is not valid"), /^That is not a valid Aptos address\./);
+    assert.match(await words("recipient is not valid", { ...deposit, direction: "cashout" }), /^That is not a valid Aptos address to receive USDC on\./);
+    assert.equal(await words("Amount is too low for bridge, try at least 300001"), "That is too little for this route. Send at least 0.300001 USDC.");
+    assert.equal(await words("Temporary swap limits: minimum swap amount is $1,000"), "Temporary swap limits: minimum swap amount is $1,000.");
+  });
+
+  test("the mainnet trades are the record's steps, or none before it exists", async () => {
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    assert.deepEqual(await (await setup().api.request("/v1/intents/trades")).json(), { steps: [] });
+    const record = { network: "mainnet", verifier: "intents.near", explorer: "https://nearblocks.io/txns/", steps: [{ step: "fund", txs: ["abc"], note: "dev wallet funds the trader and the maker", at: "2026-11-07T10:00:00.000Z" }] };
+    const path = join(mkdtempSync(join(tmpdir(), "hushd-intents-")), "mainnet-intents.json");
+    writeFileSync(path, JSON.stringify(record));
+    assert.deepEqual(await (await setup({ recordPath: path }).api.request("/v1/intents/trades")).json(), record);
+  });
+});
+
+describe("agent market worker", () => {
+  test("reads a pair and a size the ways people write them", () => {
+    assert.deepEqual(parseAsk("Sell 2,500 USDC for NEAR please"), { sellAmount: 2500, sell: "USDC", buy: "NEAR" });
+    assert.deepEqual(parseAsk("swap 0.5 btc to usdc"), { sellAmount: 0.5, sell: "BTC", buy: "USDC" });
+    assert.deepEqual(parseAsk("2500 usdc -> wnear"), { sellAmount: 2500, sell: "USDC", buy: "WNEAR" });
+    assert.deepEqual(parseAsk("buy NEAR with 1,000 USDC"), { sellAmount: 1000, sell: "USDC", buy: "NEAR" });
+    assert.equal(parseAsk("what is the weather"), null);
+  });
+  test("the report compares every quote with the mid and says what it could not do", () => {
+    const md = report({
+      ask: { sellAmount: 1000, sell: "USDC", buy: "NEAR" },
+      mid: { sellUsd: 1, buyUsd: 4, fairOut: 250 },
+      oneClick: { out: 249.5, outUsd: 998, route: "near USDC to near wNEAR" },
+      makers: [{ name: "Steady", out: 249, paidTx: "tx1" }],
+      notes: ["Weather had no quote for this size right now."],
+    });
+    assert.match(md, /\| Hyperliquid mid \(fair value\) \| 250 NEAR \| 0 bps \|/);
+    assert.match(md, /\| NEAR Intents, 1Click \(near USDC to near wNEAR\) \| 249\.5 NEAR \| -20\.0 bps \|/);
+    assert.match(md, /\| Hushd maker Steady \(testnet, indicative\) \| 249 NEAR \| -40\.0 bps \|/);
+    assert.match(md, /private x402.*\[Steady\]\(https:\/\/testnet\.nearblocks\.io\/txns\/tx1\)/);
+    assert.match(md, /- Weather had no quote/);
+  });
 });
