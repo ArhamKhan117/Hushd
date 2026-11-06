@@ -22,6 +22,24 @@ export function parseCaps(net: HushdNetwork, s: string): Map<string, bigint> {
   return out;
 }
 
+/** The owner's other rules: a date the limits stop working, and who the agent may pay. */
+export interface Rules {
+  expiresAt?: Date;
+  /** hushd1... addresses and NEAR accounts this agent may send or cash out to (any, when unset). */
+  allowTo?: Set<string>;
+}
+
+export function parseRules(env: { HUSHD_LIMITS_EXPIRE?: string; HUSHD_ALLOW_TO?: string }): Rules {
+  const rules: Rules = {};
+  if (env.HUSHD_LIMITS_EXPIRE) {
+    const d = new Date(env.HUSHD_LIMITS_EXPIRE);
+    if (Number.isNaN(d.getTime())) throw new Error(`Bad HUSHD_LIMITS_EXPIRE "${env.HUSHD_LIMITS_EXPIRE}" (want a date, e.g. 2026-12-01)`);
+    rules.expiresAt = d;
+  }
+  if (env.HUSHD_ALLOW_TO) rules.allowTo = new Set(env.HUSHD_ALLOW_TO.split(",").map((x) => x.trim()).filter(Boolean));
+  return rules;
+}
+
 export class Limits {
   private ledger: { day: string; spent: Record<string, string> };
 
@@ -31,6 +49,7 @@ export class Limits {
     readonly perDay: Map<string, bigint>,
     private readonly path: string,
     private readonly now: () => Date = () => new Date(),
+    readonly rules: Rules = {},
   ) {
     this.ledger = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { day: this.today(), spent: {} };
   }
@@ -49,7 +68,9 @@ export class Limits {
   }
 
   /** Throws when `amount` of `token` would break a limit. Tokens with no limit set cannot be spent. */
-  check(token: string, amount: bigint): void {
+  check(token: string, amount: bigint, to?: string): void {
+    if (this.rules.expiresAt && this.now() >= this.rules.expiresAt) throw new Error(`This agent's spending limits expired on ${this.rules.expiresAt.toISOString().slice(0, 10)}, so it may not spend`);
+    if (to !== undefined && this.rules.allowTo && !this.rules.allowTo.has(to)) throw new Error(`${to} is not on this agent's list of payees`);
     const t = tokenInfo(this.net, token);
     const one = this.perPayment.get(t.id);
     const day = this.perDay.get(t.id);
@@ -73,7 +94,7 @@ export class Limits {
   }
 
   describe() {
-    return [...this.perPayment.keys()].map((id) => {
+    const tokens = [...this.perPayment.keys()].map((id) => {
       const t = tokenInfo(this.net, id);
       return {
         token: t.symbol,
@@ -82,5 +103,6 @@ export class Limits {
         spentToday: formatUnits(this.spentToday(id), t.decimals),
       };
     });
+    return { tokens, expires: this.rules.expiresAt?.toISOString() ?? null, payees: this.rules.allowTo ? [...this.rules.allowTo] : "any" };
   }
 }

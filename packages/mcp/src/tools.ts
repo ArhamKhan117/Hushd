@@ -6,6 +6,8 @@
 import { formatUnits, parseUnits } from "@hushd/protocol";
 import {
   awaitMatch,
+  CUSTODY,
+  custodyView,
   checkMatchedTerms,
   decodeProof,
   deskView,
@@ -48,6 +50,7 @@ function amountIn(net: HushdNetwork, token: string, amount: string) {
 
 const human = (net: HushdNetwork, token: string, v: bigint) => `${formatUnits(v, tokenInfo(net, token).decimals)} ${tokenInfo(net, token).symbol}`;
 
+const NO_NEAR = "This agent has no NEAR account: set HUSHD_POLICY_WALLET_KEY (an OutLayer policy wallet) or HUSHD_NEAR_ACCOUNT with HUSHD_NEAR_PRIVATE_KEY";
 const TOKEN = z.string().describe("Token symbol (USDC, wNEAR, BTC) or NEP-141 account id");
 const AMOUNT = z.string().regex(/^[\d,]+(\.\d+)?$/).describe("Amount in the token's units, e.g. \"25.5\"");
 
@@ -115,11 +118,37 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
   );
 
   server.registerTool(
+    "hushd_policy",
+    {
+      title: "Policy wallet",
+      description: "Who controls this agent: its NEAR account (an OutLayer policy wallet, or its own key), the rules the TEE enforces before signing, whether the owner froze it, and Hushd's own limits on top.",
+      annotations: { readOnlyHint: true },
+    },
+    () =>
+      run(async () => {
+        const n = a.near;
+        const hushd = { ...a.limits.describe(), enforced_by: "this server, before it proves or pays" };
+        if (!n?.wallet) return { near_account: n?.accountId ?? null, signed_by: n ? "the agent's own key (no policy wallet)" : null, hushd_limits: hushd };
+        const [p, chain] = await Promise.all([n.wallet.client.policy(), custodyView.policy(net, n.wallet.pubkey)]);
+        return {
+          near_account: n.accountId,
+          signed_by: "OutLayer policy wallet: the key lives in a TEE and signs only what the owner's policy allows",
+          owner: chain?.owner ?? null,
+          frozen: chain?.frozen ?? p.frozen,
+          tee_rules: p.rules,
+          tee_usage: p.usage,
+          hushd_limits: hushd,
+          check_on_chain: `${net.explorer}/address/${CUSTODY[net.id].contract}`,
+        };
+      }),
+  );
+
+  server.registerTool(
     "hushd_faucet",
     { title: "Testnet tokens", description: "Testnet only: mint test tokens to this agent's NEAR account (then use hushd_shield).", inputSchema: { token: TOKEN } },
     ({ token }) =>
       run(async () => {
-        if (!a.near) throw new Error("Set HUSHD_NEAR_ACCOUNT and HUSHD_NEAR_PRIVATE_KEY to receive tokens");
+        if (!a.near) throw new Error(NO_NEAR);
         const t = tokenInfo(net, token);
         const r = await a.relayer.faucet(a.near.accountId, t.id);
         return { token: t.symbol, to: a.near.accountId, tx: r.txHash };
@@ -131,16 +160,13 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     { title: "Add privately", description: "Move tokens from this agent's NEAR account into its private balance. The deposit is public; what happens after is not.", inputSchema: { token: TOKEN, amount: AMOUNT } },
     ({ token, amount }) =>
       run(async () => {
-        if (!a.near) throw new Error("Set HUSHD_NEAR_ACCOUNT and HUSHD_NEAR_PRIVATE_KEY to add tokens");
+        if (!a.near) throw new Error(NO_NEAR);
+        await a.assertNotFrozen();
         const x = amountIn(net, token, amount);
         const { call, selfPost } = wallet.shield(x.token, x.amount);
         await a.relayer.post(selfPost, "note");
-        const out = (await a.near.client
-          .transaction(a.near.accountId)
-          .functionCall(call.contract, call.method, call.args, { gas: "120 Tgas", attachedDeposit: 1n })
-          .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string }; status?: { Failure?: unknown } };
-        if (out.status?.Failure) throw new Error(`The deposit failed: ${JSON.stringify(out.status.Failure)}`);
-        return { added: human(net, x.token, x.amount), tx: out.transaction?.hash ?? "" };
+        const tx = await a.near.call({ receiver: call.contract, method: call.method, args: call.args, gas: 120_000_000_000_000n, deposit: 1n });
+        return { added: human(net, x.token, x.amount), tx, signed_by: a.near.kind === "policy-wallet" ? "policy wallet (OutLayer TEE)" : "agent key" };
       }),
   );
 
@@ -150,7 +176,8 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     ({ to, token, amount, memo }) =>
       run(async () => {
         const x = amountIn(net, token, amount);
-        a.limits.check(x.token, x.amount);
+        await a.assertNotFrozen();
+        a.limits.check(x.token, x.amount, to);
         const r = await wallet.send(to, x.token, x.amount, memo);
         a.limits.record(x.token, x.amount);
         return { sent: human(net, x.token, x.amount), to, tx: r.txHash };
@@ -163,7 +190,8 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     ({ to_account, token, amount }) =>
       run(async () => {
         const x = amountIn(net, token, amount);
-        a.limits.check(x.token, x.amount);
+        await a.assertNotFrozen();
+        a.limits.check(x.token, x.amount, to_account);
         const info = await a.relayer.info();
         const fee = (x.amount * BigInt(info.cashOutFeeBps)) / 10_000n;
         const r = await wallet.cashOut(to_account, x.token, x.amount, fee);
@@ -191,6 +219,7 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
       run(async () => {
         const sell = amountIn(net, sell_token, sell_amount);
         const buy = tokenInfo(net, buy_token);
+        await a.assertNotFrozen();
         a.limits.check(sell.token, sell.amount);
         await wallet.sync();
         const draft = { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: min_receive ? parseUnits(min_receive, buy.decimals) : 0n } };
@@ -279,6 +308,7 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     },
     ({ url, method, body }) =>
       run(async () => {
+        await a.assertNotFrozen();
         await wallet.sync();
         const { response, paid } = await x402Fetch(wallet, url, { method, ...(body ? { body, headers: { "content-type": "application/json" } } : {}) }, {
           maxAmount: (token) => a.limits.maxFor(tokenInfo(net, token).id),

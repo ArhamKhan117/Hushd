@@ -8,6 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { TESTNET } from "@hushd/sdk";
 import { createAgent, createServer, Limits, parseCaps } from "../src/index.ts";
+import { parseRules } from "../src/limits.ts";
 
 const circuits = join(import.meta.dirname, "../../../app/public/circuits");
 
@@ -53,4 +54,27 @@ test("the daily limit holds across a restart and resets the next day", () => {
   assert.equal(make().maxFor("usdc.hushd.testnet"), 7_000_000n);
   now = new Date("2026-11-07T00:00:01Z");
   make().check("usdc.hushd.testnet", 10_000_000n);
+});
+
+test("the owner's expiry and payee list refuse before anything is proved", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hushd-rules-"));
+  let now = new Date("2026-11-30T23:59:00Z");
+  const rules = parseRules({ HUSHD_LIMITS_EXPIRE: "2026-12-01T00:00:00Z", HUSHD_ALLOW_TO: "hushd1friend, bob.testnet" });
+  const l = new Limits(TESTNET, parseCaps(TESTNET, "USDC=10"), parseCaps(TESTNET, "USDC=15"), join(dir, "spent.json"), () => now, rules);
+  l.check("usdc.hushd.testnet", 1_000_000n, "bob.testnet");
+  l.check("usdc.hushd.testnet", 1_000_000n);
+  assert.throws(() => l.check("usdc.hushd.testnet", 1_000_000n, "mallory.testnet"), /not on this agent's list of payees/);
+  now = new Date("2026-12-01T00:00:00Z");
+  assert.throws(() => l.check("usdc.hushd.testnet", 1_000_000n, "bob.testnet"), /expired on 2026-12-01/);
+  assert.deepEqual(l.describe().payees, ["hushd1friend", "bob.testnet"]);
+  assert.throws(() => parseRules({ HUSHD_LIMITS_EXPIRE: "soon" }), /Bad HUSHD_LIMITS_EXPIRE/);
+});
+
+test("without a NEAR account the policy tool says so, and spending tools name both ways to add one", async () => {
+  const c = await connect(true);
+  const p = await c.callTool({ name: "hushd_policy", arguments: {} });
+  assert.equal(JSON.parse((p.content as { text: string }[])[0]!.text).near_account, null);
+  const s = await c.callTool({ name: "hushd_shield", arguments: { token: "USDC", amount: "1" } });
+  assert.match((s.content as { text: string }[])[0]!.text, /HUSHD_POLICY_WALLET_KEY/);
+  await c.close();
 });

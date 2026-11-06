@@ -1,16 +1,17 @@
 /**
  * An agent's Hushd context: its identity (from a 32-byte seed it alone holds), its
  * private wallet (notes in an encrypted file), the relayer, the desk API, spending
- * limits and, optionally, a NEAR account for moving tokens into the pool.
+ * limits and, optionally, a NEAR account for moving tokens into the pool: its own key,
+ * or an OutLayer policy wallet whose owner's rules are checked in a TEE before it signs.
  */
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DeskApi, identityFromSeed, loadPoseidon, PrivateWallet, RelayerClient, TESTNET, withOverrides, type ArtifactSource, type HushdNetwork, type Identity } from "@hushd/sdk";
+import { CUSTODY, CustodyWallet, custodyView, DeskApi, identityFromSeed, loadPoseidon, PrivateWallet, RelayerClient, TESTNET, withOverrides, type ArtifactSource, type CallSpec, type HushdNetwork, type Identity } from "@hushd/sdk";
 import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 import { Near } from "near-kit";
-import { DEFAULT_PER_DAY, DEFAULT_PER_PAYMENT, Limits, parseCaps } from "./limits.js";
+import { DEFAULT_PER_DAY, DEFAULT_PER_PAYMENT, Limits, parseCaps, parseRules } from "./limits.js";
 
 export interface Env {
   [k: string]: string | undefined;
@@ -44,6 +45,15 @@ export function initSeed(env: Env): { path: string; created: boolean } {
   return { path, created: true };
 }
 
+/** The agent's NEAR account: one call at a time, signed by its own key or by its policy wallet. */
+export interface NearAccount {
+  accountId: string;
+  kind: "key" | "policy-wallet";
+  call(c: CallSpec): Promise<string>;
+  /** Set for a policy wallet: the wallet and its key in OutLayer's spelling. */
+  wallet?: { client: CustodyWallet; pubkey: string };
+}
+
 export interface Agent {
   net: HushdNetwork;
   id: Identity;
@@ -52,8 +62,33 @@ export interface Agent {
   api: DeskApi;
   limits: Limits;
   artifacts: ArtifactSource;
-  /** Present when HUSHD_NEAR_ACCOUNT and HUSHD_NEAR_PRIVATE_KEY are set. */
-  near: { accountId: string; client: Near } | null;
+  /** HUSHD_POLICY_WALLET_KEY (an OutLayer wallet key), else HUSHD_NEAR_ACCOUNT with HUSHD_NEAR_PRIVATE_KEY. */
+  near: NearAccount | null;
+  /** Refuse spending while the owner has frozen the policy wallet (read on chain, cached 15 seconds). */
+  assertNotFrozen(): Promise<void>;
+}
+
+async function nearAccount(env: Env, net: HushdNetwork): Promise<NearAccount | null> {
+  if (env.HUSHD_POLICY_WALLET_KEY) {
+    const client = new CustodyWallet(env.HUSHD_POLICY_WALLET_KEY, env.HUSHD_CUSTODY_URL ?? CUSTODY[net.id].api);
+    const a = await client.address();
+    return { accountId: a.accountId, kind: "policy-wallet", wallet: { client, pubkey: a.publicKey }, call: async (c) => (await client.call(c)).txHash };
+  }
+  if (!env.HUSHD_NEAR_ACCOUNT || !env.HUSHD_NEAR_PRIVATE_KEY) return null;
+  const accountId = env.HUSHD_NEAR_ACCOUNT;
+  const near = new Near({ network: { networkId: net.id, rpcUrl: net.rpc[0]! }, privateKey: env.HUSHD_NEAR_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: accountId });
+  return {
+    accountId,
+    kind: "key",
+    call: async (c) => {
+      const out = (await near
+        .transaction(accountId)
+        .functionCall(c.receiver, c.method, c.args, { gas: `${Number(c.gas)}`, attachedDeposit: c.deposit })
+        .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string }; status?: { Failure?: unknown } };
+      if (out.status?.Failure) throw new Error(`${c.receiver}.${c.method} failed: ${JSON.stringify(out.status.Failure)}`);
+      return out.transaction?.hash ?? "";
+    },
+  };
 }
 
 export async function artifactsFor(env: Env): Promise<ArtifactSource> {
@@ -69,13 +104,13 @@ export async function createAgent(env: Env, seed: Uint8Array): Promise<Agent> {
   const tag = id.address.slice(-12);
   const wallet = new PrivateWallet(net, id, { artifacts, relayer, store: new EncryptedFileStore(join(homeDir(env), `${net.id}-${tag}.notes`), seed) });
   await wallet.restore();
-  const limits = new Limits(net, parseCaps(net, env.HUSHD_LIMIT_PER_PAYMENT ?? DEFAULT_PER_PAYMENT), parseCaps(net, env.HUSHD_LIMIT_PER_DAY ?? DEFAULT_PER_DAY), join(homeDir(env), `${net.id}-${tag}.spent.json`));
-  const near =
-    env.HUSHD_NEAR_ACCOUNT && env.HUSHD_NEAR_PRIVATE_KEY
-      ? {
-          accountId: env.HUSHD_NEAR_ACCOUNT,
-          client: new Near({ network: { networkId: net.id, rpcUrl: net.rpc[0]! }, privateKey: env.HUSHD_NEAR_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: env.HUSHD_NEAR_ACCOUNT }),
-        }
-      : null;
-  return { net, id, wallet, relayer, api: new DeskApi(net.api), limits, artifacts, near };
+  const limits = new Limits(net, parseCaps(net, env.HUSHD_LIMIT_PER_PAYMENT ?? DEFAULT_PER_PAYMENT), parseCaps(net, env.HUSHD_LIMIT_PER_DAY ?? DEFAULT_PER_DAY), join(homeDir(env), `${net.id}-${tag}.spent.json`), undefined, parseRules(env));
+  const near = await nearAccount(env, net);
+  let frozenAt = { at: 0, frozen: false };
+  const assertNotFrozen = async () => {
+    if (!near?.wallet) return;
+    if (Date.now() - frozenAt.at > 15_000) frozenAt = { at: Date.now(), frozen: !!(await custodyView.policy(net, near.wallet.pubkey))?.frozen };
+    if (frozenAt.frozen) throw new Error("The owner froze this agent's policy wallet, so it may not spend until the owner unfreezes it");
+  };
+  return { net, id, wallet, relayer, api: new DeskApi(net.api), limits, artifacts, near, assertNotFrozen };
 }
