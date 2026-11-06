@@ -6,13 +6,14 @@ import { Segmented } from "@/components/app/desk";
 import { AmountCard, Field } from "@/components/app/forms";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
+import { IS_TESTNET } from "@/lib/hushd/config";
 import { fmt, symbol, TOKENS } from "@/lib/hushd/format";
 import { amount as readable, ApiError, duration, intentsQuote, intentsTokens, percent, usd, type Direction, type IntentsChain, type IntentsQuote, type IntentsToken, type IntentsTokens } from "@/lib/hushd/intents";
 
 /**
  * A deposit from another chain, or a cash out to one, through NEAR Intents 1Click, shown
- * as a live dry quote from mainnet. Hushd's pool runs on testnet with test tokens, so
- * nothing here makes a deposit address or sends anything.
+ * as a live dry quote from mainnet. Nothing here makes a deposit address or sends anything:
+ * on testnet Hushd's pool holds test tokens, and on mainnet the route is not live yet.
  */
 
 const DEFAULT_CHAIN = "base";
@@ -364,10 +365,12 @@ export function OtherChainPreview({ direction, balances }: { direction: Directio
 
       <div className="grid gap-2 text-[12.5px] leading-relaxed text-mute">
         <p>
-          Hushd&apos;s pool runs on NEAR testnet with test tokens, so this stays a preview: no deposit address is made and nothing is sent.{" "}
+          {IS_TESTNET
+            ? "Hushd's pool runs on NEAR testnet with test tokens, so this stays a preview: no deposit address is made and nothing is sent."
+            : "This is a preview for now: no deposit address is made and nothing is sent."}{" "}
           {deposit
-            ? `On mainnet, 1Click would give you a deposit address on ${chain.name} and pay the ${hushd.symbol} to your NEAR account, ready to add privately.`
-            : `On mainnet, the cash out would pay 1Click's deposit address on NEAR, and 1Click would send the ${asset.symbol} to your ${chain.name} address.`}
+            ? `${IS_TESTNET ? "On mainnet" : "Once it is live"}, 1Click would give you a deposit address on ${chain.name} and pay the ${hushd.symbol} to your NEAR account, ready to add privately.`
+            : `${IS_TESTNET ? "On mainnet" : "Once it is live"}, the cash out would pay 1Click's deposit address on NEAR, and 1Click would send the ${asset.symbol} to your ${chain.name} address.`}
         </p>
         <p>
           {deposit ? "The NEAR account" : "The NEAR refund account"} in this preview is the all-zero implicit account, which no one holds a key for.

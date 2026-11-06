@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
-import { NETWORK } from "@/lib/hushd/config";
+import { IS_TESTNET, NETWORK } from "@/lib/hushd/config";
 import { icons } from "./icons";
 import { WalletMenu } from "./WalletMenu";
 
@@ -110,7 +110,7 @@ function NetworkBadge() {
         <span aria-hidden className="livedot h-1.5 w-1.5 rounded-full bg-accent" />
         NEAR {NETWORK.id}
       </span>
-      <span className="text-faint">test tokens</span>
+      <span className="text-faint">{IS_TESTNET ? "test tokens" : "real tokens"}</span>
     </div>
   );
 }
@@ -198,7 +198,7 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
         </main>
         <footer className="mx-auto w-full max-w-[1120px] px-4 pb-8 sm:px-8">
           <div className="flex flex-col gap-3 border-t border-line pt-5 text-[12.5px] text-mute sm:flex-row sm:items-center sm:justify-between">
-            <p>Hushd on NEAR {NETWORK.id}. Test tokens only. Not investment, legal or tax advice.</p>
+            <p>Hushd on NEAR {NETWORK.id}. {IS_TESTNET ? "Test tokens only." : "Real tokens."} Not investment, legal or tax advice.</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <Link href="/verify" className="hover:text-foreground">Verify a proof</Link>
               <Link href="/transparency" className="hover:text-foreground">Transparency</Link>

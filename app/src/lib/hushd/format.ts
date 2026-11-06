@@ -1,6 +1,6 @@
 import { formatUnits, parseUnits } from "@hushd/protocol";
-import { tokenInfo } from "@hushd/sdk";
-import { NETWORK } from "./config";
+import { tokenInfo, type TokenInfo } from "@hushd/sdk";
+import { IS_TESTNET, NETWORK } from "./config";
 
 export const TOKENS = NETWORK.tokens;
 
@@ -24,4 +24,18 @@ export function parseAmount(token: string, input: string): bigint | null {
   } catch {
     return null;
   }
+}
+
+/** The real tokens Hushd lists on mainnet, in words. */
+const MAINNET_WORDS: Record<string, { short: string; long: string }> = {
+  USDC: { short: "Native USDC", long: "Native USDC, issued by Circle" },
+  wNEAR: { short: "Wrapped NEAR", long: "Wrapped NEAR, NEAR as a NEP-141 token" },
+  BTC: { short: "nBTC", long: "nBTC, Bitcoin bridged to NEAR by the Omni Bridge" },
+};
+
+/** What a listed token is: a test token with a faucet on testnet, the real token on mainnet. */
+export function tokenWords(t: TokenInfo): { short: string; long: string } {
+  if (IS_TESTNET) return { short: `Test ${t.symbol}`, long: `Test ${t.symbol}, ${t.decimals} decimals, with a faucet` };
+  const w = MAINNET_WORDS[t.symbol];
+  return { short: w?.short ?? t.symbol, long: `${w?.long ?? t.symbol}, ${t.decimals} decimals` };
 }

@@ -37,7 +37,7 @@ export function SignInPanel({ title = "Open your private balance" }: { title?: s
       <h2 className="t-title mt-2">{title}</h2>
       {s.status === "connected" ? (
         <>
-          <p className="mt-2 max-w-[56ch] text-[14.5px] leading-relaxed text-mute">
+          <p className="mt-2 max-w-[56ch] text-[14.5px] leading-relaxed text-mute [overflow-wrap:anywhere]">
             {s.kind === "passkey"
               ? "Use your passkey to open the private balance on this device."
               : `Signed in as ${s.accountId}. Sign one message to open your private balance. It never leaves this device, moves no funds, and the same wallet key opens the same balance anywhere.`}

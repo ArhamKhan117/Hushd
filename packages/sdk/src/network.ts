@@ -1,6 +1,7 @@
 /**
- * Where Hushd lives on each network. Testnet holds every contract; mainnet is used
- * only for NEAR Intents (no Hushd contract is deployed there).
+ * Where Hushd lives on each network. Testnet runs every contract today. MAINNET names
+ * where they go (`*.hushd.near`) and the real tokens they take; until they are deployed
+ * there, mainnet is used only for NEAR Intents (`deployed: false`).
  */
 
 export interface TokenInfo {
@@ -13,6 +14,8 @@ export interface TokenInfo {
 
 export interface HushdNetwork {
   id: "testnet" | "mainnet";
+  /** Whether the Hushd contracts below exist on this network yet. */
+  deployed: boolean;
   /** Free RPC endpoints; calls rotate across them and fail over (`rpcOrder`). */
   rpc: string[];
   /**
@@ -36,6 +39,7 @@ export interface HushdNetwork {
 
 export const TESTNET: HushdNetwork = {
   id: "testnet",
+  deployed: true,
   rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org"],
   rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
   pool: "pool.hushd.testnet",
@@ -54,15 +58,23 @@ export const TESTNET: HushdNetwork = {
   outlayer: "outlayer.testnet",
 };
 
+/** Native USDC on NEAR (Circle). */
+export const MAINNET_USDC = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+
 export const MAINNET: HushdNetwork = {
   id: "mainnet",
+  deployed: false,
   rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
   rpcSend: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
-  pool: null,
-  desk: null,
-  board: null,
-  tokens: [],
-  bondToken: null,
+  pool: "pool.hushd.near",
+  desk: "desk.hushd.near",
+  board: "board.hushd.near",
+  tokens: [
+    { id: MAINNET_USDC, symbol: "USDC", decimals: 6 },
+    { id: "wrap.near", symbol: "wNEAR", decimals: 24, hedgeCoin: "NEAR" },
+    { id: "nbtc.bridge.near", symbol: "BTC", decimals: 8, hedgeCoin: "BTC" },
+  ],
+  bondToken: MAINNET_USDC,
   api: "https://api.hushd.net",
   explorer: "https://nearblocks.io",
   intentsExplorer: "https://explorer.near-intents.org",

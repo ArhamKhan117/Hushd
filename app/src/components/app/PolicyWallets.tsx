@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The owner's side of agent policy wallets (OutLayer custody on NEAR testnet): Hushd's own
+ * The owner's side of agent policy wallets (OutLayer custody on NEAR): Hushd's own
  * agents' wallets, read from chain; a signed-in owner's wallets, with freeze and unfreeze;
  * and a new wallet for the owner's agent, with its policy stored from the owner's account.
  * The agent's key is held in memory only and goes nowhere but OutLayer.
@@ -790,8 +790,8 @@ function RuleList({ title, sub, items }: { title: string; sub: string; items: st
   );
 }
 
-/** The Policy wallets part of the Agents page. */
-export function PolicyWallets({ owner, labels }: { owner: string; labels: WalletLabel[] }) {
+/** The Policy wallets part of the Agents page. `owner` owns Hushd's own agents' wallets, or is null where Hushd runs none. */
+export function PolicyWallets({ owner, labels }: { owner: string | null; labels: WalletLabel[] }) {
   const s = useHushd();
   return (
     <>
@@ -802,7 +802,7 @@ export function PolicyWallets({ owner, labels }: { owner: string; labels: Wallet
         <p className="text-[14.5px] leading-relaxed text-soft">
           An agent that needs its own NEAR account can have one without ever holding its key. The key is made and kept in OutLayer&apos;s TEE; the agent holds only an API key, and the TEE checks the owner&apos;s policy before every signature. The owner stores the policy on chain and is the only account that can freeze it.
         </p>
-        <HushdWallets owner={owner} labels={labels} />
+        {owner && <HushdWallets owner={owner} labels={labels} />}
       </section>
 
       <section className="grid gap-3" aria-labelledby="who-enforces">

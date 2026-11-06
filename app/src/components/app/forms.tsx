@@ -65,7 +65,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 
 export function TxLine({ hash, children }: { hash: string; children: ReactNode }) {
   return (
-    <p className="text-[13.5px] text-soft">
+    <p className="text-[13.5px] text-soft [overflow-wrap:anywhere]">
       {children}{" "}
       {hash && (
         <a href={txUrl(NETWORK, hash)} target="_blank" rel="noreferrer" className="text-foreground underline decoration-line-strong underline-offset-4 hover:decoration-foreground">

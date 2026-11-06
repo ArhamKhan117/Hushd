@@ -13,14 +13,32 @@ const origin = (u) => {
   }
 };
 
+/**
+ * Per network: the free RPC endpoints (the same lists as `TESTNET.rpc` and `MAINNET.rpc` in
+ * packages/sdk/src/network.ts; change them together) and OutLayer's custody API
+ * (`CUSTODY` in packages/sdk/src/custody.ts).
+ */
+const NETWORKS = {
+  testnet: {
+    rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org"],
+    outlayer: "https://testnet-api.outlayer.ai",
+  },
+  mainnet: {
+    rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
+    outlayer: "https://api.outlayer.ai",
+  },
+};
+const NET = NETWORKS[process.env.NEXT_PUBLIC_HUSHD_NETWORK === "mainnet" ? "mainnet" : "testnet"];
+const RPC_OVERRIDE = (process.env.NEXT_PUBLIC_NEAR_RPC_URL || "").split(",").map((u) => u.trim()).filter(Boolean);
+
 /** Hosts the app reads from the browser: analytics, the Hushd API, NEAR RPC, the NEAR Connect wallet list, OutLayer custody. */
 const SERVICES = [
   "https://va.vercel-scripts.com",
   origin(process.env.NEXT_PUBLIC_HUSHD_API_URL || "https://api.hushd.net"),
-  ...(process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com,https://rpc.testnet.fastnear.com,https://near-testnet.drpc.org").split(",").map(origin),
+  ...(RPC_OVERRIDE.length ? RPC_OVERRIDE : NET.rpc).map(origin),
   "https://raw.githubusercontent.com",
   // OutLayer custody: an owner's browser registers an agent's policy wallet and sets its policy
-  "https://testnet-api.outlayer.ai",
+  NET.outlayer,
 ].filter((x, i, all) => x && all.indexOf(x) === i);
 
 export const CSP_CONNECT_SOURCES = ["'self'", ...SERVICES];

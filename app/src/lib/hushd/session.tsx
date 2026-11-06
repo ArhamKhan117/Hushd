@@ -22,7 +22,7 @@ import {
   type WalletState,
 } from "@hushd/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CIRCUITS_BASE, NETWORK } from "./config";
+import { CIRCUITS_BASE, IS_TESTNET, NETWORK } from "./config";
 import { b64ToBytes, createPasskey, nearKeyFromSeed, SEED_NONCE, SEED_RECIPIENT, storeKey, unlockPasskey } from "./keys";
 
 export interface ChainCall {
@@ -105,7 +105,8 @@ class EncryptedLocalStore implements NoteStore {
 let connectorPromise: Promise<import("@hot-labs/near-connect").NearConnector> | undefined;
 function connector() {
   connectorPromise ??= import("@hot-labs/near-connect").then(
-    ({ NearConnector }) => new NearConnector({ network: NETWORK.id, features: { signMessage: true, testnet: true } }),
+    // list only the wallets that sign on this network
+    ({ NearConnector }) => new NearConnector({ network: NETWORK.id, features: { signMessage: true, [NETWORK.id]: true } }),
   );
   return connectorPromise;
 }
@@ -256,8 +257,9 @@ export function HushdProvider({ children }: { children: ReactNode }) {
     const seed = await createPasskey();
     const s = await passkeySigner(seed);
     localStorage.setItem(PASSKEY_FLAG, s.accountId);
-    // The relayer opens the implicit account with a little testnet NEAR for gas.
-    await relayer.activate(s.accountId).catch(() => undefined);
+    // On testnet the relayer opens the implicit account with a little NEAR for gas. On
+    // mainnet it does not: the account waits for NEAR sent to it (FundGas on the Add page).
+    if (IS_TESTNET) await relayer.activate(s.accountId).catch(() => undefined);
     await open(seed, s);
   }), [open, passkeySigner, relayer, run]);
 
