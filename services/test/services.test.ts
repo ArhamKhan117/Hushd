@@ -8,7 +8,7 @@ import { Db } from "../src/db.js";
 import { eventsInBlock } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
 import { priceAsk, spreadBps } from "../src/makers.js";
-import { wirePrice, wireSize } from "../src/market.js";
+import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
 
 describe("indexer", () => {
@@ -53,6 +53,11 @@ describe("makers", () => {
     // 1,000 USDC for BTC at 60,000 with 25 bps: 0.01662499... BTC, floored to 8 decimals
     const give = priceAsk({ sellAmount: 1_000_000_000n, sellDecimals: 6, sellUsd: 1, buyDecimals: 8, buyUsd: 60_000, spreadBps: 25 });
     assert.equal(give, 1_662_500n);
+  });
+  test("a quote never beats the NEAR Intents price less the spread", () => {
+    assert.equal(capByMarket(1_700_000n, 1_662_500n, 25), 1_658_343n);
+    assert.equal(capByMarket(1_600_000n, 1_662_500n, 25), 1_600_000n);
+    assert.equal(capByMarket(1_600_000n, null, 25), 1_600_000n);
   });
   test("Hyperliquid wire numbers", () => {
     assert.equal(wireSize(0.016625, 5), "0.01662");

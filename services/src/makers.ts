@@ -42,7 +42,7 @@ import { EncryptedFileStore } from "@hushd/sdk/node";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
-import { hourVolBps, mids, testnetPerps, wirePrice, wireSize } from "./market.js";
+import { capByMarket, hourVolBps, intentsQuote, mids, testnetPerps, wirePrice, wireSize } from "./market.js";
 
 export type Style = "fixed" | "volatility" | "inventory";
 
@@ -126,7 +126,9 @@ export class Maker {
     const targetGive = (notionalUsd / buyUsd) * 10 ** buy.decimals;
     const inventoryRatio = Number(balances.get(buy.id) ?? 0n) / Math.max(1, targetGive * 4);
     const spread = spreadBps(this.style, { volBps: this.style === "volatility" ? await hourVolBps(risky).catch(() => 50) : 0, inventoryRatio });
-    const give = priceAsk({ sellAmount, sellDecimals: sell.decimals, sellUsd, buyDecimals: buy.decimals, buyUsd, spreadBps: spread });
+    const fromMids = priceAsk({ sellAmount, sellDecimals: sell.decimals, sellUsd, buyDecimals: buy.decimals, buyUsd, spreadBps: spread });
+    // NEAR Intents as a second opinion: never quote better than the open market less the spread
+    const give = capByMarket(fromMids, await intentsQuote(sell.symbol, buy.symbol, sellAmount).catch(() => null), spread);
     if (give === 0n || (balances.get(buy.id) ?? 0n) < give) return null;
 
     const now = Date.now();
