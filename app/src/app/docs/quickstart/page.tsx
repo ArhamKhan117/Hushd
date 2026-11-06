@@ -35,9 +35,9 @@ export default function QuickstartPage() {
       </p>
       <ul>
         <li>
-          <strong>Connect a NEAR wallet.</strong> Then sign one fixed message (NEP-413). The signature is the seed of
-          your private balance: it never leaves the device, moves no funds, and the same wallet key opens the same
-          balance on any device.
+          <strong>Connect a NEAR wallet.</strong> Then sign one fixed message (NEP-413). The seed of your private
+          balance is derived from a hash of that signature: the signature never leaves the device, moves no funds, and
+          the same wallet key opens the same balance on any device.
         </li>
         <li>
           <strong>Create a passkey.</strong> The passkey&apos;s PRF output is the seed. It also derives a NEAR implicit
@@ -49,8 +49,8 @@ export default function QuickstartPage() {
       <h2 id="2-get-test-tokens">2. Get test tokens</h2>
       <p>
         Go to <AppLink href="/app/balance/add">Add privately</AppLink>, pick USDC, wNEAR or BTC, and press{" "}
-        <strong>Get test</strong> under the amount. The faucet gives a fixed amount per account, then waits out a
-        cooldown. With a passkey the relayer asks the faucet for you, since your new account has no gas yet.
+        <strong>Get test</strong> under the amount. The faucet gives a fixed amount to each account once an hour. With
+        a passkey the relayer asks the faucet for you, since your new account has no gas yet.
       </p>
 
       <h2 id="3-add-privately">3. Add privately</h2>
@@ -66,13 +66,13 @@ export default function QuickstartPage() {
 
       <h2 id="4-ask-the-desk">4. Ask the desk</h2>
       <p>
-        Back on the <AppLink href="/app">desk</AppLink>, either describe the deal in your own words (for example, that
-        you want to sell some USDC for BTC and stay neutral) and let the model draft it, or fill the form:
+        Back on the <AppLink href="/app">desk</AppLink>, either describe the deal in your own words (for example,
+        &ldquo;Sell 500 USDC for BTC at the best price&rdquo;) and let the model draft it, or fill the form:
       </p>
       <ul>
         <li>
-          <strong>Package</strong>: spot, spot + hedge, or cash and carry. See{" "}
-          <Link href="/docs/packages">packages</Link>.
+          <strong>Package</strong>: spot, spot + hedge, or cash and carry. A hedged package needs a maker bond of at
+          least 1,000 USDC, so it makes sense from about 10,000 USDC. See <Link href="/docs/packages">packages</Link>.
         </li>
         <li>
           <strong>You sell</strong> and <strong>you buy</strong>: the tokens and the amount you sell, from your private

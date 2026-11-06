@@ -31,7 +31,7 @@ const TOOLS: [string, string, string][] = [
 ];
 
 const ENV: [string, string][] = [
-  ["HUSHD_SEED", "The agent's seed, 64 hex. Without it, the file `hushd-mcp init` wrote"],
+  ["HUSHD_SEED", "The agent's seed, 64 hex. Without it, the file `pnpm mcp init` wrote"],
   ["HUSHD_HOME", "Where the seed, notes and spending ledger live (default ~/.hushd)"],
   ["HUSHD_LIMIT_PER_PAYMENT", "Caps per payment, per token, e.g. USDC=100,wNEAR=50"],
   ["HUSHD_LIMIT_PER_DAY", "Caps per UTC day, per token, e.g. USDC=500,wNEAR=250"],
@@ -97,7 +97,8 @@ claude mcp add hushd \\
 }`}</code>
       </pre>
       <p>
-        The server is the <code>@hushd/mcp</code> package (<code>packages/mcp</code>). With no seed it starts anyway
+        The server is the <code>@hushd/mcp</code> package in the repo (<code>packages/mcp</code>), which is not
+        published on npm, so it runs from a checkout of the repo. With no seed it starts anyway
         and serves the read tools only. To fund the agent, either set <code>HUSHD_NEAR_ACCOUNT</code> and{" "}
         <code>HUSHD_NEAR_PRIVATE_KEY</code> and use <code>hushd_faucet</code> then <code>hushd_shield</code>, or pay its{" "}
         <code>hushd1</code> address from your own private balance.

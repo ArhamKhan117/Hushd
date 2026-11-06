@@ -82,7 +82,8 @@ export default function MakersDocsPage() {
       <p>
         They quote only what they can fill from their own private balance, and each quote holds for five minutes. For
         a hedged package they add the hedge: a short of the perp for the size they give, as an immediate-or-cancel
-        order with a limit of 99% of the mid, a ten-minute deadline, and a bond of a tenth of the trade&apos;s value.
+        order with a limit of 99% of the mid, a ten-minute deadline, and a bond of a tenth of the trade&apos;s value,
+        rounded up to one of a few fixed steps and never less than the desk&apos;s <code>min_bond</code> (1,000 USDC).
       </p>
 
       <h2 id="quoting">Quoting</h2>
@@ -97,9 +98,24 @@ export default function MakersDocsPage() {
       />
       <p>
         The ask holds the package kind, the token and amount being sold, the token wanted and the hedge coin. It never
-        holds the trader&apos;s limit or address. What the quote key signs is{" "}
-        <code>&quot;hushd.quote.v1&quot; ‖ rfq id ‖ terms hash ‖ bond ‖ expiry</code>, and the desk checks that
-        signature against the key the maker registered before it records a deal.
+        holds the trader&apos;s limit or address. What the quote key (ed25519) signs is its consent to one exact deal on
+        one desk:
+      </p>
+      <pre>
+        <code className="language-text">{`"hushd.quote.v2"
+‖ desk account id   (u32 LE length ‖ utf8)
+‖ rfq id            (u64 LE)
+‖ terms hash        (32 bytes)
+‖ bond              (u128 LE)
+‖ expires at, ms    (u64 LE)
+‖ class             (u8: 0 atomic_pool, 1 bonded_hedge, 2 atomic_intents)
+‖ hedge hash        (32 bytes: sha256 of the borsh HedgeSpec, or zeros)
+‖ maker account id  (u32 LE length ‖ utf8)`}</code>
+      </pre>
+      <p>
+        The desk rebuilds these bytes from the match itself and checks the signature against the key the maker
+        registered before it records a deal, so a matcher cannot attach a class, a hedge or a maker the maker did not
+        sign. In the protocol package the same bytes are <code>consentBytes</code>.
       </p>
 
       <h2 id="settling-the-leg">Settling the leg</h2>
@@ -133,30 +149,51 @@ export default function MakersDocsPage() {
       <h2 id="run-one">Run one</h2>
       <ol>
         <li>Create a NEAR testnet account for the maker and give it a little testnet NEAR.</li>
-        <li>Make a 32-byte seed (its private wallet) and an ed25519 quote key, and keep both secret.</li>
+        <li>
+          Make a 32-byte seed (its private wallet) and an ed25519 quote key (a 32-byte secret), both as hex, and keep
+          both secret.
+        </li>
+        <li>
+          For hedged packages, give it a Hyperliquid testnet account. Its key approves each hedged deal&apos;s own
+          address to trade on the maker&apos;s margin.
+        </li>
         <li>
           Start the makers service with them. On start, each maker registers itself on the desk with{" "}
           <code>register_maker</code> (name, X25519 key, quote URL, style, quote key), or updates its keys.
         </li>
         <li>Give it inventory: add test tokens to its private balance, or pay its hushd1… address.</li>
-        <li>Post a bond if it should quote hedged packages.</li>
+        <li>
+          Post a bond if it should quote hedged packages: at least the desk&apos;s <code>min_bond</code> (1,000 USDC).
+        </li>
       </ol>
+      <p>
+        In a checkout of the repo, put the maker&apos;s settings in the repo&apos;s <code>.env</code>. The services read
+        that file themselves, and every variable is listed in <code>.env.example</code>.
+      </p>
       <pre>
-        <code className="language-bash">{`# from a checkout of the repo
-export MAKER_A_ACCOUNT=your-maker.testnet
-export MAKER_A_PRIVATE_KEY=ed25519:…   # the account's key
-export MAKER_A_SEED=…                  # 64 hex: the maker's private wallet
-export MAKER_A_QUOTE_KEY=…             # its ed25519 quote key
-export RELAYER_URL=https://api.hushd.net
-export API_URL=https://api.hushd.net
-
-pnpm --filter @hushd/services start makers`}</code>
+        <code className="language-text">{`MAKER_A_ACCOUNT=your-maker.testnet
+MAKER_A_PRIVATE_KEY=ed25519:…   # the account's key
+MAKER_A_SEED=…                  # 32 bytes hex: the maker's private wallet
+MAKER_A_QUOTE_KEY=…             # its ed25519 quote key: the secret, 32 bytes hex
+MAKER_A_HL_KEY=0x…              # optional: its Hyperliquid testnet key, for hedged deals
+MAKERS_PUBLIC_URL=https://makers.example.com
+RELAYER_URL=https://api.hushd.net
+API_URL=https://api.hushd.net`}</code>
       </pre>
       <p>
-        The service runs up to three makers (<code>MAKER_A</code>, <code>MAKER_B</code>, <code>MAKER_C</code>) with the
-        three styles above, and keeps their notes in an encrypted file. Every variable is listed in{" "}
-        <code>.env.example</code>, and <code>deploy/docker-compose.yml</code> runs the same service from a{" "}
-        <code>.env</code> file.
+        <code>MAKERS_PUBLIC_URL</code> is where others reach this service: each maker registers{" "}
+        <code>&lt;MAKERS_PUBLIC_URL&gt;/makers/&lt;account&gt;/quote</code> as its quote URL. The service runs up to
+        three makers (<code>MAKER_A</code>, <code>MAKER_B</code>, <code>MAKER_C</code>) with the three styles above, and
+        keeps their notes in an encrypted file. Then start it:
+      </p>
+      <pre>
+        <code className="language-bash">{`pnpm stack                                   # the easy way: every service, behind one gateway
+pnpm --filter @hushd/services start makers   # or the makers alone`}</code>
+      </pre>
+      <p>
+        <code>pnpm stack</code> runs every service whose keys are in <code>.env</code> behind one gateway on{" "}
+        <code>localhost:8080</code>, routed like the production Caddyfile. <code>deploy/docker-compose.yml</code> runs
+        the same services from the same <code>.env</code> file.
       </p>
       <Callout title="A maker of your own">
         Pricing, inventory and risk are yours to change. Keep the protocol: open only asks sealed to you, sign the

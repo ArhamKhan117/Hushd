@@ -52,6 +52,7 @@ const GROUPS: { id: string; title: string; rows: [string, string][] }[] = [
       ["packageRequest(id, net, draft)", "The sealed request (with the limit) and the ask makers see"],
       ["openRfq({ net, api, relayer, request, ask, windowMs })", "Seal and commit the request, and send each maker its ask"],
       ["awaitMatch(api, id, rfqId)", "Wait for the enclave and open the terms sealed to you"],
+      ["checkMatchedTerms(terms, draft)", "Refuse a match below your limit, in another token or another package"],
       ["settleAsTrader, settleAsMaker", "Each side's settlement, from planning to the settled deal"],
       ["deskView", "config, enclave, makers, deal, deals, stats"],
       ["new DeskApi(url), new RelayerClient(url)", "The API's request intake and deal rooms, and the relayer"],
@@ -124,8 +125,9 @@ export default function SdkDocsPage() {
       <h2 id="a-trade-end-to-end">A trade, end to end</h2>
       <pre>
         <code className="language-ts">{`import {
-  awaitMatch, DeskApi, identityFromSeed, loadPoseidon, openRfq,
+  awaitMatch, checkMatchedTerms, DeskApi, identityFromSeed, loadPoseidon, openRfq,
   packageRequest, PrivateWallet, RelayerClient, settleAsTrader, TESTNET,
+  type PackageDraft,
 } from "@hushd/sdk";
 import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 
@@ -142,18 +144,25 @@ await wallet.restore();
 await wallet.sync();
 
 // Sell 100 USDC for wNEAR, taking the best quote.
-const { request, ask } = packageRequest(id, TESTNET, {
+const draft: PackageDraft = {
   kind: "spot",
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
-});
+};
+const { request, ask } = packageRequest(id, TESTNET, draft);
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
 const match = await awaitMatch(api, id, rfqId);
+checkMatchedTerms(match.terms, draft); // throws unless the match is what you asked for
 await settleAsTrader({
   net: TESTNET, api, wallet,
   dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address,
 });`}</code>
       </pre>
+      <p>
+        The enclave picks the best quote, but you check the result before your leg is proved:{" "}
+        <code>checkMatchedTerms</code> refuses a match that pays less than your <code>minAmount</code>, in another
+        token, or as another package. A deal you do not settle simply expires.
+      </p>
       <p>
         For a hedged package, keep the <code>refundBlinding</code> that <code>packageRequest</code> returns: it
         re-derives the key that closes the hedge, and the note a slashed bond pays you. The desk page in the app does

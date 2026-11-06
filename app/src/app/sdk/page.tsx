@@ -115,25 +115,27 @@ const SURFACE = [
 ];
 
 const TRADE_SNIPPET = `import {
-  awaitMatch, DeskApi, openRfq, packageRequest,
-  RelayerClient, settleAsTrader, TESTNET,
+  awaitMatch, checkMatchedTerms, DeskApi, openRfq, packageRequest,
+  RelayerClient, settleAsTrader, TESTNET, type PackageDraft,
 } from "@hushd/sdk";
 
 const api = new DeskApi(TESTNET.api);
 const relayer = new RelayerClient(TESTNET.api);
 
 // 1. The request, with your limit: sealed to the enclave only.
-const { request, ask } = packageRequest(identity, TESTNET, {
+const draft: PackageDraft = {
   kind: "spot",
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
-});
+};
+const { request, ask } = packageRequest(identity, TESTNET, draft);
 
 // 2. Commit its hash on chain; each maker gets the ask, sealed to it.
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
 
-// 3. The enclave's match, sealed to you.
+// 3. The enclave's match, sealed to you. Check it is what you asked for.
 const match = await awaitMatch(api, identity, rfqId);
+checkMatchedTerms(match.terms, draft);
 
 // 4. Prove your leg; both legs settle in one pool call.
 await settleAsTrader({
@@ -331,17 +333,18 @@ export default function SdkPage() {
             <div className="relative">
               <p className="t-label">Quickstart</p>
               <h2 id="quickstart-title" className="t-display-l mt-4 max-w-[14ch]">
-                Four calls to a private trade
+                Five calls to a private trade
               </h2>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-mute">
-                Build the request, open it on the desk, wait for the enclave, settle. Proofs are made where the code
-                runs, and the SDK never holds a NEAR key.
+                Build the request, open it on the desk, wait for the enclave, check the terms, settle. Proofs are made
+                where the code runs, and the SDK never holds a NEAR key.
               </p>
               <ul className="mt-10 divide-y divide-line border-y border-line text-[15px]">
                 {[
                   ["Build the sealed request", "packageRequest"],
                   ["Commit it, send the asks", "openRfq"],
                   ["Wait for the match", "awaitMatch"],
+                  ["Check the terms", "checkMatchedTerms"],
                   ["Settle your leg", "settleAsTrader"],
                 ].map(([k, v]) => (
                   <li key={v} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-4">

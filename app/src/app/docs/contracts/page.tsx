@@ -39,7 +39,7 @@ export default function ContractsPage() {
       lede="Every Hushd contract runs on NEAR testnet, written in Rust with near-sdk. Here is each account, what it does, and how to check it."
       glance={[
         { label: "Network", value: "NEAR testnet" },
-        { label: "Events", value: "NEP-297, standard hushd" },
+        { label: "Events", value: "NEP-297: hushd, nep141" },
         { label: "Explorer", value: "NearBlocks" },
       ]}
     >
@@ -146,8 +146,16 @@ export default function ContractsPage() {
           <code>expire</code> closes a deal nobody settled.
         </li>
         <li>
-          <strong>Hedges</strong>: <code>sign_hedge_order</code> and <code>close_hedge</code> through Chain Signatures,{" "}
-          <code>record_hedge</code> from the keeper, <code>slash_overdue</code> for anyone after the deadline.
+          <strong>Hedges</strong>: <code>sign_hedge_order</code> (the keeper or the deal&apos;s maker, up to three
+          opening orders per deal) and <code>close_hedge</code> through Chain Signatures, <code>record_hedge</code> from
+          the keeper, <code>slash_overdue</code> for anyone after the deadline, and <code>retry_slash_payout</code> for
+          anyone when the pool refused a slashed bond.
+        </li>
+        <li>
+          <strong>Rules</strong>: the pool, the bond token and the MPC are fixed at init. The other settings (the owner,
+          OutLayer, the matcher project and its secrets owner, the keeper, the OutLayer fee and <code>min_bond</code>)
+          change only through <code>propose_config</code> and then <code>apply_config</code> after a one-day timelock,
+          so makers can withdraw first. <code>min_bond</code> is 1,000 USDC.
         </li>
       </ul>
       <p>
@@ -164,14 +172,17 @@ export default function ContractsPage() {
 
       <h2 id="test-tokens">Test tokens</h2>
       <p>
-        Standard NEP-141 tokens with NEP-145 storage and NEP-148 metadata, plus a faucet: <code>faucet</code> for
-        yourself, or <code>faucet_for</code> another account, a fixed amount per account per cooldown. The faucet
-        registers the receiver&apos;s storage itself. These tokens exist only on testnet and have no value.
+        Standard NEP-141 tokens with NEP-145 storage and NEP-148 metadata, plus a faucet that pays a fixed amount to
+        each account once an hour and registers the receiver&apos;s storage itself. Anyone can call{" "}
+        <code>faucet</code> for themselves. <code>faucet_for</code>, which pays another account, is only for the token
+        owner and the operators it names with <code>set_operator</code>; the relayer is one, so it can fund a new
+        passkey account. These tokens exist only on testnet and have no value.
       </p>
 
       <h2 id="events">Events</h2>
       <p>
-        Every contract logs NEP-297 events with standard <code>hushd</code>, version <code>1.0.0</code>. The indexer
+        The pool, the desk and the board log NEP-297 events with standard <code>hushd</code>, version{" "}
+        <code>1.0.0</code>. The test tokens log the standard NEP-141 events (standard <code>nep141</code>). The indexer
         reads them from FastNEAR&apos;s neardata block stream.
       </p>
       <table>
@@ -194,13 +205,20 @@ export default function ContractsPage() {
             <td>
               <code>maker_registered</code>, <code>bond_posted</code>, <code>bond_withdrawn</code>,{" "}
               <code>rfq_opened</code>, <code>deal_matched</code>, <code>spot_settled</code>, <code>hedge_signed</code>,{" "}
-              <code>bond_slashed</code>, <code>receipt</code>, <code>enclave_key</code>
+              <code>hedge_retry</code>, <code>bond_slashed</code>, <code>slash_refused</code>,{" "}
+              <code>slash_retried</code>, <code>receipt</code>, <code>enclave_key</code>, <code>config_change</code>
             </td>
           </tr>
           <tr>
             <td>Board</td>
             <td>
               <code>post</code>, <code>max_post_bytes</code>
+            </td>
+          </tr>
+          <tr>
+            <td>Test tokens</td>
+            <td>
+              <code>ft_mint</code>, <code>ft_transfer</code>, <code>ft_burn</code> (standard <code>nep141</code>)
             </td>
           </tr>
         </tbody>

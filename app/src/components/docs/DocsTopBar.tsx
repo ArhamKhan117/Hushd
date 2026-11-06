@@ -123,8 +123,9 @@ function MobileSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Docs menu"
-        className={`absolute inset-y-0 left-0 flex w-[min(340px,88vw)] flex-col bg-background shadow-pop transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-          open ? "translate-x-0" : "-translate-x-full"
+        className={`absolute inset-y-0 left-0 flex w-[min(340px,88vw)] flex-col bg-background duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          // closed: no shadow, and hidden (also from assistive tech) once it has slid away; open: shown at once
+          open ? "visible translate-x-0 shadow-pop transition-[translate,box-shadow]" : "invisible -translate-x-full transition-[translate,box-shadow,visibility]"
         }`}
       >
         <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line pl-4 pr-2">

@@ -59,7 +59,8 @@ export default function PackagesPage() {
         You pick the package on the <AppLink href="/app">desk</AppLink>, or the intake picks it from your words:
         &ldquo;hedge it&rdquo; or &ldquo;keep me neutral&rdquo; means spot + hedge, and buying an asset with a
         stablecoin while shorting its perp is cash and carry. Only tokens with a Hyperliquid perp can be hedged: wNEAR
-        (NEAR) and BTC.
+        (NEAR) and BTC. A hedged package needs a maker bond of at least 1,000 USDC, so it makes sense from about 10,000
+        USDC of notional (see <Link href="#bonds-and-slashing">bonds</Link>).
       </p>
 
       <h2 id="spot">Spot</h2>
@@ -85,12 +86,15 @@ export default function PackagesPage() {
           { n: "1", title: "Spot settles", body: "The deal moves to hedge pending; its receipt reads unresolved." },
           { n: "2", title: "The desk has the order signed", body: "It rebuilds the order from the deal and asks the MPC to sign it for the deal's path." },
           { n: "3", title: "The keeper submits it", body: "To Hyperliquid testnet, then records the fill or the rejection on the desk." },
-          { n: "4", title: "Settled or recovered", body: "A fill settles the deal. A miss pays you the maker's bond." },
+          { n: "4", title: "Settled or recovered", body: "A fill settles the deal. A missed order can be signed again, up to three in all; if none fills in time, you get the maker's bond." },
         ]}
       />
       <p>
         The keeper cannot change the order: the desk rebuilds it from the deal record (immediate or cancel, the
-        package&apos;s side, size and limit price, the block time as nonce) and allows one opening order per deal.
+        package&apos;s side, size and limit price, the block time as nonce). The keeper or the deal&apos;s maker asks
+        for it with <code>sign_hedge_order</code>, and only one opening order is out at a time. When the keeper reports
+        that an order did not fill and the deadline has not passed, the order can be signed again, up to three opening
+        orders per deal.
       </p>
 
       <h2 id="cash-and-carry">Cash and carry</h2>
@@ -103,8 +107,12 @@ export default function PackagesPage() {
       <p>
         A maker posts a bond in the desk&apos;s bond token (test USDC) before it can quote hedged packages, and each
         hedged quote says how much of that bond it puts on the deal. The desk locks that much when the deal is
-        matched, and accepts the match only if the maker&apos;s free bond covers it. The reference makers bond a
-        tenth of the trade&apos;s value.
+        matched, and accepts the match only if the maker&apos;s free bond covers it.
+      </p>
+      <p>
+        The desk&apos;s <code>min_bond</code> is 1,000 USDC: a hedged quote must bond at least that much, so hedged
+        packages make sense from about 10,000 USDC of notional. The reference makers bond a tenth of the trade&apos;s
+        value, rounded up to one of a few fixed steps and never less than <code>min_bond</code>.
       </p>
       <ul>
         <li>
@@ -112,12 +120,17 @@ export default function PackagesPage() {
           evidence.
         </li>
         <li>
-          <strong>The hedge is rejected, or misses its deadline.</strong> The keeper records a rejection, and
-          anyone may slash a deal past its deadline with nothing recorded. Either way the desk pays the bond into the pool as a private note to you, made from the payout key in your request, and the receipt says{" "}
-          <strong>recovered</strong>. Your wallet watches for that note and adds it to your balance when it lands.
+          <strong>The hedge does not fill.</strong> The keeper records each miss. Before the deadline the order is
+          signed again, up to three opening orders in all; the third miss, or a miss after the deadline, slashes the
+          bond. Once the deadline has passed with no fill recorded, anyone may call <code>slash_overdue</code>. Either
+          way the desk pays the bond into the pool as a private note to you, made from the payout key in your request,
+          and the receipt says <strong>recovered</strong>. Your wallet watches for that note and adds it to your balance
+          when it lands.
         </li>
         <li>
-          <strong>The pool cannot take the payout.</strong> The desk keeps the bond and the receipt says unresolved.
+          <strong>The pool cannot take the payout.</strong> The desk holds the bond for you and the receipt says
+          unresolved. Anyone may call <code>retry_slash_payout</code> to send it to the pool again, as the same note
+          for you.
         </li>
       </ul>
       <Callout tone="caveat" title="A bond is public">
@@ -129,7 +142,8 @@ export default function PackagesPage() {
       <h2 id="closing-the-hedge">Closing the hedge</h2>
       <p>
         Your request carries a public key made for this deal alone, derived from your spending key. Only that key can
-        close the hedge: you sign <code>hushd.close:&lt;deal id&gt;</code>, the relayer sends it to{" "}
+        close the hedge: you sign <code>hushd.close:&lt;desk account&gt;:&lt;deal id&gt;</code> (for example{" "}
+        <code>hushd.close:desk.hushd.testnet:42</code>), the relayer sends it to{" "}
         <code>close_hedge</code>, the desk checks the signature, and the MPC signs a reduce-only order the other way.
         You can close once, after the deal has settled, from the deal&apos;s page in{" "}
         <AppLink href="/app/deals">Deals</AppLink>.
