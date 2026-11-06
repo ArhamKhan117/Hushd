@@ -17,23 +17,33 @@ test("a new passkey user trades privately and proves it", async ({ page, context
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
   });
 
+  // a full page load locks the private balance again (its key lives only in memory): unlock with the passkey
+  const go = async (path: string) => {
+    await page.goto(path);
+    const unlock = page.getByRole("button", { name: "Use passkey" });
+    if (await unlock.waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false)) {
+      await unlock.click();
+      await expect(page.getByRole("heading", { name: "Open your private balance" })).toBeHidden({ timeout: 60_000 });
+    }
+  };
+
   // 1. a passkey account, opened by the relayer
   await page.goto("/app/balance");
   await page.getByRole("button", { name: "Create a passkey" }).click();
   await expect(page.getByText("Your notes")).toBeVisible({ timeout: 60_000 });
 
   // 2. test USDC, then into the pool
-  await page.goto("/app/balance/add");
+  await go("/app/balance/add");
   await page.getByRole("button", { name: /Get test USDC/ }).click();
   await expect(page.getByRole("button", { name: "Max" })).toBeVisible({ timeout: 60_000 });
   await page.locator("#amount").fill("500");
   await page.getByRole("button", { name: "Add privately" }).click();
   await expect(page.getByRole("link", { name: "View on NearBlocks" })).toBeVisible({ timeout: 120_000 });
-  await page.goto("/app/balance");
+  await go("/app/balance");
   await expect(page.locator("li", { hasText: "USDC" }).getByText("500")).toBeVisible({ timeout: 120_000 });
 
   // 3. ask the desk with the form, and settle
-  await page.goto("/app");
+  await go("/app");
   await page.getByRole("button", { name: "Fill the form" }).click();
   await page.locator("#amount").fill("200");
   await page.getByRole("button", { name: "Ask for quotes" }).click();
@@ -49,7 +59,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.getByText("Settled").first()).toBeVisible({ timeout: 60_000 });
 
   // 5. a proof of that payment for judge.testnet, checked on /verify
-  await page.goto(`/app/prove?deal=${dealId}`);
+  await go(`/app/prove?deal=${dealId}`);
   await page.getByPlaceholder("auditor.testnet").fill("judge.testnet");
   await page.getByRole("button", { name: "Make the proof" }).click();
   const check = page.getByRole("link", { name: "Check it yourself" });

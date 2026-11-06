@@ -27,7 +27,8 @@ export class RelayerError extends Error {
 }
 
 export class RelayerClient {
-  constructor(readonly baseUrl: string, private readonly fetchImpl: typeof fetch = fetch) {}
+  // browsers refuse `fetch` called as a method of another object ("Illegal invocation"), so wrap it
+  constructor(readonly baseUrl: string, private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init)) {}
 
   private async req<T>(path: string, body?: unknown): Promise<T> {
     const res = await this.fetchImpl(`${this.baseUrl.replace(/\/$/, "")}${path}`, {

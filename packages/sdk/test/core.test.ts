@@ -113,3 +113,22 @@ test("a trader refuses a match below its limit, in the wrong token or of the wro
   assert.throws(() => checkMatchedTerms({ ...terms, traderGives: { ...terms.traderGives, amount: "1000000001" } }, draft), /other than what you offered/);
   assert.throws(() => checkMatchedTerms({ ...terms, class: "bonded_hedge" }, draft), /different package/);
 });
+
+test("the relayer client calls fetch unbound, as browsers require", async () => {
+  const { RelayerClient } = await import("../src/relayer.ts");
+  const real = globalThis.fetch;
+  let self: unknown = "unset";
+  // a fetch that, like the browser's, throws when called with any `this` but the global
+  globalThis.fetch = function (this: unknown) {
+    self = this;
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    return Promise.resolve(new Response(JSON.stringify({ account: "relayer.test", network: "testnet", cashOutFeeBps: 0, allow: {}, lanes: 1 })));
+  } as typeof fetch;
+  try {
+    const info = await new RelayerClient("http://relayer.test").info();
+    assert.equal(info.account, "relayer.test");
+    assert.ok(self === undefined || self === globalThis);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

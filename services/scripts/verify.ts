@@ -18,10 +18,20 @@ const fail = (why: string): never => {
 };
 
 async function rpc<T>(method: string, params: unknown): Promise<T> {
-  const r = await fetch(net.rpc[0]!, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-  const j = (await r.json()) as { result?: T; error?: { cause?: { name?: string } } };
-  if (j.error) fail(j.error.cause?.name ?? "RPC error");
-  return j.result as T;
+  // public RPCs rate-limit: try each endpoint, twice
+  let last = "RPC error";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (const url of net.rpc) {
+      const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })
+        .then((r) => r.json())
+        .catch(() => ({ error: { message: `${url} unreachable` } }))) as { result?: T; error?: { code?: number; message?: string; cause?: { name?: string } } };
+      if (j.result !== undefined) return j.result;
+      if (j.error?.cause?.name && j.error.code !== -429) fail(j.error.cause.name);
+      last = j.error?.message?.slice(0, 80) ?? last;
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  return fail(last);
 }
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<{ status: number; body: T }> {
