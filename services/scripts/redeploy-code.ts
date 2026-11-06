@@ -24,6 +24,8 @@ const account = `${name}.${DEPLOYER}`;
 const net = withOverrides(TESTNET, process.env.NEAR_RPC_URL ? { rpc: process.env.NEAR_RPC_URL.split(",") } : {});
 const near = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
 const code = new Uint8Array(readFileSync(wasm));
+// the deployed contracts name their commit and build image (NEP-330 build_info); keep it that way
+if (!Buffer.from(code).includes("source_code_snapshot")) throw new Error(`${wasm} is not a reproducible build: run \`cargo near build reproducible-wasm\` in contracts/${wasmName} on a clean, committed tree`);
 const out = (await near.transaction(account).deployContract(account, code).send()) as unknown as { transaction?: { hash?: string } };
 const tx = out.transaction?.hash ?? "";
 // the recorded hash is what `pnpm verify` holds the deployed code to

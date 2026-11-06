@@ -48,7 +48,7 @@ const deployed = existsSync(`${ROOT}deployments/testnet.json`)
 
 const checks: Check[] = [
   {
-    claim: "The pool, desk, board and token contracts on NEAR testnet run the recorded builds (and yours, if you built them)",
+    claim: "The pool, desk, board and token contracts on NEAR testnet run the recorded builds (and yours, if you built them reproducibly)",
     run: async () => {
       if (!deployed) fail("deployments/testnet.json is missing");
       const out: string[] = [];
@@ -56,17 +56,34 @@ const checks: Check[] = [
       for (const [name, c] of Object.entries(deployed!.contracts)) {
         const a = await rpc<{ code_hash: string }>("query", { request_type: "view_account", finality: "final", account_id: c.account });
         if (a.code_hash !== c.codeHash) fail(`${c.account} runs code ${a.code_hash}, not the recorded ${c.codeHash}`);
-        // a local `cargo near build` of the same commit should give the same bytes
+        // only a reproducible build (`cargo near build reproducible-wasm`) embeds its commit and gives the same bytes
         const crate = ["usdc", "wnear", "btc"].includes(name) ? "token" : name;
         const wasm = `${ROOT}contracts/target/near/hushd_${crate}/hushd_${crate}.wasm`;
-        if (existsSync(wasm)) {
+        if (existsSync(wasm) && readFileSync(wasm).includes("source_code_snapshot")) {
           const mine = base58.encode(sha256(readFileSync(wasm)));
-          if (mine !== a.code_hash) fail(`${c.account} runs ${a.code_hash}; your build of ${crate} hashes to ${mine}`);
+          if (mine !== a.code_hash) fail(`${c.account} runs ${a.code_hash}; your reproducible build of ${crate} hashes to ${mine}`);
           local++;
         }
         out.push(name);
       }
-      return `${out.join(", ")} match the recorded hashes${local ? `; ${local} also match your local build` : " (build the contracts to compare with your own build)"}`;
+      return `${out.join(", ")} match the recorded hashes${local ? `; ${local} also match your reproducible build` : " (`cargo near build reproducible-wasm` in a contract to compare with your own build)"}`;
+    },
+  },
+  {
+    claim: "Each contract names the commit and the Docker image it was built from (NEP-330), so anyone can rebuild it",
+    run: async () => {
+      if (!deployed) fail("deployments/testnet.json is missing");
+      const revs = new Set<string>();
+      for (const c of Object.values(deployed!.contracts)) {
+        const meta = await view<{ link: string; build_info: { build_environment: string; source_code_snapshot: string; contract_path: string } | null }>(net, c.account, "contract_source_metadata");
+        const b = meta.build_info;
+        if (!b) fail(`${c.account} has no build_info: it was not built with \`cargo near build reproducible-wasm\``);
+        if (!/^sourcescan\/cargo-near:[\w.-]+@sha256:[0-9a-f]{64}$/.test(b!.build_environment)) fail(`${c.account} names an unpinned build image: ${b!.build_environment}`);
+        const rev = /^git\+https:\/\/github\.com\/ArhamKhan117\/Hushd\?rev=([0-9a-f]{40})$/.exec(b!.source_code_snapshot)?.[1];
+        if (!rev) fail(`${c.account} names another source: ${b!.source_code_snapshot}`);
+        revs.add(`${rev!.slice(0, 7)} (${b!.build_environment.split("@")[0]})`);
+      }
+      return `built from ${[...revs].join(", ")}; NearBlocks' Verify and Publish rebuilds them from the repository`;
     },
   },
   {
