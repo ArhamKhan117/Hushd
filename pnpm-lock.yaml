@@ -36,19 +36,19 @@ importers:
         version: 2.4.0
       '@vercel/analytics':
         specifier: ^2.0.1
-        version: 2.0.1(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
+        version: 2.0.1(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
       framer-motion:
         specifier: ^12.42.2
         version: 12.43.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       geist:
         specifier: 1.4.2
-        version: 1.4.2(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
+        version: 1.4.2(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       near-kit:
         specifier: 0.20.2
         version: 0.20.2(@hot-labs/near-connect@0.12.0)
       next:
         specifier: 16.4.3
-        version: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -59,6 +59,9 @@ importers:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
+      '@playwright/test':
+        specifier: 1.64.0
+        version: 1.64.0
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.4
@@ -1076,6 +1079,11 @@ packages:
   '@phala/dcap-qvl@0.7.0':
     resolution: {integrity: sha512-b69KL2nrxGEBB1HhVCtl+vUbjMVEqKxuGzXAOuDrVZM7pi6+PeFfDmiIqqN3pnQkgcvkzZ1IKWOnFrbrXQCK+A==}
     engines: {node: '>=14.0.0'}
+    hasBin: true
+
+  '@playwright/test@1.64.0':
+    resolution: {integrity: sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==}
+    engines: {node: '>=20'}
     hasBin: true
 
   '@rtsao/scc@1.1.0':
@@ -3016,6 +3024,16 @@ packages:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
 
+  playwright-core@1.64.0:
+    resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.0:
+    resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
@@ -4521,6 +4539,10 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
+  '@playwright/test@1.64.0':
+    dependencies:
+      playwright: 1.64.0
+
   '@rtsao/scc@1.1.0': {}
 
   '@scure/base@2.4.0': {}
@@ -4856,9 +4878,9 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.13.0':
     optional: true
 
-  '@vercel/analytics@2.0.1(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+  '@vercel/analytics@2.0.1(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)':
     optionalDependencies:
-      next: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      next: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
 
   '@zorsh/zorsh@0.5.2': {}
@@ -5864,9 +5886,9 @@ snapshots:
 
   functions-have-names@1.2.3: {}
 
-  geist@1.4.2(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)):
+  geist@1.4.2(next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)):
     dependencies:
-      next: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      next: 16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
 
   generator-function@2.0.1: {}
 
@@ -6358,7 +6380,7 @@ snapshots:
     dependencies:
       content-type: 2.1.0
 
-  next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  next@16.4.3(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@22.20.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       '@next/env': 16.4.3
       '@swc/helpers': 0.5.23
@@ -6378,6 +6400,7 @@ snapshots:
       '@next/swc-win32-arm64-msvc': 16.4.3
       '@next/swc-win32-x64-msvc': 16.4.3
       '@opentelemetry/api': 1.10.0
+      '@playwright/test': 1.64.0
       sharp: 0.35.5(@types/node@22.20.5)
     transitivePeerDependencies:
       - '@babel/core'
@@ -6552,6 +6575,12 @@ snapshots:
   picomatch@4.0.7: {}
 
   pkce-challenge@5.0.1: {}
+
+  playwright-core@1.64.0: {}
+
+  playwright@1.64.0:
+    dependencies:
+      playwright-core: 1.64.0
 
   pngjs@5.0.0: {}
 
