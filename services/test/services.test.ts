@@ -5,6 +5,7 @@ import { encode } from "@msgpack/msgpack";
 import { TESTNET } from "@hushd/sdk";
 import { buildApi } from "../src/api.js";
 import { Db } from "../src/db.js";
+import { approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
 import { eventsInBlock } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
 import { priceAsk, spreadBps } from "../src/makers.js";
@@ -38,6 +39,23 @@ describe("keeper", () => {
     // contracts/desk/src/hedge.rs pins this msgpack for asset 4, buy, 1100, 0.2, IOC.
     const action = orderAction({ asset: 4, coin: "X", is_buy: true, size: "0.2", limit_px: "1100", deadline_ms: 0, testnet: true }, false);
     assert.equal(Buffer.from(encode(action)).toString("hex"), "83a474797065a56f72646572a66f72646572739186a16104a162c3a170a431313030a173a3302e32a172c2a17481a56c696d697481a3746966a3496f63a867726f7570696e67a26e61");
+  });
+});
+
+describe("hyperliquid agent approval", () => {
+  // vectors from eth_account (encode_typed_data, sign_message) and eth_keys
+  test("approveAgent digest and signature match eth_account", () => {
+    const d = approveAgentDigest({ agentAddress: `0x${"ab".repeat(20)}`, agentName: "", nonce: 1_700_000_000_000, testnet: true });
+    assert.equal(Buffer.from(d).toString("hex"), "b5ee06e24dac21716eb817fcb1b159c8e340fbcfc0eb5a555cc14f831163148c");
+    assert.deepEqual(signDigest(`0x${"11".repeat(32)}`, d), {
+      r: "0x263733c068009f98897ba61c68465c659264ae6d65e0e916224238122de36e3e",
+      s: "0x2343d6f31fc14f2c67e4036041cd7cd464ba9850a6645ff149837f565a35ab5e",
+      v: 27,
+    });
+  });
+  test("an MPC public key becomes the deal's ADDRESS address", () => {
+    const pub = Buffer.from("466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f276728176c3c6431f8eeda4538dc37c865e2784f3a9e77d044f33e407797e1278a", "hex");
+    assert.equal(evmAddress(pub), "0x1563915e194d8cfba1943570603f7606a3115508");
   });
 });
 

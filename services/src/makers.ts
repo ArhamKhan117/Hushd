@@ -39,6 +39,7 @@ import {
   type MakerAsk,
 } from "@hushd/sdk";
 import { EncryptedFileStore } from "@hushd/sdk/node";
+import { approveDealAgent, dealAddress } from "./hyperliquid.js";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
 import { app, listen } from "./http.js";
@@ -83,6 +84,8 @@ export class Maker {
     readonly api: DeskApi,
     readonly relayer: RelayerClient,
     dataDir: string,
+    /** The maker's Hyperliquid account key (0x hex): approves each hedged deal's MPC address as its agent. */
+    private readonly hlKey: string | null = null,
   ) {
     const id = identityFromSeed(hexBytes(seedHex));
     this.quoteSecret = hexBytes(quoteKeyHex);
@@ -188,9 +191,17 @@ export class Maker {
       }
       this.quoted.delete(rfqId);
       if (res.status !== "matched" || res.dealId == null || !res.for_maker) continue;
-      const won = openJson<{ terms: AgreedTerms; trader_address: string }>(this.wallet.id.encSecret, Buffer.from(res.for_maker, "base64"));
+      const won = openJson<{ terms: AgreedTerms; trader_address: string }>(this.wallet.id.encSecret, fromB64(res.for_maker));
       if (!won || won.terms.maker !== this.account || this.settling.has(res.dealId)) continue;
       this.stats.won++;
+      if (won.terms.hedge) {
+        // the deal's own address trades on this maker's margin, approved before the hedge is signed
+        if (!this.hlKey) this.fail(new Error(`deal ${res.dealId} needs a hedge but this maker has no Hyperliquid key`));
+        else
+          await dealAddress(this.net, res.dealId)
+            .then((agent) => approveDealAgent(this.hlKey!, agent, won.terms.hedge!.testnet))
+            .catch((e) => this.fail(e));
+      }
       this.settling.add(res.dealId);
       void settleAsMaker({ net: this.net, api: this.api, relayer: this.relayer, wallet: this.wallet, dealId: res.dealId, terms: won.terms, traderAddress: won.trader_address })
         .then(() => this.stats.settled++)
@@ -262,7 +273,7 @@ export async function startMakers() {
     const quoteKey = process.env[`${prefix}_QUOTE_KEY`];
     if (!acc || !seed || !quoteKey) continue;
     const name = settings.str(`${prefix}_NAME`, { fixed: "Steady", volatility: "Weather", inventory: "Ledger" }[style]);
-    makers.push(new Maker(net, name, style, new Signer(net, acc), seed, quoteKey, api, relayer, settings.str("MAKERS_DATA_DIR", "./data/makers")));
+    makers.push(new Maker(net, name, style, new Signer(net, acc), seed, quoteKey, api, relayer, settings.str("MAKERS_DATA_DIR", "./data/makers"), process.env[`${prefix}_HL_KEY`] || null));
   }
   if (makers.length === 0) throw new Error("No maker configured (MAKER_A_ACCOUNT, _PRIVATE_KEY, _SEED, _QUOTE_KEY)");
   for (const m of makers) {
