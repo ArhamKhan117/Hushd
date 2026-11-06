@@ -10,10 +10,12 @@
     "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "deploy:testnet": "tsx scripts/deploy-testnet.ts",
+    "deploy:testnet": "tsx scripts/deploy.ts",
+    "deploy:mainnet": "HUSHD_NETWORK=mainnet tsx scripts/deploy.ts",
     "verify": "tsx scripts/verify.ts",
     "stack": "tsx scripts/stack.ts",
     "intents:sandbox": "tsx scripts/intents-sandbox.ts",
+    "mainnet:sandbox": "tsx scripts/mainnet-sandbox.ts",
     "intents:mainnet": "tsx scripts/intents-mainnet.ts",
     "policy-wallet": "tsx scripts/policy-wallet.ts",
     "agent-api": "tsx scripts/agent-api.ts"
