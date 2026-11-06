@@ -7,7 +7,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
-import { deskView, poolView, TESTNET, view, withOverrides } from "@hushd/sdk";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { custodyView, deskView, implicitAccount, INTENTS_MAINNET, intake, MAINNET, poolView, signIntents, TESTNET, tradeDiffs, verifierView, view, withOverrides } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const APP = (process.env.HUSHD_APP_URL ?? "https://hushd.net").replace(/\/$/, "");
@@ -42,7 +43,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<{ status: nu
 }
 
 const deployed = existsSync(`${ROOT}deployments/testnet.json`)
-  ? (JSON.parse(readFileSync(`${ROOT}deployments/testnet.json`, "utf8")) as { contracts: Record<string, { account: string; codeHash: string }> })
+  ? (JSON.parse(readFileSync(`${ROOT}deployments/testnet.json`, "utf8")) as { contracts: Record<string, { account: string; codeHash: string }>; policyWallets?: Record<string, { account: string; owner: string }> })
   : null;
 
 const checks: Check[] = [
@@ -101,7 +102,8 @@ const checks: Check[] = [
       const deals = await deskView.deals(net, 100);
       const settled = deals.filter((d) => d.receipt?.outcome === "settled");
       if (settled.length === 0) fail("no settled deal yet");
-      return `${settled.length} settled of the last ${deals.length}; latest #${settled.at(-1)!.id}`;
+      const latest = settled.reduce((a, d) => (Number(d.id) > Number(a.id) ? d : a));
+      return `${settled.length} settled of the last ${deals.length}; latest #${latest.id}`;
     },
   },
   {
@@ -117,6 +119,60 @@ const checks: Check[] = [
     },
   },
   {
+    claim: "The indexer is caught up with the chain",
+    run: async () => {
+      const r = await getJson<{ source?: string; head: number; behind: number }>(`${API}/health/indexer`);
+      if (r.status !== 200) fail(`HTTP ${r.status}`);
+      if (r.body.behind > 30) fail(`${r.body.behind} blocks behind`);
+      return `${r.body.behind} blocks behind at ${r.body.head} (${r.body.source ?? "blocks"})`;
+    },
+  },
+  {
+    claim: "Agents act through policy wallets: OutLayer custody wallets whose policy the owner controls on chain, and the makers' desk accounts are those wallets",
+    run: async () => {
+      const wallets = Object.entries(deployed?.policyWallets ?? {});
+      if (wallets.length === 0) fail("no policy wallet in deployments/testnet.json");
+      const out: string[] = [];
+      for (const [prefix, w] of wallets) {
+        const p = (await custodyView.policy(net, `ed25519:${w.account}`)) ?? fail(`${prefix}: no policy stored on ${net.outlayer}`);
+        if (p.owner !== w.owner) fail(`${prefix}: the policy is controlled by ${p.owner}, not ${w.owner}`);
+        if (prefix.startsWith("MAKER_")) {
+          const m = (await deskView.makers(net)).find(([a]) => a === w.account) ?? fail(`${prefix}: ${w.account} is not a maker on the desk`);
+          if (!m[1].active) fail(`${prefix}: not active on the desk`);
+        }
+        out.push(`${prefix.toLowerCase()} ${w.account.slice(0, 8)}… (${p.frozen ? "frozen" : "active"}, owner ${p.owner})`);
+      }
+      return out.join(", ");
+    },
+  },
+  {
+    claim: "A direct trade signed by two agents passes intents.near's checks on mainnet (simulate_intents, nothing sent)",
+    run: async () => {
+      const [a, b] = [ed25519.utils.randomSecretKey(), ed25519.utils.randomSecretKey()];
+      const v = INTENTS_MAINNET.verifier;
+      const [fee, salt] = [await verifierView.fee(MAINNET, v), await verifierView.salt(MAINNET, v)];
+      const d = tradeDiffs({ give: { token: INTENTS_MAINNET.usdc.id, amount: 1_000_000n }, take: { token: INTENTS_MAINNET.wnear.id, amount: 3n * 10n ** 23n }, feePips: fee });
+      const dl = Date.now() + 120_000;
+      const signed = [
+        signIntents({ signerId: implicitAccount(a), secret: a, verifier: v, salt, deadlineMs: dl, intents: [{ intent: "token_diff", diff: d.a }] }),
+        signIntents({ signerId: implicitAccount(b), secret: b, verifier: v, salt, deadlineMs: dl, intents: [{ intent: "token_diff", diff: d.b }] }),
+      ];
+      // fresh agents hold nothing: the verifier checks signatures, keys and nonces, then stops at the balance
+      const why = await verifierView.simulate(MAINNET, v, signed).then(() => "executed", (e: Error) => e.message);
+      if (!/insufficient balance/.test(why)) fail(`intents.near answered: ${why}`);
+      const done = existsSync(`${ROOT}deployments/mainnet-intents.json`) ? (JSON.parse(readFileSync(`${ROOT}deployments/mainnet-intents.json`, "utf8")) as { steps: { step: string; txs: string[] }[] }).steps.find((s) => s.step === "trade") : undefined;
+      return `signatures, keys and nonces accepted (fee ${fee} pip, salt ${salt})${done ? `; mainnet trade ${done.txs[0]}` : "; the mainnet demo trade waits for the owner's go-ahead"}`;
+    },
+  },
+  {
+    claim: "The intake model signs its answer, and the signature checks out (NEAR AI Cloud, in a TEE)",
+    run: async () => {
+      const r = await intake(API, "Sell 1,000 USDC for BTC, at least 0.012 BTC").catch((e: Error) => fail(e.message.includes("402") ? "the NEAR AI Cloud account has no credits" : e.message));
+      if (!r.proof.verified) fail("the response signature or its hashes do not check out");
+      return `${r.proof.model} answered (${r.proof.signatureKind}, key ${r.proof.signingKey.slice(0, 12)}…): request and response hashes match, signature verified`;
+    },
+  },
+  {
     claim: "The intake model's NEAR AI Cloud attestation (Intel TDX and NVIDIA GPU) verifies",
     run: async () => {
       const r = await getJson<{ model: string; tcb_status: string; gpu_evidence: string; enabled: boolean; error?: string }>(`${API}/v1/intake/attestation`);
@@ -128,8 +184,8 @@ const checks: Check[] = [
   {
     claim: "Makers ask for a private x402 payment (scheme hushd) before quoting",
     run: async () => {
-      const makers = await deskView.makers(net);
-      const m = makers[0] ?? fail("no maker");
+      const makers = (await deskView.makers(net)).filter(([, x]) => x.active);
+      const m = makers[0] ?? fail("no active maker");
       const usdc = net.tokens[0]!.id;
       const r = await getJson<{ accepts?: { scheme: string; payTo: string }[] }>(`${API}/makers/${m[0]}/quote?sell=${usdc}&amount=1000000&buy=${net.tokens[2]!.id}`);
       if (r.status !== 402) fail(`answered ${r.status}, not 402`);

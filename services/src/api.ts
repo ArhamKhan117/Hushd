@@ -7,6 +7,8 @@
  *   request is the one committed on chain but can open none of it.
  * - Deal rooms: the two sides of a matched deal swap sealed messages (their planned
  *   outputs, the opening of the note each makes for the other, their proven legs).
+ * - NEAR Intents: dry 1Click quotes for deposits from and cash-outs to other chains, and
+ *   the mainnet trades between our agents (intents.ts).
  */
 import { sha256 } from "@noble/hashes/sha2.js";
 import { boardView, poolView, view, type HushdNetwork } from "@hushd/sdk";
@@ -14,6 +16,7 @@ import { network, settings } from "./config.js";
 import { Db } from "./db.js";
 import { app, BadRequest, listen, rateLimit } from "./http.js";
 import { intakeRoutes } from "./intake.js";
+import { intentsRoutes, type IntentsDeps } from "./intents.js";
 
 const hex = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 const isB64 = (s: unknown, max: number): s is string => typeof s === "string" && s.length > 0 && s.length <= max && /^[A-Za-z0-9+/]+={0,2}$/.test(s);
@@ -25,7 +28,7 @@ export interface DeskRfq {
   deal_id: string | null;
 }
 
-export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now()) {
+export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), intents: IntentsDeps = {}) {
   const desk = () => {
     if (!net.desk) throw new BadRequest(`no desk on ${net.id}`);
     return net.desk;
@@ -82,6 +85,7 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now()) {
   });
 
   intakeRoutes(a);
+  intentsRoutes(a, { now, ...intents });
 
   // ---------- RFQs ----------
 

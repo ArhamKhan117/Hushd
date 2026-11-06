@@ -1,13 +1,20 @@
 /**
- * The indexer: reads every final block from FastNEAR's free block stream (neardata),
- * keeps the NEP-297 events our contracts log ("standard":"hushd") and the NEP-141
- * events of our tokens, and stores them in Postgres for the app and transparency views.
+ * The indexer: keeps the NEP-297 events our contracts log ("standard":"hushd") and the
+ * NEP-141 events of our tokens, and stores them in Postgres for the app and transparency
+ * views. Two sources, both from FastNEAR:
  *
- * Restart-safe: it resumes from its saved cursor, and every event is keyed by
- * (receipt id, log index), so re-reading a block never duplicates anything. To
- * resync, set INDEXER_FROM_BLOCK below the cursor (or delete the cursor row).
+ * - "transactions" (the default, free): FastNEAR's transactions API lists every transaction
+ *   that touched each watched contract, with its receipts and logs, so a few requests a
+ *   poll keep the index current, including transactions signed by users' own wallets.
+ * - "blocks": every final block from the neardata stream. Its free tier reads about 30
+ *   blocks a minute, slower than testnet makes them, so this needs NEARDATA_API_KEY.
+ *
+ * Restart-safe: it resumes from its saved cursors, and every event is keyed by
+ * (receipt id, log index), so reading a transaction or block twice never duplicates
+ * anything. To resync the block stream, set INDEXER_FROM_BLOCK below the cursor.
  */
 import type { HushdNetwork } from "@hushd/sdk";
+import { latestBlock } from "@hushd/sdk";
 import { network, settings } from "./config.js";
 import { Db } from "./db.js";
 import { app, listen } from "./http.js";
@@ -118,13 +125,7 @@ export class Indexer {
   constructor(readonly net: HushdNetwork, readonly db: Db, readonly watched: Set<string>) {}
 
   async store(events: IndexedEvent[]) {
-    for (const e of events) {
-      await this.db.q(
-        `insert into events (receipt_id, log_index, block_height, block_ms, contract, event, data, tx_hash)
-         values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing`,
-        [e.receiptId, e.logIndex, e.blockHeight, e.blockMs, e.contract, e.event, JSON.stringify(e.data), e.txHash],
-      );
-    }
+    await storeEvents(this.db, events);
   }
 
   /** Process blocks from the cursor up to the final head; returns how many were read. */
@@ -160,8 +161,115 @@ export class Indexer {
   }
 }
 
-// neardata rate-limits bursts: a few blocks at a time is still well ahead of the chain
+// neardata rate-limits bursts: a few blocks at a time
 const INDEX_WINDOW = 4;
+
+export function txApiBase(net: HushdNetwork): string {
+  return settings.str("FASTNEAR_TX_URL", net.id === "mainnet" ? "https://tx.main.fastnear.com" : "https://tx.test.fastnear.com");
+}
+
+export interface AccountTx {
+  transaction_hash: string;
+  tx_block_height: number;
+  is_event_log?: boolean;
+}
+
+export interface FullTx {
+  transaction: { hash: string };
+  receipts: { execution_outcome: { id: string; block_height: number; block_timestamp: number; outcome: { logs: string[]; executor_id: string; status: Record<string, unknown> } } }[];
+}
+
+/** The events in one transaction (as the transactions API returns it), only from successful receipts of watched contracts. */
+export function eventsInTx(t: FullTx, watched: Set<string>): IndexedEvent[] {
+  const out: IndexedEvent[] = [];
+  for (const { execution_outcome: x } of t.receipts ?? []) {
+    if (!watched.has(x.outcome.executor_id)) continue;
+    const status = x.outcome.status;
+    if (!("SuccessValue" in status) && !("SuccessReceiptId" in status)) continue;
+    x.outcome.logs.forEach((log, i) => {
+      if (!log.startsWith("EVENT_JSON:")) return;
+      try {
+        const e = JSON.parse(log.slice("EVENT_JSON:".length)) as { standard: string; event: string; data?: unknown[] };
+        if (e.standard !== "hushd" && e.standard !== "nep141") return;
+        out.push({ receiptId: x.id, logIndex: i, blockHeight: x.block_height, blockMs: Math.floor(x.block_timestamp / 1e6), contract: x.outcome.executor_id, event: e.event, data: e.data?.[0] ?? null, txHash: t.transaction.hash });
+      } catch {
+        /* not JSON: not ours */
+      }
+    });
+  }
+  return out;
+}
+
+async function postJson<T>(url: string, body: object): Promise<T> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000) });
+      if (r.ok) return (await r.json()) as T;
+    } catch {
+      /* retry */
+    }
+    await new Promise((res) => setTimeout(res, 500 * 2 ** attempt));
+  }
+  throw new Error(`${url} did not answer`);
+}
+
+/** Indexes from the transactions API: per watched contract, the transactions since its cursor. */
+export class TxIndexer {
+  head = 0;
+  /** The chain head when the last poll began: everything up to it is indexed. */
+  cursor = 0;
+  constructor(readonly net: HushdNetwork, readonly db: Db, readonly watched: Set<string>, readonly finalHeight: () => Promise<number>) {}
+
+  /** New transactions of one account above `after`, oldest first, paging back while pages are full. */
+  async newTxs(account: string, after: number): Promise<AccountTx[]> {
+    const out: AccountTx[] = [];
+    let max: number | null = null;
+    for (;;) {
+      const page = (await postJson<{ account_txs: AccountTx[] }>(`${txApiBase(this.net)}/v0/account`, { account_id: account, max_block_height: max })).account_txs ?? [];
+      const fresh = page.filter((t) => t.tx_block_height > after);
+      out.push(...fresh);
+      const oldest = Math.min(...page.map((t) => t.tx_block_height));
+      if (page.length < TX_PAGE || fresh.length < page.length || !Number.isFinite(oldest)) break;
+      max = oldest - 1;
+    }
+    return out.reverse();
+  }
+
+  async step(): Promise<number> {
+    const head = await this.finalHeight();
+    const byHash = new Map<string, number>();
+    const tops = new Map<string, number>();
+    for (const account of this.watched) {
+      const after = (await this.db.getCursor(`tx:${account}`)) ?? 0;
+      const txs = await this.newTxs(account, after);
+      for (const t of txs) if (t.is_event_log !== false) byHash.set(t.transaction_hash, t.tx_block_height);
+      if (txs.length) tops.set(account, Math.max(...txs.map((t) => t.tx_block_height)));
+    }
+    const hashes = [...byHash.keys()];
+    for (let i = 0; i < hashes.length; i += 20) {
+      const { transactions } = await postJson<{ transactions: FullTx[] }>(`${txApiBase(this.net)}/v0/transactions`, { tx_hashes: hashes.slice(i, i + 20) });
+      for (const t of transactions ?? []) await storeEvents(this.db, eventsInTx(t, this.watched));
+    }
+    // cursors move only after the events are stored, so a crash re-reads instead of skipping
+    for (const [account, top] of tops) await this.db.setCursor(`tx:${account}`, top);
+    this.head = head;
+    this.cursor = head;
+    return hashes.length;
+  }
+}
+
+// the transactions API returns up to this many per page
+const TX_PAGE = 200;
+
+async function storeEvents(db: Db, events: IndexedEvent[]) {
+  for (const e of events) {
+    await db.q(
+      `insert into events (receipt_id, log_index, block_height, block_ms, contract, event, data, tx_hash)
+       values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing`,
+      [e.receiptId, e.logIndex, e.blockHeight, e.blockMs, e.contract, e.event, JSON.stringify(e.data), e.txHash],
+    );
+  }
+}
 
 export function watchedContracts(net: HushdNetwork): Set<string> {
   return new Set([net.pool, net.desk, net.board, ...net.tokens.map((t) => t.id)].filter((x): x is string => !!x));
@@ -171,16 +279,23 @@ export async function startIndexer() {
   const net = network();
   const db = new Db(settings.databaseUrl());
   await db.migrate();
-  const ix = new Indexer(net, db, watchedContracts(net));
-  const a = app("indexer", async () => ({ cursor: ix.cursor, head: ix.head, behind: ix.head - ix.cursor }));
+  const watched = watchedContracts(net);
+  const source = settings.str("INDEXER_SOURCE", "transactions");
+  const ix = source === "blocks" ? new Indexer(net, db, watched) : new TxIndexer(net, db, watched, () => finalHeight(net));
+  const a = app("indexer", async () => ({ source, cursor: ix.cursor, head: ix.head, behind: ix.head - ix.cursor }));
   listen(a, settings.port("indexer", 8789), "indexer");
   for (;;) {
     try {
       const n = await ix.step();
-      if (n === 0 || ix.head - ix.cursor < 2) await new Promise((r) => setTimeout(r, 1_000));
+      if (ix instanceof TxIndexer) await new Promise((r) => setTimeout(r, settings.num("INDEXER_POLL_MS", 4_000)));
+      else if (n === 0 || ix.head - ix.cursor < 2) await new Promise((r) => setTimeout(r, 1_000));
     } catch (e) {
       console.error("indexer:", (e as Error).message);
       await new Promise((r) => setTimeout(r, 5_000));
     }
   }
+}
+
+async function finalHeight(net: HushdNetwork): Promise<number> {
+  return (await latestBlock(net)).height;
 }

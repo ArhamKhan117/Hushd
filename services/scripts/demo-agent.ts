@@ -4,19 +4,19 @@
  *
  *   pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts
  *
- * Needs the services running (`pnpm stack`) and, in .env, DEMO_AGENT_SEED (64 hex),
- * DEMO_AGENT_ACCOUNT and DEMO_AGENT_PRIVATE_KEY (its NEAR testnet account; the script
- * creates it under the deployer, with 1 NEAR, when it does not exist yet), plus the
- * deployer key in ~/.near-credentials to mint it test USDC.
+ * The agent's NEAR account is an OutLayer policy wallet (DEMO_AGENT_POLICY_WALLET_KEY in
+ * .env, made with `scripts/policy-wallet.ts create DEMO_AGENT`): it holds no NEAR key, and
+ * the run shows the TEE refusing a call outside the owner's policy and the owner's freeze
+ * stopping the agent. Needs the services running (`pnpm stack`), DEMO_AGENT_SEED (64 hex,
+ * made when missing) and the deployer key in ~/.near-credentials to mint test USDC.
  */
+import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAgent, createServer } from "@hushd/mcp";
-import { accountBalance, type ProofKind } from "@hushd/sdk";
-import { ed25519 } from "@noble/curves/ed25519.js";
-import { base58 } from "@scure/base";
+import { CUSTODY, CustodyWallet, PolicyRefusal, type ProofKind } from "@hushd/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Near } from "near-kit";
@@ -34,31 +34,31 @@ function remember(k: string, v: string) {
 
 async function ensureAgentAccount() {
   if (!process.env.DEMO_AGENT_SEED) remember("DEMO_AGENT_SEED", randomBytes(32).toString("hex"));
-  const id = process.env.DEMO_AGENT_ACCOUNT ?? `agent-demo.${DEPLOYER}`;
+  const key = process.env.DEMO_AGENT_POLICY_WALLET_KEY;
+  if (!key) throw new Error("no policy wallet: run `tsx scripts/policy-wallet.ts create DEMO_AGENT` first");
+  const id = (await new CustodyWallet(key, CUSTODY.testnet.api).address()).accountId;
   const deployerKey = (JSON.parse(readFileSync(join(homedir(), ".near-credentials/testnet", `${DEPLOYER}.json`), "utf8")) as { private_key: string }).private_key;
   const deployer = new Near({ network: { networkId: "testnet", rpcUrl }, privateKey: deployerKey as `ed25519:${string}`, defaultSignerId: DEPLOYER, defaultWaitUntil: "FINAL" });
-  if (!process.env.DEMO_AGENT_PRIVATE_KEY || (await accountBalance({ ...(await import("@hushd/sdk")).TESTNET }, id)) === null) {
-    const secret = ed25519.utils.randomSecretKey();
-    const pub = ed25519.getPublicKey(secret);
-    await deployer.transaction(DEPLOYER).createAccount(id).transfer(id, "1 NEAR").addKey(`ed25519:${base58.encode(pub)}`, { type: "fullAccess" }).send();
-    remember("DEMO_AGENT_ACCOUNT", id);
-    remember("DEMO_AGENT_PRIVATE_KEY", `ed25519:${base58.encode(new Uint8Array([...secret, ...pub]))}`);
-    console.log(`created ${id} with 1 NEAR`);
-  }
   // test USDC for the trades: the token's owner mints it (the faucet gives 10,000 an hour)
   await deployer.transaction(DEPLOYER).functionCall("usdc.hushd.testnet", "mint", { account_id: id, amount: "21000000000" }, { gas: "30 Tgas" }).send();
-  return id;
+  return { id, key };
+}
+
+/** The owner freezes or unfreezes the agent's wallet (scripts/policy-wallet.ts). */
+function owner(cmd: "freeze" | "unfreeze") {
+  execFileSync(process.execPath, ["--import", "tsx", "scripts/policy-wallet.ts", cmd, "DEMO_AGENT"], { cwd: join(ROOT, "services"), stdio: "inherit" });
 }
 
 async function main() {
-  const account = await ensureAgentAccount();
+  const { id: account, key } = await ensureAgentAccount();
   const env = {
     ...process.env,
     HUSHD_API_URL: API,
     HUSHD_HOME: join(ROOT, "services/data/demo-agent"),
     HUSHD_CIRCUITS_DIR: join(ROOT, "app/public/circuits"),
-    HUSHD_NEAR_ACCOUNT: account,
-    HUSHD_NEAR_PRIVATE_KEY: process.env.DEMO_AGENT_PRIVATE_KEY,
+    HUSHD_POLICY_WALLET_KEY: key,
+    HUSHD_NEAR_ACCOUNT: undefined,
+    HUSHD_NEAR_PRIVATE_KEY: undefined,
     HUSHD_LIMIT_PER_PAYMENT: "USDC=12000,wNEAR=100",
     HUSHD_LIMIT_PER_DAY: "USDC=30000,wNEAR=500",
   };
@@ -79,7 +79,20 @@ async function main() {
   };
 
   await call("hushd_address");
+  await call("hushd_policy");
   await call("hushd_shield", { token: "USDC", amount: "20000" });
+  // the TEE, not this script, refuses what the owner's policy does not allow
+  await new CustodyWallet(key, CUSTODY.testnet.api)
+    .call({ receiver: "wrap.testnet", method: "near_deposit", args: {}, gas: 30_000_000_000_000n, deposit: 10n ** 21n })
+    .then(() => { throw new Error("the policy wallet signed a call outside its policy"); })
+    .catch((e) => { if (!(e instanceof PolicyRefusal)) throw e; console.log(`\n+ policy wallet refused a call outside the policy (${e.code}): ${e.message}`); });
+  owner("freeze");
+  await new Promise((r) => setTimeout(r, 16_000));
+  const frozen = await client.callTool({ name: "hushd_send", arguments: { to: (await call("hushd_address")).address, token: "USDC", amount: "1" } });
+  console.log(`\n${frozen.isError ? "+ frozen: the agent may not spend" : "x the agent spent while frozen"}: ${(frozen.content as { text: string }[])[0]?.text}`);
+  if (!frozen.isError) throw new Error("spent while frozen");
+  owner("unfreeze");
+  await new Promise((r) => setTimeout(r, 16_000));
   await new Promise((r) => setTimeout(r, 8_000));
   await call("hushd_balance");
   const makers = (await call("hushd_makers")) as unknown as { account: string; quote_url: string }[];
@@ -90,7 +103,8 @@ async function main() {
   await call("hushd_trade", { kind: "spot", sell_token: "USDC", sell_amount: "500", buy_token: "BTC", window_seconds: 30 });
   await call("hushd_prove", { what: "payment", reader: "judge.testnet", days: 30 });
   await call("hushd_prove", { what: "funds", reader: "judge.testnet", days: 30, token: "USDC", threshold: "1000" });
-  await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: "10000", buy_token: "wNEAR", window_seconds: 30 });
+  // a maker quotes a hedged package only with Hyperliquid testnet margin behind it
+  await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: "2000", buy_token: "wNEAR", window_seconds: 30 }).catch((e) => console.log(`\n= hedged trade not matched (${(e as Error).message}): no maker has Hyperliquid margin yet`));
   await call("hushd_my_deals");
   await client.close();
   process.exit(0);

@@ -14,8 +14,8 @@ import http from "node:http";
 const dotenv = new URL("../../.env", import.meta.url).pathname;
 if (existsSync(dotenv)) process.loadEnvFile(dotenv);
 
-const PORTS: Record<string, number> = { relayer: 8787, api: 8788, indexer: 8789, matcher: 8790, makers: 8791, keeper: 8792, topup: 8793 };
-const wanted = (process.env.STACK_SERVICES ?? "api,relayer,indexer,matcher,makers,keeper,topup").split(",").map((s) => s.trim()).filter((s) => s in PORTS);
+const PORTS: Record<string, number> = { relayer: 8787, api: 8788, indexer: 8789, matcher: 8790, makers: 8791, keeper: 8792, topup: 8793, market: 8794 };
+const wanted = (process.env.STACK_SERVICES ?? "api,relayer,indexer,matcher,makers,keeper,topup,market").split(",").map((s) => s.trim()).filter((s) => s in PORTS);
 const children: ChildProcess[] = [];
 
 for (const name of wanted) {

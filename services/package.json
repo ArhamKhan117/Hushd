@@ -12,7 +12,10 @@
     "test": "tsx --test test/*.test.ts",
     "deploy:testnet": "tsx scripts/deploy-testnet.ts",
     "verify": "tsx scripts/verify.ts",
-    "stack": "tsx scripts/stack.ts"
+    "stack": "tsx scripts/stack.ts",
+    "intents:sandbox": "tsx scripts/intents-sandbox.ts",
+    "intents:mainnet": "tsx scripts/intents-mainnet.ts",
+    "policy-wallet": "tsx scripts/policy-wallet.ts"
   },
   "devDependencies": {
     "@msgpack/msgpack": "^3.1.3",
