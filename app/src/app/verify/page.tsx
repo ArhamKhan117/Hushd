@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ErrorLine, Field } from "@/components/app/forms";
 import { BusyLabel } from "@/components/ui/Spinner";
-import { CIRCUITS_BASE, NETWORK } from "@/lib/hushd/config";
+import { CIRCUITS_BASE, EXAMPLE_READER, NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol, TOKENS } from "@/lib/hushd/format";
 
 const KIND_WORDS = { receipt: "Payment", funds: "Funds held", volume: "Desk volume" } as const;
@@ -129,7 +129,7 @@ export default function VerifyPage() {
           />
         </Field>
         <Field label="You are (NEAR account)" hint="A proof made for someone else is shown as such, never quietly accepted.">
-          <input className="hd-input w-full" placeholder="auditor.testnet" value={me} onChange={(e) => setMe(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
+          <input className="hd-input w-full" placeholder={EXAMPLE_READER} value={me} onChange={(e) => setMe(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
         </Field>
         <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!input || working} onClick={() => void check(input, me.trim())} aria-busy={working}>
           <BusyLabel busy={working} busyText="Checking in your browser and on chain…">

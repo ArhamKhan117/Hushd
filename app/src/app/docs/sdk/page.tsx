@@ -15,7 +15,7 @@ const GROUPS: { id: string; title: string; rows: [string, string][] }[] = [
     id: "network",
     title: "Network",
     rows: [
-      ["TESTNET, MAINNET", "Where Hushd lives: RPC, contracts, tokens, the API. MAINNET has no Hushd contracts"],
+      ["TESTNET, MAINNET", "Where Hushd lives: RPC, contracts, tokens, the API. MAINNET names the mainnet contracts and real tokens; deployed is false until they exist"],
       ["withOverrides(net, partial)", "Point any field elsewhere: a local sandbox, a self-hosted API"],
       ["tokenInfo(net, idOrSymbol)", "A token's account id, symbol, decimals and hedge coin"],
       ["txUrl, accountUrl", "NearBlocks links for a transaction or an account"],

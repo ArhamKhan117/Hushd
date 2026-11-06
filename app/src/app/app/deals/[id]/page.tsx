@@ -193,7 +193,7 @@ export default function DealPage() {
                 {BigInt(deal.bond) > 0n && <Row label="Maker's bond">{fmt(BOND, BigInt(deal.bond))} {symbol(BOND)}</Row>}
                 {deal.hedge && (
                   <Row label="Hedge">
-                    {deal.hedge.is_buy ? "Buy" : "Sell"} {deal.hedge.size} {deal.hedge.coin} perp on Hyperliquid {deal.hedge.testnet ? "testnet" : ""}, limit {deal.hedge.limit_px}, by {when(deal.hedge.deadline_ms)}.
+                    {deal.hedge.is_buy ? "Buy" : "Sell"} {deal.hedge.size} {deal.hedge.coin} perp on Hyperliquid{deal.hedge.testnet ? " testnet" : ""}, limit {deal.hedge.limit_px}, by {when(deal.hedge.deadline_ms)}.
                     <span className="block text-[12.5px] text-mute">Signed by NEAR Chain Signatures from the path hushd/hedge/{deal.id}; only the deal&apos;s owner key can close it.</span>
                   </Row>
                 )}

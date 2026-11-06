@@ -9,7 +9,7 @@ import { AmountCard, ErrorLine, Field, TokenSelect } from "@/components/app/form
 import { SignInPanel } from "@/components/app/SignInPanel";
 import { BusyLabel } from "@/components/ui/Spinner";
 import { Select } from "@/components/ui/Select";
-import { CIRCUITS_BASE, NETWORK } from "@/lib/hushd/config";
+import { CIRCUITS_BASE, EXAMPLE_READER, NETWORK } from "@/lib/hushd/config";
 import { when } from "@/lib/hushd/deal";
 import { fmt, parseAmount, symbol, TOKENS } from "@/lib/hushd/format";
 import { useHushd } from "@/lib/hushd/session";
@@ -158,8 +158,8 @@ function ProveInner() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <Field label="Who may read it" hint={reader && !readerOk ? "A NEAR account, like auditor.testnet." : "The proof names this NEAR account; anyone else checking it is told it is not theirs."}>
-          <input className="hd-input w-full" placeholder="auditor.testnet" value={reader} onChange={(e) => setReader(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
+        <Field label="Who may read it" hint={reader && !readerOk ? `A NEAR account, like ${EXAMPLE_READER}.` : "The proof names this NEAR account; anyone else checking it is told it is not theirs."}>
+          <input className="hd-input w-full" placeholder={EXAMPLE_READER} value={reader} onChange={(e) => setReader(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
         </Field>
         <Field label="Valid for">
           <Segmented label="Valid for" value={days} onChange={setDays} options={EXPIRY} />

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { accountUrl, TESTNET } from "@hushd/sdk";
+import { accountUrl } from "@hushd/sdk";
 import { DocsLayout } from "@/components/DocsLayout";
 import { Callout, Code } from "@/components/docs/FlowDiagram";
 import { NETWORK } from "@/lib/hushd/config";
+import { tokenWords } from "@/lib/hushd/format";
 
 export const metadata: Metadata = {
   title: "Contracts",
@@ -16,12 +17,12 @@ const ACCOUNTS: { account: string; what: string }[] = [
   ...(NETWORK.pool ? [{ account: NETWORK.pool, what: "The shielded pool: notes, proofs, settlement" }] : []),
   ...(NETWORK.desk ? [{ account: NETWORK.desk, what: "The desk: makers, bonds, requests, deals, receipts" }] : []),
   ...(NETWORK.board ? [{ account: NETWORK.board, what: "The board: sealed word of payments" }] : []),
-  ...NETWORK.tokens.map((t) => ({ account: t.id, what: `Test ${t.symbol}, ${t.decimals} decimals, with a faucet` })),
+  ...NETWORK.tokens.map((t) => ({ account: t.id, what: tokenWords(t).long })),
 ];
 
 const EXTERNAL: { account: string; what: string }[] = [
-  { account: TESTNET.mpc, what: "NEAR Chain Signatures: signs each deal's hedge order" },
-  { account: TESTNET.outlayer, what: "OutLayer: runs the matcher in a TEE and resumes the desk's call" },
+  { account: NETWORK.mpc, what: "NEAR Chain Signatures: signs each deal's hedge order" },
+  { account: NETWORK.outlayer, what: "OutLayer: runs the matcher in a TEE and resumes the desk's call" },
 ];
 
 function AccountLink({ account }: { account: string }) {

@@ -41,7 +41,7 @@ const ENV: [string, string][] = [
   ["HUSHD_ALLOW_TO", "The only hushd1… addresses and NEAR accounts it may send or cash out to, comma separated"],
   ["HUSHD_NEAR_ACCOUNT", "Or a NEAR testnet account with its own key, for hushd_faucet and hushd_shield"],
   ["HUSHD_NEAR_PRIVATE_KEY", "That account's key (ed25519:…)"],
-  ["HUSHD_NETWORK", "testnet, the only network with Hushd contracts"],
+  ["HUSHD_NETWORK", "testnet; mainnet once Hushd's contracts are deployed there (or with HUSHD_RPC_URL, a local node running them)"],
   ["HUSHD_API_URL", "A self-hosted Hushd API (default https://api.hushd.net)"],
   ["HUSHD_RPC_URL", "NEAR RPC endpoints, comma separated"],
   ["HUSHD_CIRCUITS_DIR", "Proving artifacts on disk (found on its own inside the repo)"],

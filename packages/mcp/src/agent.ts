@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { CUSTODY, CustodyWallet, custodyView, DeskApi, identityFromSeed, keepRpcErrorBodies, loadPoseidon, PrivateWallet, RelayerClient, sendEndpoints, TESTNET, withOverrides, type ArtifactSource, type CallSpec, type HushdNetwork, type Identity } from "@hushd/sdk";
+import { CUSTODY, CustodyWallet, custodyView, DeskApi, identityFromSeed, keepRpcErrorBodies, loadPoseidon, PrivateWallet, RelayerClient, MAINNET, sendEndpoints, TESTNET, withOverrides, type ArtifactSource, type CallSpec, type HushdNetwork, type Identity } from "@hushd/sdk";
 import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 import { Near } from "near-kit";
 import { DEFAULT_PER_DAY, DEFAULT_PER_PAYMENT, Limits, parseCaps, parseRules } from "./limits.js";
@@ -18,8 +18,12 @@ export interface Env {
 }
 
 export function networkFrom(env: Env): HushdNetwork {
-  if ((env.HUSHD_NETWORK ?? "testnet") !== "testnet") throw new Error("Hushd's contracts run on NEAR testnet; set HUSHD_NETWORK=testnet");
-  return withOverrides(TESTNET, {
+  const id = env.HUSHD_NETWORK ?? "testnet";
+  if (id !== "testnet" && id !== "mainnet") throw new Error("HUSHD_NETWORK is testnet or mainnet");
+  const base = id === "mainnet" ? MAINNET : TESTNET;
+  // a local node (HUSHD_RPC_URL) may run the mainnet contracts before mainnet does
+  if (!base.deployed && !env.HUSHD_RPC_URL) throw new Error(`Hushd's contracts are not on NEAR ${id} yet; use HUSHD_NETWORK=testnet`);
+  return withOverrides(base, {
     ...(env.HUSHD_API_URL ? { api: env.HUSHD_API_URL } : {}),
     ...(env.HUSHD_RPC_URL ? { rpc: env.HUSHD_RPC_URL.split(",") } : {}),
   });

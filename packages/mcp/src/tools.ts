@@ -148,6 +148,7 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     { title: "Testnet tokens", description: "Testnet only: mint test tokens to this agent's NEAR account (then use hushd_shield).", inputSchema: { token: TOKEN } },
     ({ token }) =>
       run(async () => {
+        if (net.id !== "testnet") throw new Error("There is no faucet on mainnet: send real tokens to this agent's NEAR account, then use hushd_shield");
         if (!a.near) throw new Error(NO_NEAR);
         const t = tokenInfo(net, token);
         const r = await a.relayer.faucet(a.near.accountId, t.id);

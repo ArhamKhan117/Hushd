@@ -9,7 +9,7 @@ import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { FlowField } from "@/components/ui/FlowField";
 import { SealedField } from "@/components/ui/SealedField";
 import { NETWORK } from "@/lib/hushd/config";
-import { fmt, symbol } from "@/lib/hushd/format";
+import { fmt, symbol, tokenWords } from "@/lib/hushd/format";
 import { intentsTrades, type IntentsTrades } from "@/lib/hushd/intents";
 
 /**
@@ -229,7 +229,7 @@ const CONTRACTS: { account: string; what: string }[] = [
   ...(NETWORK.pool ? [{ account: NETWORK.pool, what: "Shielded pool" }] : []),
   ...(NETWORK.desk ? [{ account: NETWORK.desk, what: "OTC desk" }] : []),
   ...(NETWORK.board ? [{ account: NETWORK.board, what: "Encrypted board" }] : []),
-  ...NETWORK.tokens.map((t) => ({ account: t.id, what: `Test ${t.symbol}` })),
+  ...NETWORK.tokens.map((t) => ({ account: t.id, what: tokenWords(t).short })),
 ];
 
 const PRIVATE_FACTS = [
@@ -437,7 +437,7 @@ export function TransparencyView() {
                 The contracts, live
               </h2>
               <p className="mt-5 max-w-[54ch] text-[16px] leading-relaxed text-mute">
-                Read straight from NEAR testnet RPC. No Hushd server sits in between, and you do not need a wallet.
+                Read straight from NEAR {NETWORK.id} RPC. No Hushd server sits in between, and you do not need a wallet.
               </p>
             </div>
             <button type="button" onClick={chain.refresh} disabled={chain.state.status === "loading"} className="btn btn-ghost btn-sm self-start lg:self-auto">
@@ -456,7 +456,7 @@ export function TransparencyView() {
               )}
               {chain.state.status === "missing" && (
                 <Notice title="Nothing to count yet">
-                  {chain.state.account} is not on NEAR testnet yet. Once the contracts are deployed, their counts show
+                  {chain.state.account} is not on NEAR {NETWORK.id} yet. Once the contracts are deployed, their counts show
                   here, read from the chain.
                 </Notice>
               )}
@@ -539,7 +539,7 @@ export function TransparencyView() {
                 The accounts
               </h2>
               <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
-                Every Hushd contract on NEAR testnet. Open each on NearBlocks for its code, transactions and events.
+                Every Hushd contract on NEAR {NETWORK.id}. Open each on NearBlocks for its code, transactions and events.
               </p>
               <Link href="/docs/contracts" className="hd-arrowlink mt-6">
                 What each one does <span aria-hidden>→</span>

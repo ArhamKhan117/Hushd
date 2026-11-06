@@ -101,10 +101,11 @@ export function SeenBy({ title, open, sealed }: { title: string; open: string[];
 /**
  * Inline code that may wrap after a dot, an underscore, a slash or an opening
  * bracket, so long account ids and tool names break at a seam in narrow table
- * cells instead of in the middle of a word.
+ * cells instead of in the middle of a word. A run with no seam longer than 24
+ * characters (a 64-hex implicit account) may also wrap every 16 characters.
  */
 export function Code({ children }: { children: string }) {
-  const parts = children.split(/(?<=[._/(])/);
+  const parts = children.split(/(?<=[._/(])/).flatMap((p) => (p.length > 24 ? (p.match(/.{1,16}/g) ?? [p]) : [p]));
   return (
     <code>
       {parts.map((p, i) => (

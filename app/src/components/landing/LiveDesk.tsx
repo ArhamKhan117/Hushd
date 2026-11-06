@@ -82,7 +82,7 @@ export function LiveDesk() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="inline-flex items-center gap-2 text-[13px] text-mute">
             <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${state.status === "ready" ? "livedot bg-sealed" : "bg-line-strong"}`} />
-            Read from NEAR testnet in your browser
+            Read from NEAR {NETWORK.id} in your browser
           </p>
           {state.status === "ready" && (
             <p className="tnum text-[12.5px] text-faint">
@@ -104,7 +104,7 @@ export function LiveDesk() {
             <div className="rounded-[14px] bg-surface px-4 py-5 sm:px-5">
               <p className="text-[15px] text-foreground">Nothing to count yet</p>
               <p className="mt-1.5 max-w-[60ch] text-[13.5px] leading-relaxed text-mute">
-                {state.account} is not on NEAR testnet yet. Once the contracts are deployed, the number of deposits,
+                {state.account} is not on NEAR {NETWORK.id} yet. Once the contracts are deployed, the number of deposits,
                 private transfers, cash outs and desk deals shows here, read straight from the chain.
               </p>
             </div>

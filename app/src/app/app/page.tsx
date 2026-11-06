@@ -23,7 +23,7 @@ import { AttestationLine, IntakeProof, Segmented, Steps, type Step, type StepSta
 import { AmountCard, ErrorLine, Field, TokenSelect, TxLine } from "@/components/app/forms";
 import { SignInPanel } from "@/components/app/SignInPanel";
 import { BusyLabel } from "@/components/ui/Spinner";
-import { NETWORK } from "@/lib/hushd/config";
+import { IS_TESTNET, NETWORK } from "@/lib/hushd/config";
 import { fmt, parseAmount, symbol, TOKENS } from "@/lib/hushd/format";
 import { useHushd } from "@/lib/hushd/session";
 
@@ -264,7 +264,7 @@ export default function DeskPage() {
               </p>
               <p className="text-[13px] text-mute">
                 {hedged
-                  ? `${run.makerName} now opens the hedge on Hyperliquid testnet from a per-deal address only the desk's Chain Signatures can sign for. If it misses the deadline, its bond is paid to you as a private note.`
+                  ? `${run.makerName} now opens the hedge on Hyperliquid${IS_TESTNET ? " testnet" : ""} from a per-deal address only the desk's Chain Signatures can sign for. If it misses the deadline, its bond is paid to you as a private note.`
                   : "The chain shows that deal #" + run.dealId + " settled, not who traded or how much."}
               </p>
               <div className="flex flex-wrap gap-2">

@@ -1,15 +1,20 @@
+import { x402Network } from "@hushd/sdk";
 import type { Metadata } from "next";
 import deployment from "../../../../../deployments/testnet.json";
 import { AppShell } from "@/components/app/AppShell";
 import { PolicyWallets, type WalletLabel } from "@/components/app/PolicyWallets";
 import { CodeBlock } from "@/components/ui/CodeBlock";
+import { IS_TESTNET, NETWORK } from "@/lib/hushd/config";
 
 export const metadata: Metadata = { title: "Agents" };
 
-/** Hushd's own policy wallets, named from the deployment record (read on the server; only the names reach the page). */
-const record = deployment as { deployer: string; policyWallets?: Record<string, { account: string; owner: string }> };
-const OWNER = record.deployer;
-const LABELS: WalletLabel[] = Object.entries(record.policyWallets ?? {})
+/**
+ * Hushd's own policy wallets, named from the deployment record (read on the server; only
+ * the names reach the page). There is a record for testnet only, so other networks show none.
+ */
+const record = IS_TESTNET ? (deployment as { deployer: string; policyWallets?: Record<string, { account: string; owner: string }> }) : null;
+const OWNER = record?.deployer ?? null;
+const LABELS: WalletLabel[] = Object.entries(record?.policyWallets ?? {})
   .filter(([, w]) => w.owner === OWNER)
   .map(([prefix, w]) => ({
     account: w.account,
@@ -29,14 +34,16 @@ claude mcp add hushd \\
 const HOSTED = `# read-only: status, makers, deals, proof checks
 claude mcp add --transport http hushd-read https://hushd.net/mcp`;
 
-const X402 = `curl -i "https://api.hushd.net/makers/steady/quote?sell=usdc.hushd.testnet&amount=1000000000&buy=btc.hushd.testnet"
+const USDC = NETWORK.tokens.find((t) => t.symbol === "USDC")?.id ?? NETWORK.tokens[0]!.id;
+const BTC = NETWORK.tokens.find((t) => t.symbol === "BTC")?.id ?? NETWORK.tokens.at(-1)!.id;
+const X402 = `curl -i "${NETWORK.api.replace(/\/$/, "")}/makers/steady/quote?sell=${USDC}&amount=1000000000&buy=${BTC}"
 # HTTP/1.1 402 Payment Required
-# {"x402Version":1,"accepts":[{"scheme":"hushd","network":"near-testnet",
-#   "maxAmountRequired":"10000","asset":"usdc.hushd.testnet","payTo":"hushd1…", …}]}`;
+# {"x402Version":1,"accepts":[{"scheme":"hushd","network":"${x402Network(NETWORK)}",
+#   "maxAmountRequired":"10000","asset":"${USDC}","payTo":"hushd1…", …}]}`;
 
 const TOOLS: [string, string][] = [
   ["hushd_address, hushd_balance", "The agent's receive address and private balance"],
-  ["hushd_faucet, hushd_shield", "Testnet tokens to its NEAR account, then into the pool"],
+  IS_TESTNET ? ["hushd_faucet, hushd_shield", "Testnet tokens to its NEAR account, then into the pool"] : ["hushd_shield", "Tokens from its NEAR account into the pool"],
   ["hushd_send, hushd_cash_out", "Pay a hushd1… address, or out to a NEAR account"],
   ["hushd_trade", "Ask the desk's makers, match in the enclave, settle privately"],
   ["hushd_pay_x402", "Pay a 402 resource from the private balance"],
