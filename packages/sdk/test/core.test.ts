@@ -132,3 +132,9 @@ test("the relayer client calls fetch unbound, as browsers require", async () => 
     globalThis.fetch = real;
   }
 });
+
+test("an agent starts while the artifact host is unreachable; the first proof says why it cannot load", async () => {
+  const { cachedArtifacts } = await import("../src/node.ts");
+  const a = await cachedArtifacts({ baseUrl: "http://127.0.0.1:9/circuits", cacheDir: join(import.meta.dirname, "../.cache-test") });
+  await assert.rejects(Promise.resolve(a.wasm("funds")), /Could not load the proving artifacts from http:\/\/127\.0\.0\.1:9\/circuits/);
+});

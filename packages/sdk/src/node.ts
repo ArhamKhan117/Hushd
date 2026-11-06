@@ -39,13 +39,24 @@ export class EncryptedFileStore implements NoteStore {
 export async function cachedArtifacts(opts: { dir?: string; baseUrl?: string; cacheDir: string }): Promise<ArtifactSource> {
   if (opts.dir) return { wasm: (n) => join(opts.dir!, `${n}.wasm`), zkey: (n) => join(opts.dir!, `${n}.zkey`) };
   const base = (opts.baseUrl ?? "https://hushd.net/circuits").replace(/\/$/, "");
-  const manifest = (await (await fetch(`${base}/manifest.json`)).json()) as { files: Record<string, string> };
-  mkdirSync(opts.cacheDir, { recursive: true });
+  // fetched on the first proof, so an agent starts (and reads) while the artifact host is unreachable
+  let manifest: Promise<{ files: Record<string, string> }> | null = null;
+  const loadManifest = () =>
+    (manifest ??= fetch(`${base}/manifest.json`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ files: Record<string, string> }>;
+      })
+      .catch((e: Error) => {
+        manifest = null;
+        throw new Error(`Could not load the proving artifacts from ${base}: ${e.message}`);
+      }));
   const get = async (file: string) => {
-    const want = manifest.files[file];
+    const want = (await loadManifest()).files[file];
     if (!want) throw new Error(`${file} is not in the artifact manifest`);
     const path = join(opts.cacheDir, `${want.slice(0, 16)}-${file}`);
     if (!existsSync(path)) {
+      mkdirSync(opts.cacheDir, { recursive: true });
       const res = await fetch(`${base}/${file}`);
       if (!res.ok) throw new Error(`Could not download ${file}: HTTP ${res.status}`);
       const bytes = Buffer.from(await res.arrayBuffer());

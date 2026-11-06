@@ -47,13 +47,15 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
 
 /** Call a view method; returns its JSON result. */
 export async function view<T>(net: HushdNetwork, contract: string, method: string, args: unknown = {}): Promise<T> {
-  const r = await rpcCall<{ result: number[]; logs: string[] }>(net, "query", {
+  const r = await rpcCall<{ result?: number[]; logs: string[]; error?: string }>(net, "query", {
     request_type: "call_function",
     finality: "optimistic",
     account_id: contract,
     method_name: method,
     args_base64: b64(JSON.stringify(args)),
   });
+  // some nodes answer a contract panic inside the result instead of as an RPC error
+  if (r.error !== undefined || !r.result) throw new RpcError(r.error ?? `${contract}.${method} returned nothing`, { data: r.error });
   const text = new TextDecoder().decode(Uint8Array.from(r.result));
   return (text ? JSON.parse(text) : null) as T;
 }
