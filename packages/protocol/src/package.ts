@@ -1,7 +1,7 @@
 /**
  * OTC packages: what a trader asks for, what a maker quotes, what both agree to,
  * and the bytes each side signs or hashes. The matcher enclave (Rust) encodes the
- * same bytes; `test/vectors.json` pins them.
+ * same bytes; `test/protocol.test.ts` pins them.
  *
  * Three templates:
  * - `spot`: sell one token for another, settled privately inside the pool (atomic).

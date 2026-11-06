@@ -49,7 +49,7 @@ Everything runs on NEAR testnet with test tokens.
 | NEAR AI Cloud verifiable private inference, attestation checked with `@nearai/inference-sdk` | Desk, "Describe it" |
 | Named accounts as proof readers: a proof is for `auditor.testnet`, not for a key | Prove page, "Who may read it" |
 | Passkeys that derive an implicit account, opened by the relayer with a little NEAR | Sign in with a passkey |
-| Gas keys give the relayer parallel nonce lanes; NEP-366 meta transactions for makers | Settings page, "Relayer" |
+| Gas keys give the relayer parallel nonce lanes; it also relays NEP-366 meta transactions for allowlisted calls | Settings page, "Relayer" |
 | NEP-141 `ft_transfer_call` deposits straight into the pool | Balance, "Add privately" |
 | NEP-297 events read from FastNEAR's neardata by the indexer | A deal page's "On chain" list |
 
