@@ -9,7 +9,9 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { accountBalance, assetField, extHash, poolView, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
+import { accountBalance, assetField, extHash, poolView, settleMessage, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { base58 } from "@scure/base";
 import { decodeSignedDelegateAction } from "near-kit";
 import * as snarkjs from "snarkjs";
 import { account, network, settings } from "./config.js";
@@ -152,11 +154,12 @@ export class Relayer {
     return { txHash: r.txHash, rfqId: Number(r.result), result: r.result };
   }
 
-  /** Dry-run both legs against the deal's binding, then `desk.settle`. */
-  async settle(body: { dealId: number; legs: Leg[] }) {
+  /** Dry-run both legs against the deal's binding and check both parties' approvals, then `desk.settle`. */
+  async settle(body: { dealId: number; legs: Leg[]; approvals: { trader: string; maker: string } }) {
     const dealId = BigInt(body.dealId);
     const legs = body.legs;
     if (!Array.isArray(legs) || legs.length !== 2) throw new BadRequest("Two legs");
+    await this.checkApprovals(Number(dealId), legs, body.approvals);
     const binding = swapExtHash(dealId, legs[0]!.commitments.map(big) as [bigint, bigint], legs[1]!.commitments.map(big) as [bigint, bigint]);
     for (const l of legs) {
       await this.verifyJoinsplit([big(l.root), big(l.nullifiers[0]), big(l.nullifiers[1]), big(l.commitments[0]), big(l.commitments[1]), 0n, 0n, binding], l.proof);
@@ -166,9 +169,24 @@ export class Relayer {
     if (!deal) throw new BadRequest("No such deal");
     if (deal.status !== "matched") throw new BadRequest(`The deal is ${deal.status}`);
     this.budget(300_000_000_000_000n);
-    const r = await this.signer.call(this.net.desk!, "settle", { deal_id: String(dealId), legs }, { gas: "300 Tgas", deposit: 20_000_000_000_000_000_000_000n });
+    const r = await this.signer.call(this.net.desk!, "settle", { deal_id: String(dealId), legs, approvals: body.approvals }, { gas: "300 Tgas", deposit: 20_000_000_000_000_000_000_000n });
     this.charge(r.gasBurnt);
     return { txHash: r.txHash, result: r.result };
+  }
+
+  /** The desk refuses legs both parties did not approve; check here first so no gas is spent on them. */
+  private async checkApprovals(dealId: number, legs: Leg[], approvals: { trader: string; maker: string } | undefined) {
+    if (typeof approvals?.trader !== "string" || typeof approvals?.maker !== "string") throw new BadRequest("approvals: the trader's and the maker's signatures");
+    const deal = await view<{ maker: string; owner_key: string | null } | null>(this.net, this.net.desk!, "deal", { deal_id: String(dealId) });
+    if (!deal) throw new BadRequest("No such deal");
+    const maker = await view<{ quote_key: string } | null>(this.net, this.net.desk!, "maker", { account_id: deal.maker });
+    const message = new TextEncoder().encode(settleMessage(this.net, dealId, [...legs[0]!.commitments, ...legs[1]!.commitments] as [string, string, string, string]));
+    const ok = (sig: string, key: string | null | undefined) => {
+      const bytes = Buffer.from(sig, "base64");
+      return Boolean(key?.startsWith("ed25519:")) && bytes.length === 64 && ed25519.verify(bytes, message, base58.decode(key!.slice(8)));
+    };
+    if (!ok(approvals.trader, deal.owner_key)) throw new BadRequest("The trader did not approve these legs");
+    if (!ok(approvals.maker, maker?.quote_key)) throw new BadRequest("The maker did not approve these legs");
   }
 
   /** Testnet faucet for an account that has no gas yet (a fresh passkey account). */

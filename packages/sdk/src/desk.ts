@@ -156,7 +156,7 @@ export class DeskApi {
 
 type RoomMsg =
   | { t: "plan"; outputs: [string, string]; noteForYou: NoteMessage }
-  | { t: "leg"; leg: ReturnType<typeof swapLeg> };
+  | { t: "leg"; leg: ReturnType<typeof swapLeg>; approval: string };
 
 export type PackageKind = MakerAsk["kind"];
 
@@ -184,6 +184,16 @@ export function ownerKeyFor(id: Identity, refundBlinding: bigint): { secret: Uin
 export function closeHedgeMessage(net: HushdNetwork, dealId: number): string {
   if (!net.desk) throw new Error(`No desk on ${net.id}`);
   return `hushd.close:${net.desk}:${dealId}`;
+}
+
+/**
+ * What both parties sign before `desk.settle` takes their legs: "hushd.settle.v1:<desk>:<deal
+ * id>:<a0>,<a1>,<b0>,<b1>", the four output commitments (decimal, as the legs carry them),
+ * the trader's leg first. The same text as `settle_message` in contracts/desk/src/lib.rs.
+ */
+export function settleMessage(net: HushdNetwork, dealId: number, outputs: readonly [string, string, string, string]): string {
+  if (!net.desk) throw new Error(`No desk on ${net.id}`);
+  return `hushd.settle.v1:${net.desk}:${dealId}:${outputs.join(",")}`;
 }
 
 /** Sign "hushd.close:<desk>:<deal id>" with the deal's owner key, for `desk.close_hedge`. */
@@ -222,6 +232,9 @@ export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft)
   return { request, ask, refundBlinding };
 }
 
+/** How many makers one RFQ asks: the API keeps at most this many sealed asks per request. */
+export const MAX_ASKED_MAKERS = 32;
+
 /** Seal the trader's request to the enclave and its ask to each maker, and commit it on chain. */
 export async function openRfq(p: {
   net: HushdNetwork;
@@ -237,7 +250,11 @@ export async function openRfq(p: {
   const commitment = bytesHex(sha256(rfqBox));
   const { rfqId } = await p.relayer.openRfq(commitment, p.windowMs);
   const closesAtMs = Date.now() + p.windowMs;
-  const makers = (await deskView.makers(p.net)).filter(([, m]) => m.active);
+  // anyone may register as a maker: ask only active ones with a usable key, the best bonded first, as many as the API takes
+  const makers = (await deskView.makers(p.net))
+    .filter(([, m]) => m.active && /^0x[0-9a-fA-F]{64}$/.test(m.enc_key))
+    .sort(([, a], [, b]) => (BigInt(b.bond) > BigInt(a.bond) ? 1 : BigInt(b.bond) < BigInt(a.bond) ? -1 : 0))
+    .slice(0, MAX_ASKED_MAKERS);
   const makerBoxes = Object.fromEntries(makers.map(([acc, m]) => [acc, toB64(sealJson(hexToBytes(m.enc_key), { ...p.ask, v: 1, rfqId, closesAtMs }))]));
   await p.api.postRfq(rfqId, toB64(rfqBox), makerBoxes);
   return { rfqId, closesAtMs };
@@ -300,8 +317,12 @@ export interface SettleProgress {
   (step: "planning" | "waiting_plan" | "proving" | "waiting_settlement" | "settled", detail?: string): void;
 }
 
-/** Trader side of settlement (leg A). Returns the note received from the maker. */
-export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; wallet: PrivateWallet; dealId: number; terms: AgreedTerms; makerAddress: string; onStep?: SettleProgress }): Promise<{ received: Note; plan: LegPlan }> {
+/**
+ * Trader side of settlement (leg A). `refundBlinding` is the one `packageRequest` returned:
+ * it re-derives the deal's owner key, which approves the four outputs. Returns the note
+ * received from the maker.
+ */
+export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; wallet: PrivateWallet; dealId: number; terms: AgreedTerms; makerAddress: string; refundBlinding: bigint; onStep?: SettleProgress }): Promise<{ received: Note; plan: LegPlan }> {
   const me = p.wallet.id;
   const maker = decodeAddress(p.makerAddress);
   p.onStep?.("planning");
@@ -311,9 +332,12 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
   p.onStep?.("waiting_plan");
   const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, me, "plan", 120_000);
   const received = checkNoteForMe(me, theirs.noteForYou, p.terms.makerGives, theirs.outputs[0]);
+  // the note for me checked out: approve exactly these four outputs with the deal's owner key
+  const message = new TextEncoder().encode(settleMessage(p.net, p.dealId, [...aOut, ...theirs.outputs]));
+  const approval = toB64(ed25519.sign(message, ownerKeyFor(me, p.refundBlinding).secret));
   p.onStep?.("proving");
   const legA: JoinsplitArgs = await p.wallet.proveLeg(plan, aOut.map(BigInt) as [bigint, bigint], theirs.outputs.map(BigInt) as [bigint, bigint]);
-  await p.api.send(p.dealId, maker.encPublic, { t: "leg", leg: swapLeg(legA) } satisfies RoomMsg);
+  await p.api.send(p.dealId, maker.encPublic, { t: "leg", leg: swapLeg(legA), approval } satisfies RoomMsg);
   p.onStep?.("waiting_settlement");
   const start = Date.now();
   for (;;) {
@@ -329,8 +353,11 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
   return { received, plan };
 }
 
-/** Maker side of settlement (leg B): answers the trader's plan, then submits both legs. */
-export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relayer: RelayerClient; wallet: PrivateWallet; dealId: number; terms: AgreedTerms; traderAddress: string }): Promise<{ txHash: string; received: Note }> {
+/**
+ * Maker side of settlement (leg B): answers the trader's plan, then submits both legs with
+ * both approvals; `quoteSecret` is the maker's quote key, the one its consents are signed with.
+ */
+export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relayer: RelayerClient; wallet: PrivateWallet; dealId: number; terms: AgreedTerms; traderAddress: string; quoteSecret: Uint8Array }): Promise<{ txHash: string; received: Note }> {
   const me = p.wallet.id;
   const trader = decodeAddress(p.traderAddress);
   const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, me, "plan", 120_000);
@@ -340,7 +367,11 @@ export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relaye
   await p.api.send(p.dealId, trader.encPublic, { t: "plan", outputs: bOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) } satisfies RoomMsg);
   const legB = await p.wallet.proveLeg(plan, theirs.outputs.map(BigInt) as [bigint, bigint], bOut.map(BigInt) as [bigint, bigint]);
   const legA = await waitFor<Extract<RoomMsg, { t: "leg" }>>(p.api, p.dealId, me, "leg", 180_000);
-  const r = await p.relayer.settle(p.dealId, [legA.leg, swapLeg(legB)]);
+  // the trader's leg must carry the outputs whose note this maker checked
+  if (legA.leg.commitments.some((c, i) => c !== theirs.outputs[i])) throw new Error(`Deal ${p.dealId}: the trader's leg names other outputs than its plan`);
+  const message = new TextEncoder().encode(settleMessage(p.net, p.dealId, [...theirs.outputs, ...bOut]));
+  const approvals = { trader: legA.approval, maker: toB64(ed25519.sign(message, p.quoteSecret)) };
+  const r = await p.relayer.settle(p.dealId, [legA.leg, swapLeg(legB)], approvals);
   await p.wallet.settled(plan, received, r.txHash);
   return { txHash: r.txHash, received };
 }

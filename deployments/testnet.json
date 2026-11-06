@@ -25,14 +25,15 @@
     },
     "board": {
       "account": "board.hushd.testnet",
-      "codeHash": "GpaqnwDd7X6soEFxtnM8sDzpf7JvNYhwia63VZPc5jyD",
-      "tx": "GiBFw3p5QSb5uYPHCiL6xuKtM4wfJ9TkAHgWv4hykRzv"
+      "codeHash": "21ZMmpkEGEqE9J54w2doysFwnB6cegfdbzKdt3ZyzAHD",
+      "tx": "GiBFw3p5QSb5uYPHCiL6xuKtM4wfJ9TkAHgWv4hykRzv",
+      "redeployed": "3YxMJoYubxTLNr6hGrA16aS7y979xYr9vKdLGXt1AcZK"
     },
     "desk": {
       "account": "desk.hushd.testnet",
-      "codeHash": "CKQHb1JKRM1smft8EAwL2VZ2nrftBzjxtEe4HNTuzDTN",
+      "codeHash": "CSVqmdtYFgTTYd2xyqkRk8zhgD3b4WR4H6eDaKYyH9ST",
       "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
-      "redeployed": "MKcLXTL1nmia5J7AZpzLrHryU68mkzgivvJMJGN5xd7"
+      "redeployed": "3Rre5v1UskUVVMK44Js4WsptaK8t8rm5Tj8n9DySC5wD"
     }
   },
   "services": {
@@ -331,7 +332,9 @@
         "freeze_1793987260135": "A7vAGWHfdhfKDRa7ixNwhe7AB8RqUhupHSc6SGsh2Dzh",
         "unfreeze_1793987281863": "DyVj9heFQjjHV11noC1BPDAP2b9tePNQyN4WWmWtQFmM",
         "freeze_1793987601542": "ATNyhwu18qAPEcJKeAnUzJUuFcU1Gnf8VXFS3XFco8BK",
-        "unfreeze_1793987623310": "8yQBktBgKFMt28RG6vaPnBoWYYzs4LrSKkXxogHLv7YA"
+        "unfreeze_1793987623310": "8yQBktBgKFMt28RG6vaPnBoWYYzs4LrSKkXxogHLv7YA",
+        "freeze_1793994011845": "9CdPaeiKsugfP6UVgK3Tc1Q4c989Nkyzay82SBJUmcMu",
+        "unfreeze_1793994033619": "Byhfm81TsyP1TNj3GaWV43PFd8D48AiBkapD64VD5Uyi"
       },
       "createdAt": "2026-11-06T12:01:27.413Z"
     },

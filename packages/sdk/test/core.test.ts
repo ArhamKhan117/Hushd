@@ -181,3 +181,9 @@ test("transactions go only through endpoints that take them; an RPC override sen
   assert.deepEqual(sendEndpoints(withOverrides(TESTNET, { rpc: ["http://127.0.0.1:3030"] })), ["http://127.0.0.1:3030"]);
   assert.deepEqual(sendEndpoints(withOverrides(TESTNET, { rpc: ["https://near-testnet.drpc.org", "https://rpc.testnet.fastnear.com"] })), ["https://rpc.testnet.fastnear.com"]);
 });
+
+test("the settle message is the same text the desk contract checks", async () => {
+  const { settleMessage } = await import("../src/desk.ts");
+  // the vector in contracts/desk/src/tests.rs (the_settle_message_names_the_desk_the_deal_and_the_outputs_in_leg_order)
+  assert.equal(settleMessage(withOverrides(TESTNET, { desk: "desk.test" }), 7, ["1", "2", "3", "4"]), "hushd.settle.v1:desk.test:7:1,2,3,4");
+});

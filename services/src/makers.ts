@@ -268,7 +268,7 @@ export class Maker {
             .catch((e) => this.fail(e));
       }
       this.settling.add(res.dealId);
-      void settleAsMaker({ net: this.net, api: this.api, relayer: this.relayer, wallet: this.wallet, dealId: res.dealId, terms: won.terms, traderAddress: won.trader_address })
+      void settleAsMaker({ net: this.net, api: this.api, relayer: this.relayer, wallet: this.wallet, dealId: res.dealId, terms: won.terms, traderAddress: won.trader_address, quoteSecret: this.quoteSecret })
         .then(() => this.stats.settled++)
         .catch((e) => this.fail(e))
         .finally(() => this.settling.delete(res.dealId!));

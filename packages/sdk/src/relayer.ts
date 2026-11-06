@@ -60,8 +60,9 @@ export class RelayerClient {
   openRfq(commitment: string, windowMs: number) {
     return this.req<Relayed & { rfqId: number }>("/v1/relay/rfq", { commitment, windowMs });
   }
-  settle(dealId: number, legs: unknown[]) {
-    return this.req<Relayed>("/v1/relay/settle", { dealId, legs });
+  /** Both legs, with both parties' approvals of their four outputs (see `settleMessage`). */
+  settle(dealId: number, legs: unknown[], approvals: { trader: string; maker: string }) {
+    return this.req<Relayed>("/v1/relay/settle", { dealId, legs, approvals });
   }
   /** Close a hedge: the signature by the deal's owner key is the only authority. */
   closeHedge(dealId: number, signature: string) {
