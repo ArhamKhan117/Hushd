@@ -58,9 +58,10 @@ export default function AddPage() {
     setError(null);
     try {
       const { call, selfPost } = s.wallet.shield(token, amount);
+      // The note goes on the board, sealed to you, before any token moves: the deposit is then
+      // recoverable from your seed alone, even if this tab closes mid-way.
+      await s.relayer.post(selfPost, "note");
       const r = await s.call({ contract: call.contract, method: call.method, args: call.args, gas: call.gas, deposit: call.deposit });
-      // The note goes on the board for you too, so this deposit is recoverable from your seed alone.
-      await s.relayer.post(selfPost, "note").catch(() => undefined);
       setDone({ hash: r.txHash, text: `${fmt(token, amount)} ${symbol(token)} is now private.` });
       setInput("");
       await Promise.all([refresh(), s.sync()]);

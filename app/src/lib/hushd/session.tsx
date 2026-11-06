@@ -60,6 +60,16 @@ interface Session {
 }
 
 const Ctx = createContext<Session | null>(null);
+
+/** NEAR RPC answers "Server error" for a refused transaction; say why in words. */
+function readableChainError(e: unknown): string {
+  const text = JSON.stringify((e as { data?: unknown }).data ?? "") + String((e as Error).message ?? e);
+  if (text.includes("NotEnoughBalance")) return "Your NEAR account does not have enough NEAR to pay for this transaction's gas.";
+  if (text.includes("InvalidNonce")) return "Another transaction from this account is in flight; try again in a moment.";
+  const panic = /Smart contract panicked: ([^"\\]+)/.exec(text);
+  if (panic) return panic[1]!;
+  return (e as Error).message ?? "The transaction failed";
+}
 const PASSKEY_FLAG = "hushd.passkey.account";
 
 class EncryptedLocalStore implements NoteStore {
@@ -141,11 +151,15 @@ export function HushdProvider({ children }: { children: ReactNode }) {
       accountId: k.implicitAccount,
       kind: "passkey",
       async call(x) {
-        const out = (await near
-          .transaction(k.implicitAccount)
-          .functionCall(x.contract, x.method, x.args, { gas: `${Number(BigInt(x.gas ?? "100000000000000") / 1_000_000_000_000n)} Tgas` as `${number} Tgas`, attachedDeposit: BigInt(x.deposit ?? "0") })
-          .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
-        return { txHash: out?.transaction?.hash ?? "" };
+        try {
+          const out = (await near
+            .transaction(k.implicitAccount)
+            .functionCall(x.contract, x.method, x.args, { gas: `${Number(BigInt(x.gas ?? "100000000000000") / 1_000_000_000_000n)} Tgas` as `${number} Tgas`, attachedDeposit: BigInt(x.deposit ?? "0") })
+            .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+          return { txHash: out?.transaction?.hash ?? "" };
+        } catch (e) {
+          throw new Error(readableChainError(e));
+        }
       },
     };
   }, []);

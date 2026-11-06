@@ -38,7 +38,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.getByRole("button", { name: "Max" })).toBeVisible({ timeout: 60_000 });
   await page.locator("#amount").fill("500");
   await page.getByRole("button", { name: "Add privately" }).click();
-  await expect(page.getByRole("link", { name: "View on NearBlocks" })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText(/is now private/)).toBeVisible({ timeout: 120_000 });
   await go("/app/balance");
   await expect(page.locator("li", { hasText: "USDC" }).getByText("500")).toBeVisible({ timeout: 120_000 });
 
