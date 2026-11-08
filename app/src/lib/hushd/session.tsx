@@ -14,6 +14,8 @@ import {
   loadPoseidon,
   PrivateWallet,
   RelayerClient,
+  restEndpoint,
+  rpcOrder,
   SEED_MESSAGE,
   sendEndpoints,
   seedFromSignature,
@@ -163,29 +165,56 @@ export function HushdProvider({ children }: { children: ReactNode }) {
     const k = nearKeyFromSeed(seed);
     const { Near } = await import("near-kit");
     keepRpcErrorBodies(NETWORK.rpc);
-    const near = new Near({ network: { networkId: NETWORK.id, rpcUrl: sendEndpoints(NETWORK)[0]! }, privateKey: k.secretKey as `ed25519:${string}`, defaultSignerId: k.implicitAccount });
+    // one client per endpoint that takes transactions
+    const clients = new Map(sendEndpoints(NETWORK).map((rpcUrl) => [rpcUrl, new Near({ network: { networkId: NETWORK.id, rpcUrl }, privateKey: k.secretKey as `ed25519:${string}`, defaultSignerId: k.implicitAccount })]));
+    type Builder = ReturnType<InstanceType<typeof Near>["transaction"]>;
+    /**
+     * Signs once and sends those exact bytes, failing over to the next endpoint when one
+     * cannot be reached (a free RPC that rate-limits answers without CORS headers, so the
+     * browser sees only "Failed to fetch"). Resending the same signed bytes is safe: a node
+     * accepts one transaction hash at most once. Only a stale nonce, which proves the
+     * transaction was refused, hands it to near-kit's own send, which signs again.
+     */
+    const send = async (build: (near: InstanceType<typeof Near>) => Builder): Promise<{ txHash: string }> => {
+      const order = rpcOrder([...clients.keys()]);
+      let bytes: Uint8Array | null = null;
+      let last: unknown = null;
+      for (let attempt = 0; attempt < order.length * 3; attempt++) {
+        const url = order[attempt % order.length]!;
+        const near = clients.get(url)!;
+        try {
+          if (!bytes) bytes = (await build(near).sign()).serialize();
+          const out = (await near.rpc.sendTransaction(bytes, "EXECUTED_OPTIMISTIC")) as unknown as { transaction?: { hash?: string } };
+          return { txHash: out?.transaction?.hash ?? "" };
+        } catch (e) {
+          last = e;
+          const msg = `${(e as Error).name ?? ""} ${(e as Error).message ?? ""}`;
+          if (/InvalidNonce|nonce/i.test(msg) && !/fetch/i.test(msg)) {
+            // refused, so nothing went out: near-kit's own send refreshes its cached nonce and retries
+            try {
+              const out = (await build(near).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
+              return { txHash: out?.transaction?.hash ?? "" };
+            } catch (again) {
+              throw new Error(readableChainError(again));
+            }
+          }
+          if (!/Failed to fetch|fetch failed|Load failed|NetworkError|Network request failed|429|too many|rate.?limit|timed? ?out/i.test(msg)) break;
+          restEndpoint(url);
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+      throw new Error(readableChainError(last));
+    };
     return {
       accountId: k.implicitAccount,
       kind: "passkey",
-      async call(x) {
-        try {
-          const out = (await near
+      call: (x) =>
+        send((near) =>
+          near
             .transaction(k.implicitAccount)
-            .functionCall(x.contract, x.method, x.args, { gas: `${Number(BigInt(x.gas ?? "100000000000000") / 1_000_000_000_000n)} Tgas` as `${number} Tgas`, attachedDeposit: BigInt(x.deposit ?? "0") })
-            .send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
-          return { txHash: out?.transaction?.hash ?? "" };
-        } catch (e) {
-          throw new Error(readableChainError(e));
-        }
-      },
-      async transfer(to, yocto) {
-        try {
-          const out = (await near.transaction(k.implicitAccount).transfer(to, yocto).send({ waitUntil: "EXECUTED_OPTIMISTIC" })) as unknown as { transaction?: { hash?: string } };
-          return { txHash: out?.transaction?.hash ?? "" };
-        } catch (e) {
-          throw new Error(readableChainError(e));
-        }
-      },
+            .functionCall(x.contract, x.method, x.args, { gas: `${Number(BigInt(x.gas ?? "100000000000000") / 1_000_000_000_000n)} Tgas` as `${number} Tgas`, attachedDeposit: BigInt(x.deposit ?? "0") }),
+        ),
+      transfer: (to, yocto) => send((near) => near.transaction(k.implicitAccount).transfer(to, yocto)),
     };
   }, []);
 

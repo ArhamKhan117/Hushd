@@ -29,14 +29,19 @@ export default function AddPage() {
     const raw = await view<string>(NETWORK, token, "ft_balance_of", { account_id: s.accountId }).catch(() => null);
     return raw === null ? null : BigInt(raw);
   }, [s.accountId, token]);
-  /** After a send, reads until the balance moves: the read can reach an RPC node a block behind the send. */
+  /**
+   * After a send, reads until the balance moves: the read can reach an RPC node a block
+   * behind the send, and the free RPCs refuse reads for a while when they rate-limit.
+   * Keeps trying for up to 90 seconds, a little slower each time.
+   */
   const refresh = useCallback(
     async (before?: bigint | null) => {
+      const deadline = Date.now() + 90_000;
       for (let tries = 0; ; tries++) {
         const b = await readBalance();
         if (b !== null) setPublicBal(b);
-        if (before === undefined || (b !== null && b !== before) || tries >= 7) return;
-        await new Promise((r) => setTimeout(r, 2_000));
+        if (before === undefined || (b !== null && b !== before) || Date.now() > deadline) return;
+        await new Promise((r) => setTimeout(r, Math.min(2_000 + tries * 500, 6_000)));
       }
     },
     [readBalance],

@@ -11,25 +11,50 @@ import { WalletMenu } from "./WalletMenu";
 
 type NavItem = { href: string; label: string; icon: ReactNode; exact?: boolean; children?: { href: string; label: string }[] };
 
-const nav: NavItem[] = [
-  { href: "/app", label: "Desk", icon: icons.desk, exact: true },
-  { href: "/app/deals", label: "Deals", icon: icons.deals },
+/** The product in three numbered groups: trading, your wallet, and the network behind the desk. */
+const groups: { label: string; items: NavItem[] }[] = [
   {
-    href: "/app/balance",
-    label: "Balance",
-    icon: icons.balance,
-    children: [
-      { href: "/app/balance/add", label: "Add privately" },
-      { href: "/app/balance/send", label: "Send privately" },
-      { href: "/app/balance/receive", label: "Receive" },
-      { href: "/app/balance/cash-out", label: "Cash out" },
+    label: "Trade",
+    items: [
+      { href: "/app", label: "Desk", icon: icons.desk, exact: true },
+      { href: "/app/trade", label: "Trade", icon: icons.trade },
+      { href: "/app/deals", label: "Deals", icon: icons.deals },
     ],
   },
-  { href: "/app/prove", label: "Prove", icon: icons.prove },
-  { href: "/app/makers", label: "Makers", icon: icons.makers },
-  { href: "/app/agents", label: "Agents", icon: icons.agents },
+  {
+    label: "Wallet",
+    items: [
+      {
+        href: "/app/balance",
+        label: "Balance",
+        icon: icons.balance,
+        children: [
+          { href: "/app/balance/add", label: "Add privately" },
+          { href: "/app/balance/send", label: "Send privately" },
+          { href: "/app/balance/receive", label: "Receive" },
+          { href: "/app/balance/cash-out", label: "Cash out" },
+        ],
+      },
+      { href: "/app/prove", label: "Prove", icon: icons.prove },
+    ],
+  },
+  {
+    label: "Network",
+    items: [
+      { href: "/app/makers", label: "Makers", icon: icons.makers },
+      { href: "/app/agents", label: "Agents", icon: icons.agents },
+    ],
+  },
 ];
-const tabs = nav.filter((n) => n.href !== "/app/agents");
+const nav: NavItem[] = groups.flatMap((g) => g.items);
+// five tabs fit a phone; makers and agents are in the menu
+const tabs = nav.filter((n) => ["/app", "/app/trade", "/app/deals", "/app/balance", "/app/prove"].includes(n.href));
+
+/** The group a page belongs to, numbered as in the sidebar. */
+function groupOf(pathname: string): { n: string; label: string } | null {
+  const i = groups.findIndex((g) => g.items.some((item) => isActive(pathname, item.href, item.exact)));
+  return i < 0 ? null : { n: `0${i + 1}`, label: groups[i]!.label };
+}
 
 function isActive(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;
@@ -42,8 +67,10 @@ function NavLink({ item, active, onClick, sheet }: { item: { href: string; label
       href={item.href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors ${
-        active ? `${sheet ? "bg-panel" : "bg-surface"} font-medium text-foreground` : "text-mute hover:bg-surface/70 hover:text-foreground"
+      className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors ${
+        active
+          ? `${sheet ? "bg-panel" : "bg-surface"} font-medium text-foreground before:absolute before:bottom-2.5 before:left-0 before:top-2.5 before:w-[2px] before:rounded-full before:bg-foreground`
+          : "text-mute hover:bg-surface/70 hover:text-foreground"
       }`}
     >
       {item.icon ?? <span aria-hidden className="w-[18px]" />}
@@ -55,7 +82,25 @@ function NavLink({ item, active, onClick, sheet }: { item: { href: string; label
 function ProductNav({ pathname, sheet, onNavigate }: { pathname: string; sheet?: boolean; onNavigate?: () => void }) {
   return (
     <>
-      {nav.map((item) => (
+      {groups.map((g, gi) => (
+        <div key={g.label} className={gi > 0 ? "mt-4" : ""}>
+          <p className="mb-1 flex items-center gap-2 px-3 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+            <span className="tabular-nums text-mute">0{gi + 1}</span>
+            {g.label}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            <GroupItems items={g.items} pathname={pathname} sheet={sheet} onNavigate={onNavigate} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function GroupItems({ items, pathname, sheet, onNavigate }: { items: NavItem[]; pathname: string; sheet?: boolean; onNavigate?: () => void }) {
+  return (
+    <>
+      {items.map((item) => (
         <div key={item.href}>
           <NavLink item={item} active={isActive(pathname, item.href, item.exact) && !(item.children && item.children.some((c) => pathname.startsWith(c.href)))} onClick={onNavigate} sheet={sheet} />
           {item.children && isActive(pathname, item.href) && (
@@ -133,12 +178,12 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
 
   return (
     <div className="hushd-app relative flex min-h-svh flex-col bg-background">
-      <aside className="hd-sidebar fixed bottom-3 left-3 top-3 z-40 w-[248px] flex-col rounded-[20px] border border-line bg-panel p-3 shadow-card" aria-label="App">
+      <aside className="hd-sidebar hd-sheen fixed bottom-3 left-3 top-3 z-40 w-[248px] flex-col rounded-[20px] border border-line bg-panel p-3" aria-label="App">
         <div className="flex items-center justify-between px-2 pb-5 pt-2">
           <Logo size={24} />
         </div>
         <NetworkBadge />
-        <nav className="-mx-1 mt-4 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 pb-3" aria-label="Product">
+        <nav className="-mx-1 mt-5 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-3" aria-label="Product">
           <ProductNav pathname={pathname} />
         </nav>
         <div className="flex flex-col gap-0.5">
@@ -171,8 +216,9 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
         {open && (
           <div className="h-[calc(100dvh-3.5rem)] overflow-y-auto border-t border-line bg-background px-4 pb-8 pt-4">
             <NetworkBadge />
-            <nav className="mt-4 flex flex-col gap-0.5" aria-label="Product mobile">
+            <nav className="mt-5 flex flex-col gap-0.5" aria-label="Product mobile">
               <ProductNav pathname={pathname} sheet onNavigate={() => setOpen(false)} />
+              <div className="mt-4" />
               <NavLink item={{ href: "/app/settings", label: "Settings", icon: icons.settings }} active={isActive(pathname, "/app/settings")} onClick={() => setOpen(false)} sheet />
               <NavLink item={{ href: "/docs", label: "Docs", icon: icons.docs }} active={false} onClick={() => setOpen(false)} />
             </nav>
@@ -187,8 +233,14 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
 
       <div className="hd-tabbar-space flex flex-1 flex-col lg:pl-[272px]">
         <main id="main" className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-16 pt-5 sm:px-8 sm:pt-7">
-          <div className="hd-pagehead mb-6 gap-4 sm:mb-8">
+          <div className="hd-pagehead mb-6 gap-4 border-b border-line pb-6 sm:mb-8 sm:pb-7">
             <div>
+              {groupOf(pathname) && (
+                <span className="hd-index mb-3" data-n={groupOf(pathname)!.n}>
+                  <i />
+                  {groupOf(pathname)!.label}
+                </span>
+              )}
               <h1 className="t-display-m text-foreground">{title}</h1>
               {subtitle && <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-mute">{subtitle}</p>}
             </div>

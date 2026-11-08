@@ -2,6 +2,13 @@
 const ic = "h-[18px] w-[18px] shrink-0";
 
 export const icons = {
+  trade: (
+    <svg className={ic} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4.75 19.25h14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M5.25 15.5l4.25-4.5 3.25 2.75 6-6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.25 7.25h3.5v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   desk: (
     <svg className={ic} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M4.75 8.75h14.5M4.75 15.25h14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

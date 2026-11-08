@@ -37,7 +37,7 @@ function Mark({ state }: { state: StepState }) {
       </span>
     );
   if (state === "failed") return <span aria-hidden className="grid h-4 w-4 place-items-center rounded-full bg-danger text-[10px] font-semibold text-on-ink">!</span>;
-  return <span aria-hidden className="h-4 w-4 rounded-full border border-line-strong" />;
+  return <span aria-hidden className="block h-4 w-4 rounded-full border border-line-strong" />;
 }
 
 /** The life of a deal, step by step, with what each step put on chain. */

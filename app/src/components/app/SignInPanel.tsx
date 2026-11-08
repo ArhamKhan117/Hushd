@@ -2,6 +2,7 @@
 
 import { useHushd } from "@/lib/hushd/session";
 import { passkeySupported } from "@/lib/hushd/keys";
+import { Mark } from "@/components/Logo";
 import { Spinner } from "@/components/ui/Spinner";
 import { useState } from "react";
 
@@ -32,7 +33,10 @@ export function SignInPanel({ title = "Open your private balance" }: { title?: s
   }
 
   return (
-    <div className="hd-panel p-6 sm:p-8">
+    <div className="hd-crop">
+    <div className="hd-sheen relative overflow-hidden rounded-[20px] border border-line bg-panel p-6 sm:p-8">
+      <Mark size={220} className="pointer-events-none absolute -right-10 -top-8 hidden opacity-[0.06] sm:block" />
+      <div className="relative">
       <p className="t-label">Private balance</p>
       <h2 className="t-title mt-2">{title}</h2>
       {s.status === "connected" ? (
@@ -74,6 +78,8 @@ export function SignInPanel({ title = "Open your private balance" }: { title?: s
         </>
       )}
       {s.error && <p className="mt-4 text-[13.5px] text-danger" role="alert">{s.error}</p>}
+      </div>
+    </div>
     </div>
   );
 }
