@@ -6,14 +6,13 @@
 /*
  * The Hushd system. Pure monochrome: ink and paper.
  *
- * Colour theory: an achromatic scheme with a cool hairline bias (greys lean a
- * couple of degrees cool so they read as chosen, not default). Hierarchy comes
- * from value, not hue: 60% paper, 30% ink type and graphite surfaces, 10% solid
- * ink for the one thing that matters on each screen. The luminous field is a
- * silver haze (light) / graphite moonlight (dark) with ONE accent, Hushd iris
- * (#4B4BC4 light, #AEB0FF dark), used as a seasoning, never a flood: it marks
- * private / sealed / verified, glints inside the field, and tints the soft pill.
- * Under 5% of any screen.
+ * Colour theory: graphite. An achromatic scheme with a cool hairline bias (greys
+ * lean a couple of degrees toward steel so they read as chosen, not default), and
+ * no hue anywhere. Hierarchy comes from value: 60% paper, 30% ink type and graphite
+ * surfaces, 10% solid ink for the one thing that matters on each screen. The accent
+ * is steel (#4A5260 light, #B8C0CC dark): it marks private / sealed / verified,
+ * lights the fields as a cool haze, and tints the soft pill. Light, shade and
+ * contrast do the rest.
  *
  * Light is :root. Dark applies when html[data-theme="dark"] is stamped (by the
  * head script from the saved choice or the OS setting). `.theme-dark` scopes the
@@ -30,27 +29,29 @@
   --grey-300: #a7abb2;
   --grey-100: #e6e8eb;
   --grey-50: #f2f3f5;
-  /* the private / sealed / verified signal: the iris accent. Dark enough that 12px
-     text passes AA (4.5:1) on every light surface, the soft chip and surface-2 included. */
-  --sealed: #4646bd;
-  --sealed-soft: #ececfb;
-  --accent: #4b4bc4;
-  --accent-soft: #ececfb;
-  --tint: #e7e7fa; /* soft pill ground, a breath of iris */
-  --on-tint: #2b2a7a;
+  /* the private / sealed / verified signal: steel. Dark enough that 12px text passes
+     AA (4.5:1) on every light surface, the soft chip and surface-2 included. */
+  --sealed: #3d4450;
+  --sealed-soft: #eceef1;
+  --accent: #4a5260;
+  --accent-soft: #eceef1;
+  --tint: #e8eaee; /* soft pill ground, a breath of steel */
+  --on-tint: #262a32;
+  --mark-2: #7a828f; /* the second half of the mark */
+  --mark-tile-2: #aab1bc; /* the same half, on the ink tile */
   --field-1: #c8cbd0;
   --field-2: #e3e5e8;
   --field-3: #f8f9fa;
   --field-base: #f0f1f3;
-  --field-deep: #c3c2f2; /* the one iris glint inside the silver haze */
+  --field-deep: #c4c9d1; /* the steel glint inside the silver haze */
   --f-hi: #ffffff; /* light patches in the blend */
   --f-mid: #d2d6db; /* silver shadow */
   --f-deep: #b4bac2; /* deepest silver in the flow */
-  --f-t1: #c0bff2; /* iris wash, deep */
-  --f-t2: #dedef9; /* iris wash, soft */
+  --f-t1: #c3c8d0; /* steel wash, deep */
+  --f-t2: #dfe2e7; /* steel wash, soft */
   --f-a: #f3f4f5;
   --f-b: #e5e7ea;
-  --f-c: #dddcf6;
+  --f-c: #dadde3;
   --glass: rgba(255, 255, 255, 0.55);
   --glass-line: rgba(255, 255, 255, 0.85);
   --text: #0b0c0e;
@@ -72,11 +73,11 @@
   --shadow-dock: 0 10px 30px -12px rgba(11, 12, 14, 0.16);
   --shadow-card: 0 1px 2px rgba(11, 12, 14, 0.04), 0 10px 28px -16px rgba(11, 12, 14, 0.12);
   --shadow-pop: 0 2px 6px rgba(11, 12, 14, 0.05), 0 28px 70px -24px rgba(11, 12, 14, 0.3);
-  --chart-up: #4b4bc4;
+  --chart-up: #262a32;
   --chart-down: #b4362a;
-  /* Money in and out. The gray is deliberately neutral, so direction and labels carry it too. */
-  --chart-in: #4b4bc4;
-  --chart-out: #979ba2;
+  /* Money in and out: ink and a pale grey, so direction and labels carry it too. */
+  --chart-in: #3d4450;
+  --chart-out: #a9aeb6;
 }
 
 /* Native dropdown lists take their colours from the option itself on Windows,
@@ -97,25 +98,27 @@ html[data-theme="dark"],
   --grey-300: #5d6168;
   --grey-100: #1f2125;
   --grey-50: #16181b;
-  --sealed: #aeb0ff;
-  --sealed-soft: rgba(174, 176, 255, 0.12);
-  --accent: #aeb0ff;
-  --accent-soft: rgba(174, 176, 255, 0.12);
-  --tint: #1b1c3a;
-  --on-tint: #cfd0ff;
+  --sealed: #c3cad5;
+  --sealed-soft: rgba(184, 192, 204, 0.12);
+  --accent: #b8c0cc;
+  --accent-soft: rgba(184, 192, 204, 0.12);
+  --tint: #1d2026;
+  --on-tint: #d8dde4;
+  --mark-2: #8e97a4;
+  --mark-tile-2: #5b6370;
   --field-1: #26292d;
   --field-2: #16171a;
   --field-3: #0c0d0f;
   --field-base: #0b0c0e;
-  --field-deep: #2d2f6b;
+  --field-deep: #2a2f37;
   --f-hi: #24272b;
   --f-mid: #0c0d0f;
   --f-deep: #050506;
-  --f-t1: #26285a;
-  --f-t2: #1a1b38;
+  --f-t1: #262b33;
+  --f-t2: #1a1d22;
   --f-a: #121316;
   --f-b: #0d0e10;
-  --f-c: #18192e;
+  --f-c: #191c21;
   --glass: rgba(255, 255, 255, 0.05);
   --glass-line: rgba(255, 255, 255, 0.1);
   --text: #f4f5f6;
@@ -137,10 +140,10 @@ html[data-theme="dark"],
   --shadow-dock: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.7);
   --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 30px 80px -24px rgba(0, 0, 0, 0.85);
-  --chart-up: #aeb0ff;
+  --chart-up: #e6e9ee;
   --chart-down: #f08a7e;
-  --chart-in: #7a7de0;
-  --chart-out: #6c7077;
+  --chart-in: #b8c0cc;
+  --chart-out: #5b6068;
 }
 
 /* Inside the app the ground drops to a soft neutral so cards float on it.
@@ -438,10 +441,19 @@ main:focus {
   isolation: isolate;
 }
 .hd-card {
-  background: var(--panel);
+  /* lit from above: a faint shade toward the foot and a highlight along the top edge */
+  background: linear-gradient(180deg, var(--panel) 55%, color-mix(in srgb, var(--panel) 94%, var(--surface-2)));
   border: 1px solid var(--line);
   border-radius: 18px;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 70%, transparent),
+    var(--shadow-card);
+}
+html[data-theme="dark"] .hd-card,
+.theme-dark .hd-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-card);
 }
 .hd-tile {
   background: var(--surface);
@@ -1088,35 +1100,36 @@ html.hd-lite .hd-field.hd-drift {
 }
 }
 
-/* Syntax colours (lib/highlight.ts). On-brand: graphite structure, iris for
-   keywords (the one accent), warm sand strings, amber numbers. Light + dark. */
+/* Syntax colours (lib/highlight.ts), graphite: no hue, so value, weight and
+   style tell the parts apart. Keywords in steel and medium weight, functions in
+   ink, strings a step lighter, comments faint and italic. Light + dark. */
 :root,
 .theme-light {
-  --tok-kw: #4646bd;
-  --tok-str: #8a5a12;
-  --tok-num: #a1491f;
-  --tok-com: #6b6f76;
+  --tok-kw: #3d4450;
+  --tok-str: #5c6370;
+  --tok-num: #262a32;
+  --tok-com: #8a8f97;
   --tok-fn: #0b0c0e;
   --tok-prop: #4b5059;
-  --tok-type: #2b2a7a;
-  --tok-const: #a1491f;
-  --tok-lit: #a1491f;
-  --tok-punc: #6b6f76;
+  --tok-type: #262a32;
+  --tok-const: #262a32;
+  --tok-lit: #262a32;
+  --tok-punc: #8a8f97;
 }
 html[data-theme="dark"],
 .theme-dark {
-  --tok-kw: #aeb0ff;
-  --tok-str: #e7c48d;
-  --tok-num: #f0a875;
-  --tok-com: #83878e;
+  --tok-kw: #c3cad5;
+  --tok-str: #a3aab5;
+  --tok-num: #e6e9ee;
+  --tok-com: #6f747c;
   --tok-fn: #f4f5f6;
   --tok-prop: #c3c8cf;
-  --tok-type: #cfd0ff;
-  --tok-const: #f0a875;
-  --tok-lit: #f0a875;
-  --tok-punc: #83878e;
+  --tok-type: #e6e9ee;
+  --tok-const: #e6e9ee;
+  --tok-lit: #e6e9ee;
+  --tok-punc: #6f747c;
 }
-.tok-kw { color: var(--tok-kw); }
+.tok-kw { color: var(--tok-kw); font-weight: 500; }
 .tok-str { color: var(--tok-str); }
 .tok-num { color: var(--tok-num); }
 .tok-com { color: var(--tok-com); font-style: italic; }
@@ -1214,8 +1227,8 @@ html[data-theme="dark"],
 }
 
 /* The name across the foot of the public pages (FooterWordmark): ink at the top of
-   each letter fading into the iris accent, cut by the page's own edge, with a faint
-   iris glow behind. It rises letter by letter the first time it scrolls into view. */
+   each letter fading into steel, cut by the page's own edge, with a faint steel
+   glow behind. It rises letter by letter the first time it scrolls into view. */
 .hd-wordmark {
   --wm-top: #1b1e24;
   --wm-bottom: color-mix(in srgb, var(--accent) 34%, #e3e5ec);
@@ -1282,4 +1295,348 @@ html[data-theme="dark"] .hd-wordmark {
 }
 html.hd-lite .hd-wordmark .hd-wordmark-word span {
   filter: none;
+}
+
+/* The mark (components/Logo): hovering the logo slides the two halves together
+   along their cut into one coin, the deal settling, and lets them part again. */
+.hd-mark-hover path {
+  transition: transform 0.45s var(--ease-out);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .group:hover .hd-mark-hover path:first-child {
+    transform: translateX(1.9px);
+  }
+  .group:hover .hd-mark-hover path:last-child {
+    transform: translateX(-1.9px);
+  }
+}
+
+@layer components {
+/* ---------- The graphite set: frames, light and rise ----------
+   Shared by the site, the docs and the app. Hairline frames with corner ticks,
+   a top sheen on raised panels, a light that follows the pointer, numbered
+   section labels, and content that rises into view once. */
+
+/* A hairline frame with a small tick at each corner, like a crop mark. */
+.hd-frame {
+  position: relative;
+  border: 1px solid var(--line);
+  --tick: 9px;
+  --tick-c: var(--line-strong);
+}
+.hd-frame::before,
+.hd-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--tick-c), var(--tick-c)) top left / var(--tick) 1px no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) top left / 1px var(--tick) no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) top right / var(--tick) 1px no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) top right / 1px var(--tick) no-repeat;
+}
+.hd-frame::after {
+  background:
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom left / var(--tick) 1px no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom left / 1px var(--tick) no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom right / var(--tick) 1px no-repeat,
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom right / 1px var(--tick) no-repeat;
+}
+.hd-frame-strong {
+  --tick-c: var(--foreground);
+}
+
+/* A raised panel lit from above: a faint highlight along the top edge, a shade below. */
+.hd-sheen {
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 70%, transparent),
+    0 1px 2px rgba(11, 12, 14, 0.04),
+    0 18px 40px -28px rgba(11, 12, 14, 0.22);
+}
+html[data-theme="dark"] .hd-sheen,
+.theme-dark .hd-sheen {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 24px 48px -30px rgba(0, 0, 0, 0.9);
+}
+
+/* A light that follows the pointer (components/ui/Spotlight sets --mx, --my). */
+.hd-spot {
+  position: relative;
+  isolation: isolate;
+}
+.hd-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
+}
+.hd-spot:hover::before {
+  opacity: 1;
+}
+
+/* A numbered section label: "01" and a short rule before the name. */
+.hd-index {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+.hd-index::before {
+  content: attr(data-n);
+  color: var(--foreground);
+}
+.hd-index > i {
+  display: block;
+  width: 22px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* Rise into view (components/ui/Reveal). */
+@media (prefers-reduced-motion: no-preference) {
+  .hd-reveal[data-reveal="armed"] [data-reveal-item],
+  .hd-reveal[data-reveal="armed"]:not(:has([data-reveal-item])) {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+  .hd-reveal[data-reveal="in"] [data-reveal-item],
+  .hd-reveal[data-reveal="in"]:not(:has([data-reveal-item])) {
+    transition:
+      opacity 0.7s ease calc(var(--reveal-i, 0) * var(--reveal-stagger, 70ms)),
+      transform 0.9s var(--ease-out) calc(var(--reveal-i, 0) * var(--reveal-stagger, 70ms)),
+      filter 0.7s ease calc(var(--reveal-i, 0) * var(--reveal-stagger, 70ms));
+  }
+}
+html.hd-lite .hd-reveal [data-reveal-item],
+html.hd-lite .hd-reveal {
+  filter: none !important;
+}
+
+/* A hairline grid: cells divided by 1px lines, no gaps (the bento rule). */
+.hd-grid-lines {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.hd-grid-lines > * {
+  background: var(--grid-cell, var(--background));
+}
+
+/* Crop marks just outside a panel's corners, like a sheet ready to be cut: the
+   site's signature frame. The panel keeps its own radius; the marks sit 10px out. */
+.hd-crop {
+  position: relative;
+  --crop: 14px;
+  --crop-gap: 10px;
+  --crop-c: var(--line-strong);
+}
+.hd-crop::before,
+.hd-crop::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--crop-gap) * -1);
+  pointer-events: none;
+  z-index: 2;
+}
+.hd-crop::before {
+  background:
+    linear-gradient(var(--crop-c), var(--crop-c)) left top / var(--crop) 1px no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) left top / 1px var(--crop) no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) right top / var(--crop) 1px no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) right top / 1px var(--crop) no-repeat;
+}
+.hd-crop::after {
+  background:
+    linear-gradient(var(--crop-c), var(--crop-c)) left bottom / var(--crop) 1px no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) left bottom / 1px var(--crop) no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) right bottom / var(--crop) 1px no-repeat,
+    linear-gradient(var(--crop-c), var(--crop-c)) right bottom / 1px var(--crop) no-repeat;
+}
+@media (max-width: 639px) {
+  .hd-crop {
+    --crop-gap: 6px;
+    --crop: 10px;
+  }
+}
+
+/* A faint grid of dots, lit toward one corner: texture for ink panels. */
+.hd-dotgrid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--foreground) 22%, transparent) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(70% 80% at 85% 20%, black, transparent 75%);
+}
+
+/* The site header docks into a floating bar once the page scrolls. */
+.hd-dockbar {
+  transition:
+    max-width 0.45s var(--ease-out),
+    margin-top 0.45s var(--ease-out),
+    border-color 0.3s ease,
+    background-color 0.3s ease,
+    box-shadow 0.3s ease,
+    border-radius 0.45s var(--ease-out);
+  border: 1px solid transparent;
+}
+.hd-dockbar[data-docked="true"] {
+  max-width: 1120px;
+  margin-top: 10px;
+  border-radius: 16px;
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--background) 82%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 55%, transparent),
+    0 12px 32px -20px rgba(11, 12, 14, 0.28);
+}
+html[data-theme="dark"] .hd-dockbar[data-docked="true"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 16px 36px -20px rgba(0, 0, 0, 0.9);
+}
+html.hd-lite .hd-dockbar[data-docked="true"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--background);
+}
+
+/* A nav link with a hairline that grows in under it; the current page keeps it. */
+.hd-navlink {
+  position: relative;
+  padding: 6px 0;
+}
+.hd-navlink::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease-out);
+}
+.hd-navlink:hover::after,
+.hd-navlink[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+/* The deal timeline on the landing page: a rule that draws across, nodes that light. */
+.hd-timeline-rule {
+  transform-origin: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hd-reveal[data-reveal="armed"] .hd-timeline-rule {
+    transform: scaleX(0);
+  }
+  .hd-reveal[data-reveal="in"] .hd-timeline-rule {
+    transition: transform 1.6s var(--ease-out) 0.15s;
+  }
+}
+.hd-node {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 6px var(--surface);
+}
+
+/* The hero's deal card: each stage lights in turn (components/landing/HeroDeal). */
+.hd-stage {
+  transition:
+    opacity 0.5s ease,
+    color 0.5s ease;
+}
+.hd-stage[data-lit="false"] {
+  opacity: 0.38;
+}
+.hd-stage-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+.hd-stage[data-lit="true"] .hd-stage-dot {
+  background: var(--foreground);
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+.hd-stage-rail {
+  transform-origin: top;
+  transition: transform 0.6s var(--ease-out);
+}
+/* In a hairline grid the cells stay put (their ground draws the lines); only what is
+   inside them rises, so the grid never shows as a grey block while it waits. */
+@media (prefers-reduced-motion: no-preference) {
+  .hd-grid-lines.hd-reveal[data-reveal] > [data-reveal-item] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .hd-grid-lines.hd-reveal[data-reveal="armed"] > [data-reveal-item] > * {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  .hd-grid-lines.hd-reveal[data-reveal="in"] > [data-reveal-item] > * {
+    transition:
+      opacity 0.7s ease calc(var(--reveal-i, 0) * var(--reveal-stagger, 70ms)),
+      transform 0.9s var(--ease-out) calc(var(--reveal-i, 0) * var(--reveal-stagger, 70ms));
+  }
+}
+
+/* Inside the app the ground is a soft grey, so content panels and input cards stand
+   on paper with a hairline and the top highlight instead of melting into it. */
+.hushd-app .hd-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 70%, transparent),
+    var(--shadow-card);
+}
+html[data-theme="dark"] .hushd-app .hd-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-card);
+}
+.hushd-app .hd-inputcard {
+  background: var(--panel);
+  border-color: var(--line);
+}
+.hushd-app .hd-inputcard:hover:not(:focus-within) {
+  border-color: var(--line-strong);
+}
 }

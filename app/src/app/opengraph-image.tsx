@@ -8,36 +8,60 @@ export const contentType = "image/png";
 
 const geist = (f: string) => join(process.cwd(), "node_modules/geist/dist/fonts/geist-sans", f);
 
-const INK = "#000000";
+const INK = "#08090A";
 const PAPER = "#F4F5F6";
-const MUTE = "#3A3D42";
-const IRIS = "#AEB0FF";
+const STEEL = "#8E97A4";
+const FAINT = "#5B6068";
+const RULE = "#33363B";
 
-/** Rows of redaction bars across the foot of the card: the mark's motif, at scale. */
-const BARS: { w: number; tone: string }[][] = [
-  [{ w: 210, tone: MUTE }, { w: 330, tone: MUTE }, { w: 150, tone: IRIS }, { w: 260, tone: MUTE }, { w: 120, tone: MUTE }],
-  [{ w: 300, tone: MUTE }, { w: 120, tone: MUTE }, { w: 240, tone: MUTE }, { w: 180, tone: MUTE }, { w: 230, tone: MUTE }],
-];
+// the mark (components/Logo): a coin cut on a slant, its halves slid past each other
+const TOP = "M5.1 15.2H23.1Q24.3 15.2 24.3 14A10.2 10.2 0 0 0 3.9 14Q3.9 15.2 5.1 15.2Z";
+const BOTTOM = "M8.9 16.8H26.9Q28.1 16.8 28.1 18A10.2 10.2 0 0 1 7.7 18Q7.7 16.8 8.9 16.8Z";
 
-/** Share card: an ink panel, the mark and wordmark, the headline in Geist Light, redaction bars below. */
+function Mark({ size, top, bottom }: { size: number; top: string; bottom: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <g transform="rotate(-35 16 16)">
+        <path d={TOP} fill={top} />
+        <path d={BOTTOM} fill={bottom} />
+      </g>
+    </svg>
+  );
+}
+
+/** A crop mark at one corner of the card, as on the site's panels. */
+function Crop({ x, y, dx, dy }: { x: number; y: number; dx: 1 | -1; dy: 1 | -1 }) {
+  return (
+    <div style={{ position: "absolute", left: x, top: y, width: 1, height: 1, display: "flex" }}>
+      <div style={{ position: "absolute", left: dx === 1 ? 0 : -22, top: 0, width: 22, height: 1, background: RULE, display: "flex" }} />
+      <div style={{ position: "absolute", left: 0, top: dy === 1 ? 0 : -22, width: 1, height: 22, background: RULE, display: "flex" }} />
+    </div>
+  );
+}
+
+/** Share card: ink, the mark and name, the headline in Geist Light, the mark at scale, crop marks at the corners. */
 export default async function OpenGraphImage() {
   const [light, medium] = await Promise.all([readFile(geist("Geist-Light.ttf")), readFile(geist("Geist-Medium.ttf"))]);
 
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: INK, fontFamily: "Geist" }}>
-        <div style={{ display: "flex", flexDirection: "column", padding: "64px 72px 0" }}>
+      <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", background: INK, fontFamily: "Geist", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -120, top: 70, display: "flex", opacity: 0.16 }}>
+          <Mark size={620} top={PAPER} bottom={STEEL} />
+        </div>
+        <Crop x={36} y={36} dx={1} dy={1} />
+        <Crop x={1164} y={36} dx={-1} dy={1} />
+        <Crop x={36} y={594} dx={1} dy={-1} />
+        <Crop x={1164} y={594} dx={-1} dy={-1} />
+        <div style={{ display: "flex", flexDirection: "column", padding: "72px 80px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ position: "relative", width: 44, height: 44, borderRadius: 13.75, background: PAPER, display: "flex" }}>
-              <div style={{ position: "absolute", left: 9.6, top: 15.1, width: 24.75, height: 6.2, borderRadius: 3.1, background: INK, display: "flex" }} />
-              <div style={{ position: "absolute", left: 9.6, top: 24.75, width: 15.1, height: 6.2, borderRadius: 3.1, background: INK, display: "flex" }} />
-            </div>
+            <Mark size={46} top={PAPER} bottom={STEEL} />
             <div style={{ color: PAPER, fontSize: 30, fontWeight: 500, letterSpacing: "-0.015em", display: "flex" }}>Hushd</div>
           </div>
           <div
             style={{
-              marginTop: 44,
-              fontSize: 82,
+              marginTop: 56,
+              fontSize: 84,
               lineHeight: 1.02,
               fontWeight: 300,
               letterSpacing: "-0.028em",
@@ -50,14 +74,10 @@ export default async function OpenGraphImage() {
             <span style={{ display: "flex" }}>run by agents</span>
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 22, marginTop: "auto", padding: "0 72px 64px" }}>
-          {BARS.map((row, i) => (
-            <div key={i} style={{ display: "flex", gap: 22 }}>
-              {row.map((b, j) => (
-                <div key={j} style={{ width: b.w, height: 26, borderRadius: 13, background: b.tone, display: "flex" }} />
-              ))}
-            </div>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: "auto", padding: "0 80px 72px", color: FAINT, fontSize: 24, fontWeight: 300 }}>
+          <span style={{ display: "flex", color: STEEL }}>01</span>
+          <span style={{ display: "flex", width: 40, height: 1, background: RULE }} />
+          <span style={{ display: "flex" }}>A private OTC desk on NEAR</span>
         </div>
       </div>
     ),
