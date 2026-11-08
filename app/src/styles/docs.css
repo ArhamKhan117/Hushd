@@ -1,0 +1,532 @@
+@layer theme, base, components, utilities;
+
+/* The docs: sidebar, header band, reading rail and the reading column.
+   Shared page pieces (band, cards, pager) live in pages.css. The chrome sits in
+   the components layer; the prose overrides at the foot stay unlayered, like
+   the .docs-prose rules in globals.css they refine. */
+
+@layer components {
+  /* ---------- Sidebar: numbered groups on a hairline track ---------- */
+  .docs-nav-group + .docs-nav-group {
+    margin-top: 28px;
+  }
+  .docs-nav-label {
+    padding-left: 12px;
+  }
+  .docs-nav-label .hd-index {
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    gap: 9px;
+  }
+  .docs-nav-label .hd-index > i {
+    width: 14px;
+  }
+  .docs-nav-list {
+    margin: 12px 0 0 12px;
+    border-left: 1px solid var(--line);
+  }
+  .docs-nav-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 4px 10px 4px 15px;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--mute);
+    transition:
+      color 0.15s ease,
+      background-color 0.2s ease;
+  }
+  .docs-nav-link[data-dense] {
+    min-height: 44px;
+  }
+  .docs-nav-link::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 7px;
+    bottom: 7px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--line-strong);
+    transform: scaleY(0);
+    transition:
+      transform 0.4s var(--ease-out),
+      background-color 0.2s ease;
+  }
+  .docs-nav-link:hover {
+    color: var(--foreground);
+  }
+  .docs-nav-link:hover::before {
+    transform: scaleY(1);
+  }
+  .docs-nav-link[aria-current="page"] {
+    color: var(--foreground);
+    font-weight: 500;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 75%);
+  }
+  .docs-nav-link[aria-current="page"]::before {
+    transform: scaleY(1);
+    background: var(--accent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  /* ---------- Top bar: section tabs and the reading hairline ---------- */
+  .docs-tab-rule {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition:
+      transform 0.4s var(--ease-out),
+      background-color 0.2s ease;
+  }
+  .docs-tab:hover .docs-tab-rule {
+    transform: scaleX(1);
+    background: var(--line-strong);
+  }
+  .docs-tab[aria-current="page"] .docs-tab-rule {
+    transform: scaleX(1);
+    background: var(--foreground);
+  }
+  /* Below xl, where there is no rail, the header's foot shows how far you have read. */
+  .docs-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    pointer-events: none;
+    background: var(--accent);
+    transform: scaleX(var(--docs-read, 0));
+    transform-origin: left;
+  }
+  @media (min-width: 1280px) {
+    .docs-progress {
+      display: none;
+    }
+  }
+
+  /* ---------- The article's header band ---------- */
+  .docs-head {
+    border-radius: 20px;
+  }
+  /* The facts at a glance: a hairline-divided tray along the band's foot. */
+  .docs-glance {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 19px 19px;
+    background: var(--line);
+  }
+  .docs-glance-cell {
+    min-width: 0;
+    padding: 14px 16px 16px;
+    background: color-mix(in srgb, var(--panel) 86%, var(--pg-base-bottom));
+  }
+  .docs-glance[data-n="3"] .docs-glance-cell:last-child {
+    grid-column: 1 / -1;
+  }
+  @media (min-width: 640px) {
+    .docs-glance {
+      grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    }
+    .docs-glance[data-n="2"] {
+      --cols: 2;
+    }
+    .docs-glance[data-n="3"] {
+      --cols: 3;
+    }
+    .docs-glance[data-n="4"] {
+      --cols: 4;
+    }
+    .docs-glance[data-n="3"] .docs-glance-cell:last-child {
+      grid-column: auto;
+    }
+    .docs-glance-cell {
+      padding: 16px 28px 18px;
+    }
+  }
+
+  /* Quick links: small framed chips, squarer than the pills of the app. */
+  .docs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--pg-card-top), var(--pg-card-bottom));
+    box-shadow: inset 0 1px 0 var(--pg-rim);
+    padding: 0 13px;
+    font-size: 13px;
+    color: var(--soft);
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .docs-chip:hover {
+    border-color: var(--line-strong);
+    color: var(--foreground);
+  }
+  @media (min-width: 1024px) {
+    .docs-chip {
+      height: 32px;
+      padding: 0 11px;
+    }
+  }
+
+  /* ---------- On this page: a track that fills as you read ---------- */
+  .docs-toc-track {
+    position: relative;
+    margin-top: 16px;
+  }
+  .docs-toc-track::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line);
+  }
+  .docs-toc-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--accent);
+    transform: scaleY(var(--docs-read, 0));
+    transform-origin: top;
+  }
+  .docs-toc-head {
+    position: absolute;
+    left: -2px;
+    top: calc(var(--docs-read, 0) * 100% - 2.5px);
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .docs-toc-link {
+    position: relative;
+    display: block;
+    padding: 7px 0 7px 16px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--mute);
+    transition: color 0.15s ease;
+  }
+  .docs-toc-link:hover {
+    color: var(--foreground);
+  }
+  .docs-toc-link::before {
+    content: "";
+    position: absolute;
+    left: -0.5px;
+    top: 7px;
+    bottom: 7px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--foreground);
+    transform: scaleY(0);
+    transition: transform 0.35s var(--ease-out);
+  }
+  .docs-toc-link[aria-current="location"] {
+    color: var(--foreground);
+  }
+  .docs-toc-link[aria-current="location"]::before {
+    transform: scaleY(1);
+  }
+  .docs-totop {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--mute);
+    transition: color 0.15s ease;
+  }
+  .docs-totop:hover {
+    color: var(--foreground);
+  }
+  .docs-totop-arrow {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    transition:
+      transform 0.35s var(--ease-out),
+      border-color 0.2s ease;
+  }
+  .docs-totop:hover .docs-totop-arrow {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
+  }
+
+  /* ---------- Figures in the column (FlowDiagram, SeenBy) ---------- */
+  .docs-figure {
+    margin: 2.5rem 0;
+    border-radius: 18px;
+    padding: 6px;
+  }
+  .docs-figure-cap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 10px 12px 14px;
+  }
+  .docs-steps {
+    --grid-cell: linear-gradient(180deg, var(--pg-card-top), var(--pg-card-bottom));
+    overflow: hidden;
+    border-radius: 13px;
+  }
+  .docs-step {
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px 20px;
+  }
+  .docs-step-n {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--panel);
+    font-size: 11.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--foreground);
+  }
+  .docs-step-sealed {
+    --grid-cell: linear-gradient(var(--sealed-soft), var(--sealed-soft)), linear-gradient(var(--panel), var(--panel));
+  }
+  .docs-step-tag {
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+
+  /* ---------- Callouts: a left rule and an icon ---------- */
+  .docs-callout {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 12px;
+    margin: 2rem 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--surface) 80%, transparent), color-mix(in srgb, var(--surface) 25%, transparent));
+    box-shadow: inset 0 1px 0 var(--pg-rim);
+    padding: 16px 20px 16px 18px;
+  }
+  .docs-callout::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--callout-rule, var(--accent));
+  }
+  .docs-callout[data-tone="caveat"] {
+    --callout-rule: var(--foreground);
+    border-color: var(--line-strong);
+  }
+  .docs-callout-icon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    color: var(--accent);
+  }
+  .docs-callout[data-tone="caveat"] .docs-callout-icon {
+    color: var(--foreground);
+  }
+}
+
+/* ---------- Reading column overrides (unlayered, like globals' .docs-prose) ---------- */
+
+/* Section headings: a hairline above, ink for its first 20px, and an anchor
+   that shows on hover or focus. */
+[data-docs-article] .docs-prose h2 {
+  position: relative;
+  margin-top: 3.75rem;
+  padding-top: 1.75rem;
+  background:
+    linear-gradient(var(--foreground), var(--foreground)) 0 0 / 20px 1px no-repeat,
+    linear-gradient(var(--line), var(--line)) 0 0 / 100% 1px no-repeat;
+}
+[data-docs-article] .docs-prose > h2:first-child {
+  margin-top: 0;
+}
+[data-docs-article] .docs-prose a.docs-anchor {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  border-radius: 8px;
+  vertical-align: middle;
+  color: var(--faint);
+  text-decoration: none;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s var(--ease-out),
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+[data-docs-article] .docs-prose h3 a.docs-anchor {
+  width: 24px;
+  height: 24px;
+}
+[data-docs-article] .docs-prose :is(h2, h3):hover a.docs-anchor,
+[data-docs-article] .docs-prose a.docs-anchor:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+[data-docs-article] .docs-prose a.docs-anchor:hover {
+  color: var(--foreground);
+  background: var(--surface);
+}
+.docs-prose.is-copying .docs-anchor {
+  display: none;
+}
+
+/* Inline code: a chip on a hairline. */
+[data-docs-article] .docs-prose :not(pre) > code {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, var(--panel));
+  padding: 0.06em 0.38em;
+}
+
+/* Code blocks: a framed header bar (language and copy), lit like a card. */
+[data-docs-article] .docs-prose pre {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 35%, var(--panel));
+  box-shadow:
+    inset 0 1px 0 var(--pg-rim),
+    var(--pg-drop);
+}
+[data-docs-article] .docs-prose pre::before {
+  z-index: 1;
+}
+[data-docs-article] .docs-prose .docs-code-head {
+  background: linear-gradient(180deg, var(--pg-card-top), color-mix(in srgb, var(--surface) 70%, var(--panel)));
+  padding-left: 14px;
+}
+.docs-code-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  font-weight: 500;
+  color: var(--soft);
+}
+.docs-code-glyph {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--mute);
+}
+html[data-theme="dark"] [data-docs-article] .docs-prose pre {
+  background: color-mix(in srgb, var(--panel) 60%, var(--background));
+}
+
+/* Tables on a hairline grid. */
+[data-docs-article] .docs-prose table {
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 var(--pg-rim),
+    var(--pg-drop);
+}
+[data-docs-article] .docs-prose th {
+  background: linear-gradient(180deg, var(--pg-card-top), var(--surface));
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+[data-docs-article] .docs-prose thead th:first-child {
+  border-top-left-radius: 11px;
+}
+[data-docs-article] .docs-prose thead th:last-child {
+  border-top-right-radius: 11px;
+}
+[data-docs-article] .docs-prose :is(th, td) + :is(th, td) {
+  border-left: 1px solid var(--line);
+}
+[data-docs-article] .docs-prose thead + tbody tr:first-child td {
+  border-top: 0;
+}
+[data-docs-article] .docs-prose tbody tr {
+  transition: background-color 0.15s ease;
+}
+[data-docs-article] .docs-prose tbody tr:hover {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+[data-docs-article] .docs-prose tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 11px;
+}
+[data-docs-article] .docs-prose tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 11px;
+}
+
+@media (max-width: 639.98px) {
+  [data-docs-article] .docs-prose th {
+    white-space: normal;
+    letter-spacing: 0.03em;
+  }
+  /* long account ids may break anywhere, so a narrow table never pushes the page wide */
+  [data-docs-article] .docs-prose td,
+  [data-docs-article] .docs-prose td code {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Code, tables and callouts below the fold rise in once (DocsLayout arms them). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-docs-article] .docs-prose > [data-docs-rise="armed"] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  [data-docs-article] .docs-prose > [data-docs-rise="in"] {
+    transition:
+      opacity 0.7s ease,
+      transform 0.9s var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-nav-link,
+  .docs-nav-link::before,
+  .docs-toc-link::before,
+  .docs-tab-rule,
+  .docs-totop-arrow,
+  [data-docs-article] .docs-prose a.docs-anchor {
+    transition: none;
+  }
+}

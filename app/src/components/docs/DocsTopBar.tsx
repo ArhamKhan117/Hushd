@@ -58,17 +58,12 @@ function Tabs({ pathname }: { pathname: string }) {
               key={t.href}
               href={t.href}
               aria-current={on ? "page" : undefined}
-              className={`relative flex items-center whitespace-nowrap text-[14px] transition-colors ${
+              className={`docs-tab relative flex items-center whitespace-nowrap text-[14px] transition-colors ${
                 on ? "font-medium text-foreground" : "text-mute hover:text-foreground"
               }`}
             >
               {t.label}
-              <span
-                aria-hidden
-                className={`absolute inset-x-0 bottom-0 h-[2px] rounded-full transition-colors ${
-                  on ? "bg-foreground" : "bg-transparent"
-                }`}
-              />
+              <span aria-hidden className="docs-tab-rule absolute inset-x-0 bottom-0 h-[2px] rounded-full" />
             </Link>
           );
         })}
@@ -239,6 +234,7 @@ export function DocsTopBar() {
           </div>
           <Tabs pathname={pathname} />
         </div>
+        <span aria-hidden className="docs-progress" />
       </header>
 
       <MobileSheet open={sheetOpen} pathname={pathname} onClose={closeSheet} onSearch={openSearch} />

@@ -59,7 +59,7 @@ function toMarkdown(node: Node): string {
     return (node.textContent ?? "").replace(/\s+/g, " ");
   }
   if (!(node instanceof HTMLElement)) return "";
-  if (node.matches(".docs-code-head, .docs-code-hl, button, svg, [aria-hidden='true']")) return "";
+  if (node.matches(".docs-code-head, .docs-code-hl, .docs-anchor, button, svg, [aria-hidden='true']")) return "";
 
   const kids = () => Array.from(node.childNodes).map(toMarkdown).join("");
   const tag = node.tagName.toLowerCase();
@@ -231,7 +231,7 @@ export function CopyPageButton({ title, lede }: { title: string; lede?: string }
   };
 
   const segment =
-    "inline-flex h-10 items-center border border-line text-mute transition-colors hover:bg-surface hover:text-foreground focus-visible:z-10 lg:h-8";
+    "relative inline-flex h-10 items-center border border-line bg-panel text-mute shadow-[inset_0_1px_0_var(--pg-rim)] transition-colors hover:z-10 hover:border-line-strong hover:text-foreground focus-visible:z-10 lg:h-8";
 
   return (
     <div ref={wrapRef} className="relative inline-flex shrink-0">
@@ -256,7 +256,7 @@ export function CopyPageButton({ title, lede }: { title: string; lede?: string }
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="More copy options"
-        className={`${segment} -ml-px w-10 justify-center rounded-r-full lg:w-8 ${open ? "bg-surface text-foreground" : ""}`}
+        className={`${segment} -ml-px w-10 justify-center rounded-r-full lg:w-8 ${open ? "z-10 border-line-strong text-foreground" : ""}`}
       >
         <ChevronDownIcon className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>

@@ -50,13 +50,15 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-[background-color,box-shadow] duration-200 ${
-        scrolled || open
-          ? "bg-background/85 shadow-[0_1px_0_var(--line)] backdrop-blur-xl"
-          : "bg-transparent"
+      className={`sticky top-0 z-50 px-2 transition-[background-color,box-shadow] duration-200 sm:px-3 ${
+        open ? "bg-background shadow-[0_1px_0_var(--line)]" : "bg-transparent"
       }`}
     >
-      <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-7">
+      {/* docks into a floating framed bar once the page scrolls */}
+      <div
+        data-docked={scrolled && !open}
+        className="hd-dockbar mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-2 sm:px-4 data-[docked=true]:h-14"
+      >
         <Logo />
         <nav className="hidden items-center gap-8 lg:flex" aria-label="Primary">
           {MARKETING_LINKS.map((l) => (
@@ -64,7 +66,7 @@ export function Header() {
               key={l.href}
               href={l.href}
               aria-current={isCurrent(pathname, l.href) ? "page" : undefined}
-              className={`text-[14px] transition-colors hover:text-foreground ${
+              className={`hd-navlink text-[14px] transition-colors hover:text-foreground ${
                 isCurrent(pathname, l.href) ? "text-foreground" : "text-soft"
               }`}
             >

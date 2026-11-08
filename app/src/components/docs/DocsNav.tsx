@@ -106,13 +106,28 @@ export function findDocHeading(hash: string): HTMLElement | null {
   return null;
 }
 
+/** "01", "02"…: a section's place in the docs, shared by the sidebar and the breadcrumb. */
+export function sectionNumber(section: string) {
+  const i = DOCS_NAV.findIndex((g) => g.section === section);
+  return i < 0 ? "" : String(i + 1).padStart(2, "0");
+}
+
+/**
+ * The grouped page list. Each group sits on a hairline track; the page you are
+ * on is marked by a steel rule on that track, not a filled pill.
+ */
 export function DocsNavList({ pathname, onNavigate, dense = false }: { pathname: string; onNavigate?: () => void; dense?: boolean }) {
   return (
     <>
-      {DOCS_NAV.map((group) => (
-        <div key={group.section} className="mb-7 last:mb-0">
-          <p className="t-label px-3">{group.section}</p>
-          <ul className="mt-2 space-y-px">
+      {DOCS_NAV.map((group, gi) => (
+        <div key={group.section} className="docs-nav-group">
+          <p className="docs-nav-label">
+            <span className="hd-index" data-n={String(gi + 1).padStart(2, "0")}>
+              <i />
+              {group.section}
+            </span>
+          </p>
+          <ul className="docs-nav-list">
             {group.items.map((item) => {
               const active = isDocActive(pathname, item.href);
               return (
@@ -121,9 +136,8 @@ export function DocsNavList({ pathname, onNavigate, dense = false }: { pathname:
                     href={item.href}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
-                    className={`flex items-center rounded-full px-3 text-[14px] transition-colors ${dense ? "min-h-11" : "min-h-[34px]"} ${
-                      active ? "bg-surface font-medium text-foreground" : "text-mute hover:bg-surface/60 hover:text-foreground"
-                    }`}
+                    data-dense={dense || undefined}
+                    className="docs-nav-link"
                   >
                     {item.label}
                   </Link>

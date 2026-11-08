@@ -6,7 +6,11 @@ import { ListIcon, useDismiss } from "./docsUi";
 
 export type TocHeading = { id: string; text: string };
 
-/** Right rail: "On this page" with a bar that follows the section in view. */
+/**
+ * Right rail: "On this page" on a hairline track. A steel line fills the track
+ * as you read (--docs-read, set by DocsLayout) and the section in view is
+ * marked in ink.
+ */
 export function OnThisPage({
   headings,
   activeId,
@@ -16,35 +20,27 @@ export function OnThisPage({
 }) {
   if (headings.length < 2) return null;
   return (
-    <nav aria-label="On this page">
+    <nav aria-label="On this page" className="docs-toc">
       <p className="t-label flex items-center gap-2">
         <ListIcon size={13} className="text-faint" />
         On this page
       </p>
-      <ul className="mt-4 border-l border-line">
-        {headings.map((h) => {
-          const on = h.id === activeId;
-          return (
-            <li key={h.id} className="relative">
-              {on && (
-                <span
-                  aria-hidden
-                  className="absolute -left-px top-1 bottom-1 w-[2px] rounded-full bg-foreground"
-                />
-              )}
-              <a
-                href={`#${h.id}`}
-                aria-current={on ? "location" : undefined}
-                className={`block py-[7px] pl-4 text-[13.5px] leading-snug transition-colors ${
-                  on ? "text-foreground" : "text-mute hover:text-foreground"
-                }`}
-              >
-                {h.text}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="docs-toc-track">
+        <span aria-hidden className="docs-toc-fill" />
+        <span aria-hidden className="docs-toc-head" />
+        <ul>
+          {headings.map((h) => {
+            const on = h.id === activeId;
+            return (
+              <li key={h.id}>
+                <a href={`#${h.id}`} aria-current={on ? "location" : undefined} className="docs-toc-link">
+                  {h.text}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
       <a
         href="#top"
         onClick={(e) => {
@@ -52,10 +48,12 @@ export function OnThisPage({
           window.scrollTo({ top: 0 });
           window.history.replaceState(null, "", window.location.pathname);
         }}
-        className="mt-6 inline-flex items-center gap-1.5 text-[13px] text-mute transition-colors hover:text-foreground"
+        className="docs-totop"
       >
+        <span aria-hidden className="docs-totop-arrow">
+          ↑
+        </span>
         Back to top
-        <span aria-hidden>↑</span>
       </a>
     </nav>
   );
@@ -86,8 +84,8 @@ export function TocMenu({
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="On this page"
-        className={`grid h-10 w-10 place-items-center rounded-full border border-line lg:h-8 lg:w-8 text-mute transition-colors hover:bg-surface hover:text-foreground ${
-          open ? "bg-surface text-foreground" : ""
+        className={`grid h-10 w-10 place-items-center rounded-full border bg-panel text-mute shadow-[inset_0_1px_0_var(--pg-rim)] transition-colors hover:border-line-strong hover:text-foreground lg:h-8 lg:w-8 ${
+          open ? "border-line-strong text-foreground" : "border-line"
         }`}
       >
         <ListIcon />

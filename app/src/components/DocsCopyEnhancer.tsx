@@ -7,6 +7,12 @@ import { tabIndent } from "@/components/ui/CodeBlock";
 
 /* Same glyphs as CopyButton in components/ui/CodeBlock. */
 const COPY_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="1.5"/></svg>`;
+/* A glyph for the header bar: a prompt for the terminal, braces for JSON, a page for the rest. */
+const GLYPH: Record<string, string> = {
+  Terminal: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7l5 5-5 5M12.5 17.5H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  JSON: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4.5H8a2 2 0 0 0-2 2V10a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3.5a2 2 0 0 0 2 2h1M15 4.5h1a2 2 0 0 1 2 2V10a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3.5a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  page: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3.75h6.5L18.25 8.5v10.25a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-13.5a1.5 1.5 0 0 1 1.5-1.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.25 4v4.5h4.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+};
 const CHECK_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 /* The header strip sits in space the pre reserves in CSS (.docs-prose pre), so
@@ -86,9 +92,17 @@ export function DocsCopyEnhancer() {
 
       const head = document.createElement("div");
       head.className = HEAD_CLASS;
+      const name = labelOf(lang, src);
       const label = document.createElement("span");
-      label.className = "min-w-0 truncate";
-      label.textContent = labelOf(lang, src);
+      label.className = "docs-code-label";
+      const glyph = document.createElement("span");
+      glyph.className = "docs-code-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.innerHTML = GLYPH[name] ?? GLYPH.page;
+      const text = document.createElement("span");
+      text.className = "min-w-0 truncate";
+      text.textContent = name;
+      label.append(glyph, text);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = BUTTON_CLASS;
