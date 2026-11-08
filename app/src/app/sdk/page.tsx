@@ -7,8 +7,12 @@ import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { FlowField } from "@/components/ui/FlowField";
 import { SealDots } from "@/components/ui/SealDots";
+import { Reveal } from "@/components/ui/Reveal";
 import { SealedField } from "@/components/ui/SealedField";
+import { Spotlight } from "@/components/ui/Spotlight";
+import type { CSSProperties } from "react";
 import { CodeTabs, type CodeTab } from "./SdkClient";
+import "@/styles/pages.css";
 
 export const metadata: Metadata = {
   title: "Developers",
@@ -21,7 +25,8 @@ const GITHUB = "https://github.com/ArhamKhan117/Hushd";
 
 /* ---------- line icons (same hand as the landing) ---------- */
 
-const icon = "h-6 w-6 text-foreground";
+const icon = "h-5 w-5 text-foreground";
+const rise = (d: number) => ({ "--d": d }) as CSSProperties;
 function IconBalance() {
   return (
     <svg className={icon} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -277,48 +282,52 @@ export default function SdkPage() {
       <main id="main">
         {/* hero */}
         <section className="mx-auto max-w-[1400px] px-4 pt-3 sm:px-7 sm:pt-6">
-          <div className="hd-panel flex min-h-[max(520px,calc(100svh-8rem))] flex-col justify-end px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:h-[calc(100svh-10rem)] lg:max-h-[980px] lg:min-h-[620px] lg:px-14 lg:pb-14">
-            <FlowField />
-            <div className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
-              <div className="relative z-10 max-w-[720px]">
-                <p className="t-label">Hushd for developers</p>
-                <h1 className="t-display-xl mt-5">Private OTC, as a package</h1>
-                <p className="mt-6 max-w-[50ch] text-[16px] leading-relaxed text-soft sm:text-[17px]">
-                  The same TypeScript the desk runs on: private balances, sealed requests, atomic settlement, proofs to
-                  one named reader and private x402. Real proofs, checked on chain by NEAR.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-                  <Link href="/docs/sdk" className="btn btn-ink btn-lg">
-                    Read the SDK docs
-                  </Link>
-                  <Link href="/docs/agents" className="hd-arrowlink">
-                    Agents and MCP <span aria-hidden>→</span>
-                  </Link>
-                </div>
-              </div>
-
-              <div className="hd-glass relative z-10 w-full p-2 lg:max-w-[460px] lg:justify-self-end">
-                <div className="rounded-[12px] bg-panel p-4 sm:p-5">
-                  <p className="text-[13px] text-mute">Get the code</p>
-                  <a
-                    href={GITHUB}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2.5 flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-panel py-1.5 pl-3.5 pr-3 text-[13.5px] text-foreground transition-colors hover:border-line-strong sm:pl-4 sm:text-[14.5px]"
-                  >
-                    <span className="min-w-0 [overflow-wrap:anywhere]">github.com/ArhamKhan117/Hushd</span>
-                    <ArrowUpRight className="text-mute" />
-                  </a>
-                  <p className="mt-5 text-[13px] text-mute">Then, in a clone of it</p>
-                  <div className="mt-2.5">
-                    <CopyCommand command="pnpm install" />
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen flex min-h-[max(520px,calc(100svh-8rem))] flex-col justify-end border border-line px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:h-[calc(100svh-10rem)] lg:max-h-[980px] lg:min-h-[620px] lg:px-14 lg:pb-14">
+              <FlowField />
+              <div className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
+                <div className="relative z-10 max-w-[720px]">
+                  <p className="t-label pg-rise">Hushd for developers</p>
+                  <h1 style={rise(1)} className="t-display-xl pg-rise mt-5">
+                    Private OTC, as a package
+                  </h1>
+                  <p style={rise(2)} className="pg-rise mt-6 max-w-[50ch] text-[16px] leading-relaxed text-soft sm:text-[17px]">
+                    The same TypeScript the desk runs on: private balances, sealed requests, atomic settlement, proofs to
+                    one named reader and private x402. Real proofs, checked on chain by NEAR.
+                  </p>
+                  <div style={rise(3)} className="pg-rise mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <Link href="/docs/sdk" className="btn btn-ink btn-lg">
+                      Read the SDK docs
+                    </Link>
+                    <Link href="/docs/agents" className="hd-arrowlink">
+                      Agents and MCP <span aria-hidden>→</span>
+                    </Link>
                   </div>
-                  <div className="mt-5 flex flex-wrap gap-1.5 text-[12px] text-mute">
-                    {["TypeScript", "Browser and Node", "Open source, MIT"].map((t) => (
-                      <span key={t} className="rounded-full bg-surface px-2.5 py-1">
-                        {t}
-                      </span>
-                    ))}
+                </div>
+
+                <div style={rise(4)} className="hd-glass hd-sheen pg-rise relative z-10 w-full p-2 lg:max-w-[460px] lg:justify-self-end">
+                  <div className="rounded-[12px] bg-panel p-4 sm:p-5">
+                    <p className="text-[13px] text-mute">Get the code</p>
+                    <a
+                      href={GITHUB}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2.5 flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-panel py-1.5 pl-3.5 pr-3 text-[13.5px] text-foreground transition-colors hover:border-line-strong sm:pl-4 sm:text-[14.5px]"
+                    >
+                      <span className="min-w-0 [overflow-wrap:anywhere]">github.com/ArhamKhan117/Hushd</span>
+                      <ArrowUpRight className="text-mute" />
+                    </a>
+                    <p className="mt-5 text-[13px] text-mute">Then, in a clone of it</p>
+                    <div className="mt-2.5">
+                      <CopyCommand command="pnpm install" />
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-1.5">
+                      {["TypeScript", "Browser and Node", "Open source, MIT"].map((t) => (
+                        <span key={t} className="pg-tag">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -328,31 +337,40 @@ export default function SdkPage() {
 
         {/* quickstart: the ink panel */}
         <section id="quickstart" aria-labelledby="quickstart-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-14 sm:px-7 sm:py-20">
-          <div className="theme-dark hd-panel grid grid-cols-1 gap-12 border border-line bg-background px-5 py-14 text-foreground sm:px-12 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+          <div className="theme-dark hd-panel hd-sheen grid grid-cols-1 gap-12 border border-line bg-background px-5 py-14 text-foreground sm:px-12 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
             <SealedField tone="soft" />
+            <span aria-hidden className="hd-dotgrid" />
             <div className="relative">
-              <p className="t-label">Quickstart</p>
-              <h2 id="quickstart-title" className="t-display-l mt-4 max-w-[14ch]">
+              <span className="hd-index" data-n="01">
+                <i />
+                Quickstart
+              </span>
+              <h2 id="quickstart-title" className="t-display-l mt-5 max-w-[14ch]">
                 Five calls to a private trade
               </h2>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-mute">
                 Build the request, open it on the desk, wait for the enclave, check the terms, settle. Proofs are made
                 where the code runs, and the SDK never holds a NEAR key.
               </p>
-              <ul className="mt-10 divide-y divide-line border-y border-line text-[15px]">
+              <Reveal as="ol" className="mt-10 divide-y divide-line border-y border-line text-[15px]" stagger={60}>
                 {[
                   ["Build the sealed request", "packageRequest"],
                   ["Commit it, send the asks", "openRfq"],
                   ["Wait for the match", "awaitMatch"],
                   ["Check the terms", "checkMatchedTerms"],
                   ["Settle your leg", "settleAsTrader"],
-                ].map(([k, v]) => (
-                  <li key={v} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-4">
-                    <span>{k}</span>
-                    <span className="text-[13.5px] text-mute">{v}</span>
+                ].map(([k, v], i) => (
+                  <li key={v} data-reveal-item className="flex items-baseline gap-4 py-4">
+                    <span aria-hidden className="tnum text-[12px] text-faint">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                      {k}
+                      <span className="pg-tag">{v}</span>
+                    </span>
                   </li>
                 ))}
-              </ul>
+              </Reveal>
               <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
                 <Link href="/docs/sdk" className="hd-arrowlink">
                   The full example <span aria-hidden>→</span>
@@ -369,81 +387,95 @@ export default function SdkPage() {
         </section>
 
         {/* the surface */}
-        <section aria-labelledby="surface" className="mx-auto max-w-[1240px] px-6 pb-20 sm:pb-28">
-          <div className="max-w-[720px]">
-            <h2 id="surface" className="t-display-l">
-              Everything the desk does, in one import
-            </h2>
-            <p className="mt-5 max-w-[56ch] text-[16px] leading-relaxed text-mute">
+        <section aria-labelledby="surface" className="mx-auto max-w-[1240px] px-4 pb-20 sm:px-6 sm:pb-28">
+          <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-end lg:gap-16">
+            <div className="max-w-[720px]">
+              <span className="hd-index" data-n="02">
+                <i />
+                One import
+              </span>
+              <h2 id="surface" className="t-display-l mt-5">
+                Everything the desk does, in one import
+              </h2>
+            </div>
+            <p className="max-w-[56ch] text-[16px] leading-relaxed text-mute lg:pb-1.5">
               Pure TypeScript that runs in the browser and on a server, with the prover passed in so you choose where
               proofs are made.
             </p>
           </div>
-          <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Reveal className="pg-bento hd-grid-lines mt-12 grid grid-cols-1 sm:mt-14 sm:grid-cols-2 lg:grid-cols-3" stagger={70}>
             {SURFACE.map((s) => (
-              <div key={s.title} className="hd-tile flex min-h-[208px] flex-col p-6 sm:min-h-[248px]">
+              <Spotlight key={s.title} data-reveal-item className="flex min-h-[208px] flex-col p-6 sm:min-h-[248px] sm:p-7">
                 <div className="flex items-start justify-between gap-4">
-                  {s.icon}
-                  <span className="max-w-full truncate rounded-full bg-panel px-2.5 py-1 text-[12px] text-mute">{s.fn}</span>
+                  <span className="pg-icon">{s.icon}</span>
+                  <span className="pg-tag">{s.fn}</span>
                 </div>
                 <div className="mt-auto pt-8 sm:pt-10">
                   <p className="text-[19px] leading-snug tracking-[-0.01em] text-foreground">{s.title}</p>
                   <p className="mt-2 text-[14px] leading-relaxed text-mute">{s.body}</p>
                 </div>
-              </div>
+              </Spotlight>
             ))}
-          </div>
+          </Reveal>
         </section>
 
         {/* agents */}
         <section id="agents" aria-labelledby="agents-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 sm:px-7">
-          <div className="hd-panel grid grid-cols-1 gap-12 bg-surface px-5 py-14 sm:px-12 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
-            <SealedField tone="soft" />
-            <div className="relative">
-              <p className="t-label">For agents</p>
-              <h2 id="agents-title" className="t-display-l mt-4 max-w-[14ch]">
-                No code: an MCP server with limits
-              </h2>
-              <p className="mt-5 max-w-[48ch] text-[16px] leading-relaxed text-mute">
-                The MCP server wraps the SDK for any agent. It runs next to the agent with its own seed, proves on that
-                machine, and refuses anything over the caps you set per payment and per day.
-              </p>
-              <ul className="mt-10 divide-y divide-line border-y border-line">
-                {MCP_TOOLS.map((t) => (
-                  <li key={t.name} className="flex flex-col gap-1 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-                    <span className="text-[14.5px] text-foreground">{t.body}</span>
-                    <span className="truncate text-[13px] text-mute">{t.name}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-8 flex flex-wrap gap-2">
-                <Link href="/docs/agents" className="btn btn-ink">
-                  Connect an agent
-                </Link>
-                <a href={`${GITHUB}/tree/main/packages/mcp`} target="_blank" rel="noreferrer" className="btn btn-quiet">
-                  MCP server on GitHub <ArrowUpRight />
-                </a>
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen grid grid-cols-1 gap-12 border border-line bg-surface px-5 py-14 sm:px-12 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
+              <SealedField tone="soft" />
+              <div className="relative">
+                <span className="hd-index" data-n="03">
+                  <i />
+                  For agents
+                </span>
+                <h2 id="agents-title" className="t-display-l mt-5 max-w-[14ch]">
+                  No code: an MCP server with limits
+                </h2>
+                <p className="mt-5 max-w-[48ch] text-[16px] leading-relaxed text-mute">
+                  The MCP server wraps the SDK for any agent. It runs next to the agent with its own seed, proves on that
+                  machine, and refuses anything over the caps you set per payment and per day.
+                </p>
+                <Reveal as="ul" className="mt-10 divide-y divide-line border-y border-line" stagger={55}>
+                  {MCP_TOOLS.map((t) => (
+                    <li key={t.name} data-reveal-item className="flex flex-col gap-1 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                      <span className="text-[14.5px] text-foreground">{t.body}</span>
+                      <span className="truncate text-[13px] text-mute">{t.name}</span>
+                    </li>
+                  ))}
+                </Reveal>
+                <div className="mt-8 flex flex-wrap gap-2">
+                  <Link href="/docs/agents" className="btn btn-ink">
+                    Connect an agent
+                  </Link>
+                  <a href={`${GITHUB}/tree/main/packages/mcp`} target="_blank" rel="noreferrer" className="btn btn-quiet">
+                    MCP server on GitHub <ArrowUpRight />
+                  </a>
+                </div>
               </div>
-            </div>
 
-            <div className="relative min-w-0">
-              <div className="hd-glass p-2 shadow-pop">
-                <X402Exchange />
-              </div>
-              <div className="theme-dark mt-3 text-foreground">
-                <CodeBlock code={MCP_CONFIG} lang="json" title="Any MCP client" meta="mcp.json" className="bg-background" />
+              <div className="relative min-w-0">
+                <div className="hd-glass hd-sheen p-2 shadow-pop">
+                  <X402Exchange />
+                </div>
+                <div className="theme-dark mt-3 text-foreground">
+                  <CodeBlock code={MCP_CONFIG} lang="json" title="Any MCP client" meta="mcp.json" className="bg-background" />
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* start from a reference */}
-        <section aria-labelledby="references" className="mx-auto max-w-[1240px] px-6 py-20 sm:py-28">
+        <section aria-labelledby="references" className="mx-auto max-w-[1240px] px-4 py-20 sm:px-6 sm:py-28">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.35fr]">
-            <div className="hd-card flex flex-col justify-between p-7 sm:p-9">
+            <div className="pg-card flex flex-col justify-between p-7 sm:p-9">
               <div>
-                <p className="t-label">One repository</p>
-                <h2 id="references" className="t-display-m mt-4 max-w-[14ch]">
+                <span className="hd-index" data-n="04">
+                  <i />
+                  One repository
+                </span>
+                <h2 id="references" className="t-display-m mt-5 max-w-[14ch]">
                   Every part, open source
                 </h2>
                 <p className="mt-4 max-w-[44ch] text-[15px] leading-relaxed text-mute">
@@ -455,34 +487,40 @@ export default function SdkPage() {
                 <CopyCommand command="git clone https://github.com/ArhamKhan117/Hushd" />
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Reveal className="pg-bento hd-grid-lines grid grid-cols-1 sm:grid-cols-2" stagger={70}>
               {REFERENCES.map((r) => (
-                <a
+                <Spotlight
+                  as="a"
                   key={r.path}
                   href={r.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="hd-tile group flex min-h-[176px] flex-col p-6 transition-colors hover:bg-surface-2"
+                  data-reveal-item
+                  className="pg-cell group flex min-h-[176px] flex-col p-6"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full bg-panel px-2.5 py-1 text-[12px] text-mute">{r.env}</span>
+                    <span className="pg-tag">{r.env}</span>
                     <ArrowUpRight className="text-mute transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
                   </div>
                   <div className="mt-auto pt-8">
                     <p className="text-[18px] leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{r.path}</p>
                     <p className="mt-1.5 text-[14px] leading-relaxed text-mute">{r.body}</p>
                   </div>
-                </a>
+                </Spotlight>
               ))}
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* honest status */}
-        <section aria-labelledby="status" className="mx-auto max-w-[1240px] px-6">
+        <section aria-labelledby="status" className="mx-auto max-w-[1240px] px-4 sm:px-6">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_2fr]">
             <div>
-              <h2 id="status" className="t-display-l max-w-[11ch]">
+              <span className="hd-index" data-n="05">
+                <i />
+                Status
+              </span>
+              <h2 id="status" className="t-display-l mt-5 max-w-[11ch]">
                 Honest about where it is
               </h2>
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
@@ -494,7 +532,7 @@ export default function SdkPage() {
                 </Link>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-10 sm:grid-cols-3">
+            <Reveal className="pg-bento hd-grid-lines grid grid-cols-1 self-start sm:grid-cols-3" stagger={80}>
               {[
                 {
                   title: "Testnet only",
@@ -508,13 +546,16 @@ export default function SdkPage() {
                   title: "Nothing faked",
                   body: "When a read fails, these pages say so and show no number. Every count on them comes from the chain.",
                 },
-              ].map((t) => (
-                <div key={t.title} className="border-t border-foreground pt-5">
-                  <p className="text-[18px] leading-snug tracking-[-0.01em]">{t.title}</p>
+              ].map((t, i) => (
+                <div key={t.title} data-reveal-item className="flex flex-col p-6 sm:p-7">
+                  <span aria-hidden className="tnum text-[12px] font-medium text-faint">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <p className="mt-6 text-[18px] leading-snug tracking-[-0.01em]">{t.title}</p>
                   <p className="mt-3 text-[14px] leading-relaxed text-mute">{t.body}</p>
                 </div>
               ))}
-            </div>
+            </Reveal>
           </div>
         </section>
       </main>

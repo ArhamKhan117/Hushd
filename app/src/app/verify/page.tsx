@@ -1,13 +1,17 @@
 "use client";
 
 import { decodeProof, verifyProof, type ReaderProof, type Verdict } from "@hushd/sdk";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ErrorLine, Field } from "@/components/app/forms";
 import { BusyLabel } from "@/components/ui/Spinner";
 import { CIRCUITS_BASE, EXAMPLE_READER, NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol, TOKENS } from "@/lib/hushd/format";
+import "@/styles/pages.css";
+
+const rise = (d: number) => ({ "--d": d }) as CSSProperties;
 
 const KIND_WORDS = { receipt: "Payment", funds: "Funds held", volume: "Desk volume" } as const;
 
@@ -110,36 +114,49 @@ export default function VerifyPage() {
   return (
     <div className="relative flex min-h-screen flex-col bg-panel text-foreground">
       <Header />
-      <main id="main" className="mx-auto grid w-full max-w-[760px] grid-cols-[minmax(0,1fr)] gap-6 px-5 pb-20 pt-10 sm:pt-16">
-        <div>
-          <p className="t-label">Proof checker</p>
-          <h1 className="t-display-m mt-3">Check a Hushd proof</h1>
-          <p className="mt-4 max-w-[58ch] text-[15.5px] leading-relaxed text-soft">
-            A proof shows one fact about private money (a payment, a balance above a line, or desk volume) to one named NEAR account, until it expires. This page checks the zero-knowledge proof in your browser, then asks the pool contract on NEAR to check it again against the chain.
-          </p>
-        </div>
+      <main id="main" className="mx-auto w-full max-w-[880px] px-4 pb-20 pt-6 sm:px-6 sm:pt-10">
+        <header className="pg-band hd-crop">
+          <div className="pg-band-light" aria-hidden />
+          <div className="px-5 pb-8 pt-5 sm:px-10 sm:pb-10 sm:pt-7">
+            <nav aria-label="Breadcrumb" className="pg-crumbs pg-rise">
+              <Link href="/">Hushd</Link>
+              <span data-sep aria-hidden>
+                /
+              </span>
+              <span aria-current="page">Proof checker</span>
+            </nav>
+            <h1 style={rise(1)} className="t-display-l pg-rise mt-10 sm:mt-12">
+              Check a Hushd proof
+            </h1>
+            <p style={rise(2)} className="pg-rise mt-5 max-w-[60ch] text-[15.5px] leading-relaxed text-soft sm:text-[16.5px]">
+              A proof shows one fact about private money (a payment, a balance above a line, or desk volume) to one named NEAR account, until it expires. This page checks the zero-knowledge proof in your browser, then asks the pool contract on NEAR to check it again against the chain.
+            </p>
+          </div>
+        </header>
 
-        <Field label="Proof">
-          <textarea
-            className="hd-input min-h-[120px] w-full resize-y py-3 font-mono text-[12.5px]"
-            placeholder="hushdproof1…"
-            value={input}
-            onChange={(e) => setInput(e.target.value.trim())}
-            spellCheck={false}
-          />
-        </Field>
-        <Field label="You are (NEAR account)" hint="A proof made for someone else is shown as such, never quietly accepted.">
-          <input className="hd-input w-full" placeholder={EXAMPLE_READER} value={me} onChange={(e) => setMe(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
-        </Field>
-        <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!input || working} onClick={() => void check(input, me.trim())} aria-busy={working}>
-          <BusyLabel busy={working} busyText="Checking in your browser and on chain…">
-            Check
-          </BusyLabel>
-        </button>
-        <ErrorLine error={shownError} />
+        <section aria-label="Proof checker" style={rise(3)} className="pg-card pg-rise mt-8 grid grid-cols-[minmax(0,1fr)] gap-6 p-5 sm:mt-10 sm:p-8">
+          <Field label="Proof">
+            <textarea
+              className="hd-input min-h-[120px] w-full resize-y py-3 font-mono text-[12.5px]"
+              placeholder="hushdproof1…"
+              value={input}
+              onChange={(e) => setInput(e.target.value.trim())}
+              spellCheck={false}
+            />
+          </Field>
+          <Field label="You are (NEAR account)" hint="A proof made for someone else is shown as such, never quietly accepted.">
+            <input className="hd-input w-full" placeholder={EXAMPLE_READER} value={me} onChange={(e) => setMe(e.target.value.toLowerCase())} spellCheck={false} autoCapitalize="none" />
+          </Field>
+          <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!input || working} onClick={() => void check(input, me.trim())} aria-busy={working}>
+            <BusyLabel busy={working} busyText="Checking in your browser and on chain…">
+              Check
+            </BusyLabel>
+          </button>
+          <ErrorLine error={shownError} />
+        </section>
 
         {proof && verdict && (
-          <section className={`hd-card grid gap-4 p-5 sm:p-6 ${verdict.ok ? "" : "border-danger/40"}`} aria-live="polite">
+          <section className={`pg-card hd-settle mt-6 grid gap-4 p-5 sm:p-7 ${verdict.ok ? "" : "border-danger/40"}`} aria-live="polite">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="t-label">{KIND_WORDS[proof.kind]}</p>
               <span className={`rounded-full px-3 py-1 text-[12.5px] font-medium ${verdict.ok ? "bg-accent-soft text-accent" : "bg-danger-soft text-danger"}`}>{verdict.ok ? "Holds" : "Does not hold"}</span>

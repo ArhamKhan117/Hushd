@@ -2,15 +2,18 @@
 
 import { accountUrl, deskView, poolView, type AssetView, type PoolStats } from "@hushd/sdk";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { FlowField } from "@/components/ui/FlowField";
+import { Reveal } from "@/components/ui/Reveal";
 import { SealedField } from "@/components/ui/SealedField";
+import { Spotlight } from "@/components/ui/Spotlight";
 import { NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol, tokenWords } from "@/lib/hushd/format";
 import { intentsTrades, type IntentsTrades } from "@/lib/hushd/intents";
+import "@/styles/pages.css";
 
 /**
  * /transparency: what anyone can see about Hushd, read live in the browser. The
@@ -32,6 +35,17 @@ const SERVICE_WORDS: Record<string, string> = {
 };
 
 const intFmt = new Intl.NumberFormat("en-US");
+const rise = (d: number) => ({ "--d": d }) as CSSProperties;
+
+/** A numbered label over a section heading, as on the landing page. */
+function SectionIndex({ n, children }: { n: string; children: ReactNode }) {
+  return (
+    <span className="hd-index" data-n={n}>
+      <i />
+      {children}
+    </span>
+  );
+}
 
 type Health = { state: "ok" | "down" | "unreachable"; uptimeS?: number; detail?: string };
 type Status = {
@@ -191,7 +205,7 @@ function stateWords(h: Health | undefined, loading: boolean): string {
 
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <section className="hd-card min-w-0 p-5 sm:p-6">
+    <section className="pg-card min-w-0 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="t-title">{title}</h3>
         {action}
@@ -203,7 +217,7 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
 
 function Notice({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-3 rounded-[14px] bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+    <div className="flex flex-col items-start gap-3 rounded-[14px] border border-line bg-surface px-4 py-4 shadow-[inset_2px_0_0_var(--accent)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div>
         <p className="text-[15px] text-foreground">{title}</p>
         <p className="mt-1 max-w-[60ch] text-[13.5px] leading-relaxed text-mute">{children}</p>
@@ -215,7 +229,7 @@ function Notice({ title, children, action }: { title: string; children: ReactNod
 
 function Count({ label, value, sealed = false }: { label: string; value: number; sealed?: boolean }) {
   return (
-    <div className="flex min-h-[92px] flex-col justify-between rounded-[14px] bg-surface p-4">
+    <div className="flex min-h-[96px] flex-col justify-between p-4">
       <span className="flex items-center justify-between gap-2 text-[12.5px] text-mute">
         {label}
         {sealed && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-sealed" />}
@@ -281,53 +295,55 @@ export function TransparencyView() {
       <main id="main">
         {/* hero */}
         <section className="mx-auto max-w-[1400px] px-4 pt-3 sm:px-7 sm:pt-6">
-          <div className="hd-panel flex min-h-[520px] flex-col justify-end gap-12 px-6 pb-8 pt-24 sm:px-12 sm:pb-12 lg:min-h-[580px]">
-            <FlowField />
-            <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-14">
-              <div className="max-w-[720px]">
-                <h1 className="t-display-xl">What anyone can see</h1>
-                <p className="mt-6 max-w-[52ch] text-[16px] leading-relaxed text-soft sm:text-[17px]">
-                  Hushd keeps who traded, who paid whom and how much private. The contracts and the services that run
-                  the desk are public. This page reads them live, in your browser, so you can see exactly what is out
-                  in the open.
-                </p>
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen flex min-h-[520px] flex-col justify-end gap-12 border border-line px-6 pb-8 pt-24 sm:px-12 sm:pb-12 lg:min-h-[580px]">
+              <FlowField />
+              <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-14">
+                <div className="max-w-[720px]">
+                  <h1 className="t-display-xl pg-rise">What anyone can see</h1>
+                  <p style={rise(1)} className="pg-rise mt-6 max-w-[52ch] text-[16px] leading-relaxed text-soft sm:text-[17px]">
+                    Hushd keeps who traded, who paid whom and how much private. The contracts and the services that run
+                    the desk are public. This page reads them live, in your browser, so you can see exactly what is out
+                    in the open.
+                  </p>
+                </div>
+                <div style={rise(2)} className="pg-rise flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 lg:pb-1">
+                  <a href="#services" className="btn btn-ink btn-lg">
+                    See the services
+                  </a>
+                  <a href="#private" className="hd-arrowlink">
+                    What stays private <span aria-hidden>→</span>
+                  </a>
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 lg:pb-1">
-                <a href="#services" className="btn btn-ink btn-lg">
-                  See the services
-                </a>
-                <a href="#private" className="hd-arrowlink">
-                  What stays private <span aria-hidden>→</span>
-                </a>
-              </div>
-            </div>
 
-            <div className="hd-glass relative w-full p-2">
-              <div className="rounded-[12px] bg-panel">
-                <p className="px-5 pt-4 text-[13px] text-mute sm:px-6">What the chain shows</p>
-                <ul className="grid grid-cols-1 divide-y divide-line px-5 sm:px-6 lg:grid-cols-4 lg:divide-x lg:divide-y-0 lg:px-0 lg:pb-2">
-                  {(
-                    [
-                      ["Deposits, cash outs", "Public, with amounts", false],
-                      ["Desk deals", "Public, with outcomes", false],
-                      ["Private transfers", "Count only", true],
-                      ["Amounts in the pool", "Hidden", true],
-                    ] as const
-                  ).map(([k, v, sealed]) => (
-                    <li key={k} className="flex min-h-[52px] items-center justify-between gap-4 py-2 text-[14px] lg:block lg:min-h-0 lg:px-6 lg:py-3">
-                      <span className="text-mute lg:block">{k}</span>
-                      <span className="inline-flex items-center gap-2 text-right text-foreground lg:mt-1.5 lg:text-left lg:text-[17px]">
-                        <span
-                          aria-hidden
-                          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full max-lg:order-2 ${sealed ? "bg-sealed-soft text-sealed" : "bg-surface text-soft"}`}
-                        >
-                          {sealed ? <LockIcon size={10} /> : <EyeIcon size={11} />}
+              <div style={rise(3)} className="hd-glass hd-sheen pg-rise relative w-full p-2">
+                <div className="rounded-[12px] bg-panel">
+                  <p className="px-5 pt-4 text-[13px] text-mute sm:px-6">What the chain shows</p>
+                  <ul className="grid grid-cols-1 divide-y divide-line px-5 sm:px-6 lg:grid-cols-4 lg:divide-x lg:divide-y-0 lg:px-0 lg:pb-2">
+                    {(
+                      [
+                        ["Deposits, cash outs", "Public, with amounts", false],
+                        ["Desk deals", "Public, with outcomes", false],
+                        ["Private transfers", "Count only", true],
+                        ["Amounts in the pool", "Hidden", true],
+                      ] as const
+                    ).map(([k, v, sealed]) => (
+                      <li key={k} className="flex min-h-[52px] items-center justify-between gap-4 py-2 text-[14px] lg:block lg:min-h-0 lg:px-6 lg:py-3">
+                        <span className="text-mute lg:block">{k}</span>
+                        <span className="inline-flex items-center gap-2 text-right text-foreground lg:mt-1.5 lg:text-left lg:text-[17px]">
+                          <span
+                            aria-hidden
+                            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full max-lg:order-2 ${sealed ? "bg-sealed-soft text-sealed" : "bg-surface text-soft"}`}
+                          >
+                            {sealed ? <LockIcon size={10} /> : <EyeIcon size={11} />}
+                          </span>
+                          {v}
                         </span>
-                        {v}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -337,7 +353,8 @@ export function TransparencyView() {
         <section id="services" aria-labelledby="services-title" className="mx-auto max-w-[1240px] scroll-mt-20 px-4 pt-20 sm:px-6 sm:pt-28">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[640px]">
-              <h2 id="services-title" className="t-display-l">
+              <SectionIndex n="01">Services</SectionIndex>
+              <h2 id="services-title" className="t-display-l mt-5">
                 The services, live
               </h2>
               <p className="mt-5 max-w-[54ch] text-[16px] leading-relaxed text-mute">
@@ -433,7 +450,8 @@ export function TransparencyView() {
         <section id="chain" aria-labelledby="chain-title" className="mx-auto max-w-[1240px] scroll-mt-20 px-4 pt-20 sm:px-6 sm:pt-28">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[640px]">
-              <h2 id="chain-title" className="t-display-l">
+              <SectionIndex n="02">Contracts</SectionIndex>
+              <h2 id="chain-title" className="t-display-l mt-5">
                 The contracts, live
               </h2>
               <p className="mt-5 max-w-[54ch] text-[16px] leading-relaxed text-mute">
@@ -475,7 +493,7 @@ export function TransparencyView() {
               )}
               {chain.state.status === "ready" && (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="hd-grid-lines grid grid-cols-2 overflow-hidden rounded-[14px] [--grid-cell:linear-gradient(180deg,var(--pg-card-top),var(--surface))] sm:grid-cols-3">
                     <Count label="Deposits" value={chain.state.pool.shields} />
                     <Count label="Private transfers" value={chain.state.pool.transfers} sealed />
                     <Count label="Cash outs" value={chain.state.pool.cash_outs} />
@@ -535,7 +553,8 @@ export function TransparencyView() {
         <section id="contracts" aria-labelledby="contracts-title" className="mx-auto max-w-[1240px] scroll-mt-20 px-4 pt-20 sm:px-6 sm:pt-28">
           <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-12">
             <div>
-              <h2 id="contracts-title" className="t-display-l max-w-[12ch]">
+              <SectionIndex n="03">Accounts</SectionIndex>
+              <h2 id="contracts-title" className="t-display-l mt-5 max-w-[12ch]">
                 The accounts
               </h2>
               <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
@@ -545,9 +564,9 @@ export function TransparencyView() {
                 What each one does <span aria-hidden>→</span>
               </Link>
             </div>
-            <ul className="divide-y divide-line border-y border-line">
+            <ul className="pg-card self-start divide-y divide-line overflow-hidden">
               {CONTRACTS.map((c) => (
-                <li key={c.account} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-3.5">
+                <li key={c.account} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-5 py-3.5 sm:px-6">
                   <span className="text-[14px] text-mute">{c.what}</span>
                   <a
                     href={accountUrl(NETWORK, c.account)}
@@ -567,7 +586,8 @@ export function TransparencyView() {
         <section id="intents" aria-labelledby="intents-title" className="mx-auto max-w-[1240px] scroll-mt-20 px-4 pt-20 sm:px-6 sm:pt-28">
           <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-12">
             <div>
-              <h2 id="intents-title" className="t-display-l">
+              <SectionIndex n="04">Mainnet</SectionIndex>
+              <h2 id="intents-title" className="t-display-l mt-5">
                 On NEAR&nbsp;Intents (mainnet)
               </h2>
               <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
@@ -589,15 +609,15 @@ export function TransparencyView() {
                 The list of mainnet trades comes from the Hushd API, which is not answering right now.
               </Notice>
             ) : trades.record.steps.length === 0 ? (
-              <p className="self-start rounded-[14px] bg-surface px-4 py-4 text-[14.5px] leading-relaxed text-soft sm:px-5">
+              <p className="pg-card self-start px-5 py-4 text-[14.5px] leading-relaxed text-soft sm:px-6">
                 The mainnet demo trades between Hushd&apos;s agents are built and waiting for the owner&apos;s go-ahead.
               </p>
             ) : (
-              <ul className="self-start divide-y divide-line border-y border-line">
+              <ul className="pg-card self-start divide-y divide-line overflow-hidden">
                 {trades.record.steps.map((st) => {
                   const base = trades.record.explorer?.startsWith("https://") ? trades.record.explorer.replace(/\/?$/, "/") : MAINNET_TX;
                   return (
-                    <li key={st.step} className="grid gap-2 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6">
+                    <li key={st.step} className="grid gap-2 px-5 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6 sm:px-6">
                       <div className="min-w-0">
                         <p className="text-[14.5px] text-foreground">{stepWords(st.step)}</p>
                         {st.note && <p className="mt-0.5 text-[13px] leading-relaxed text-mute [overflow-wrap:anywhere]">{sentence(st.note)}.</p>}
@@ -629,33 +649,34 @@ export function TransparencyView() {
 
         {/* what stays private */}
         <section id="private" aria-labelledby="private-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 pt-20 sm:px-7 sm:pt-28">
-          <div className="hd-panel bg-surface px-5 py-14 sm:px-12 sm:py-20">
-            <SealedField tone="soft" />
-            <div className="relative mx-auto grid max-w-[1120px] grid-cols-1 gap-12 lg:grid-cols-[1fr_2fr]">
-              <div>
-                <h2 id="private-title" className="t-display-l max-w-[10ch]">
-                  What stays private
-                </h2>
-                <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
-                  Deposits and cash outs are public by design, because tokens move between a NEAR account and the pool.
-                  What happens inside the pool stays sealed.
-                </p>
-                <Link href="/docs/privacy-model" className="hd-arrowlink mt-8">
-                  The full privacy model <span aria-hidden>→</span>
-                </Link>
-              </div>
-              <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
-                {PRIVATE_FACTS.map((f) => (
-                  <div key={f.title} className="border-t border-foreground pt-5">
-                    <p className="flex items-center gap-2.5 text-[18px] leading-snug tracking-[-0.01em]">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-sealed-soft text-sealed">
-                        <LockIcon size={10} />
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen border border-line bg-surface px-5 py-14 sm:px-12 sm:py-20">
+              <SealedField tone="soft" />
+              <div className="relative mx-auto grid max-w-[1120px] grid-cols-1 gap-12 lg:grid-cols-[1fr_2fr]">
+                <div>
+                  <SectionIndex n="05">Private</SectionIndex>
+                  <h2 id="private-title" className="t-display-l mt-5 max-w-[10ch]">
+                    What stays private
+                  </h2>
+                  <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
+                    Deposits and cash outs are public by design, because tokens move between a NEAR account and the pool.
+                    What happens inside the pool stays sealed.
+                  </p>
+                  <Link href="/docs/privacy-model" className="hd-arrowlink mt-8">
+                    The full privacy model <span aria-hidden>→</span>
+                  </Link>
+                </div>
+                <Reveal className="pg-bento hd-grid-lines grid grid-cols-1 sm:grid-cols-2" stagger={80}>
+                  {PRIVATE_FACTS.map((f) => (
+                    <Spotlight key={f.title} data-reveal-item className="flex flex-col p-6 sm:p-7">
+                      <span className="pg-icon text-sealed">
+                        <LockIcon size={16} />
                       </span>
-                      {f.title}
-                    </p>
-                    <p className="mt-3 text-[14px] leading-relaxed text-mute">{f.body}</p>
-                  </div>
-                ))}
+                      <p className="mt-7 text-[18px] leading-snug tracking-[-0.01em]">{f.title}</p>
+                      <p className="mt-2.5 text-[14px] leading-relaxed text-mute">{f.body}</p>
+                    </Spotlight>
+                  ))}
+                </Reveal>
               </div>
             </div>
           </div>

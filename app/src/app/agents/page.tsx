@@ -6,7 +6,11 @@ import { Header } from "@/components/Header";
 import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { CodeBlock, CopyButton } from "@/components/ui/CodeBlock";
 import { FlowField } from "@/components/ui/FlowField";
+import { Reveal } from "@/components/ui/Reveal";
 import { SealedField } from "@/components/ui/SealedField";
+import { Spotlight } from "@/components/ui/Spotlight";
+import type { CSSProperties } from "react";
+import "@/styles/pages.css";
 
 export const metadata: Metadata = {
   title: "Agents",
@@ -22,6 +26,7 @@ export const metadata: Metadata = {
  */
 
 const MCP_URL = "https://hushd.net/mcp";
+const rise = (d: number) => ({ "--d": d }) as CSSProperties;
 const GITHUB = "https://github.com/ArhamKhan117/Hushd";
 
 const FOUR = [
@@ -119,6 +124,15 @@ function LinkBlock({ title, value, className = "bg-panel" }: { title: string; va
   );
 }
 
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.8" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
 export default function AgentsPage() {
   return (
     <div className="relative min-h-screen bg-panel text-foreground">
@@ -127,22 +141,26 @@ export default function AgentsPage() {
       <main id="main">
         {/* hero */}
         <section className="mx-auto max-w-[1400px] px-4 pt-3 sm:px-7 sm:pt-6">
-          <div className="hd-panel flex min-h-[max(520px,calc(100svh-8rem))] flex-col justify-end px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:min-h-[620px] lg:px-14 lg:pb-14">
-            <FlowField />
-            <div className="relative z-10 max-w-[760px]">
-              <p className="text-[15px] text-mute">Hushd for agents</p>
-              <h1 className="t-display-xl mt-4">A private desk for AI agents</h1>
-              <p className="mt-6 max-w-[48ch] text-[18px] leading-[1.55] text-soft">
-                Give an agent its own private balance and a seat at the desk. It trades, pays and proves through MCP,
-                and never spends past the limits you set.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-                <a href="#start" className="btn btn-ink btn-lg">
-                  Connect an agent
-                </a>
-                <a href="#x402" className="hd-arrowlink">
-                  Private x402 <span aria-hidden>→</span>
-                </a>
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen flex min-h-[max(520px,calc(100svh-8rem))] flex-col justify-end border border-line px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:min-h-[620px] lg:px-14 lg:pb-14">
+              <FlowField />
+              <div className="relative z-10 max-w-[760px]">
+                <p className="pg-rise text-[15px] text-mute">Hushd for agents</p>
+                <h1 style={rise(1)} className="t-display-xl pg-rise mt-4">
+                  A private desk for AI agents
+                </h1>
+                <p style={rise(2)} className="pg-rise mt-6 max-w-[48ch] text-[18px] leading-[1.55] text-soft">
+                  Give an agent its own private balance and a seat at the desk. It trades, pays and proves through MCP,
+                  and never spends past the limits you set.
+                </p>
+                <div style={rise(3)} className="pg-rise mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <a href="#start" className="btn btn-ink btn-lg">
+                    Connect an agent
+                  </a>
+                  <a href="#x402" className="hd-arrowlink">
+                    Private x402 <span aria-hidden>→</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -150,87 +168,108 @@ export default function AgentsPage() {
 
         {/* what an agent gets, each with exactly what stays public */}
         <section aria-labelledby="what-it-gets" className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-7 sm:pt-32">
-          <div className="max-w-[720px]">
-            <h2 id="what-it-gets" className="t-display-l">
-              Agents trade in public. Their book does not have to be.
-            </h2>
-            <p className="mt-5 max-w-[56ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]">
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end lg:gap-16">
+            <div className="max-w-[720px]">
+              <span className="hd-index" data-n="01">
+                <i />
+                What it gets
+              </span>
+              <h2 id="what-it-gets" className="t-display-l mt-5">
+                Agents trade in public. Their book does not have to be.
+              </h2>
+            </div>
+            <p className="max-w-[52ch] text-[17px] leading-[1.6] text-mute lg:pb-1">
               On a public chain, anyone can read what an agent holds, what it trades and who it pays. Hushd keeps that
               private, and says plainly what still shows.
             </p>
           </div>
-          <ol className="mt-12 divide-y divide-line border-y border-line">
+          <Reveal as="ol" className="pg-bento hd-grid-lines mt-12 grid grid-cols-1 md:grid-cols-2" stagger={80}>
             {FOUR.map((t, i) => (
-              <li key={t.id} id={t.id} className="grid scroll-mt-24 gap-4 py-8 sm:py-10 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
-                <p className="flex items-baseline gap-4 text-[22px] leading-snug tracking-[-0.01em] sm:text-[26px]">
-                  <span className="tnum text-[15px] text-faint">0{i + 1}</span>
-                  {t.title}
-                </p>
-                <div className="max-w-[56ch]">
-                  <p className="text-[16px] leading-relaxed text-soft sm:text-[17px]">{t.body}</p>
-                  <p className="mt-3 text-[14px] leading-relaxed text-mute">
-                    <span className="text-foreground">Public:</span> {t.pub}
+              <Spotlight as="li" key={t.id} id={t.id} data-reveal-item className="flex scroll-mt-24 flex-col p-6 sm:p-8 lg:p-10">
+                <span className="hd-index" data-n={`0${i + 1}`}>
+                  <i />
+                </span>
+                <p className="mt-8 text-[22px] leading-snug tracking-[-0.01em] sm:text-[26px]">{t.title}</p>
+                <p className="mt-4 max-w-[52ch] text-[16px] leading-relaxed text-soft">{t.body}</p>
+                <div className="mt-auto pt-7">
+                  <p className="flex gap-3 border-t border-line pt-5 text-[14px] leading-relaxed text-mute">
+                    <span className="mt-[3px] shrink-0 text-faint">
+                      <EyeIcon />
+                    </span>
+                    <span>
+                      <span className="text-foreground">Public:</span> {t.pub}
+                    </span>
                   </p>
                 </div>
-              </li>
+              </Spotlight>
             ))}
-          </ol>
+          </Reveal>
         </section>
 
         {/* start */}
         <section id="start" aria-labelledby="start-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 pt-20 sm:px-7 sm:pt-32">
-          <div className="theme-dark hd-panel border border-transparent bg-background px-5 py-12 text-foreground dark:border-line dark:bg-panel sm:px-12 sm:py-16">
-            <div className="relative max-w-[640px]">
-              <h2 id="start-title" className="t-display-l text-foreground">
-                Connect an agent
-              </h2>
-              <p className="mt-5 max-w-[50ch] text-[17px] leading-[1.6] text-mute">
-                Three steps, each useful on its own. Everything runs on NEAR testnet, with test tokens from the faucet.
-              </p>
-            </div>
-            <ol className="relative mt-12 divide-y divide-line border-t border-line">
-              {STEPS.map((s) => (
-                <li key={s.n} className="grid gap-6 py-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-                  <div>
-                    <p className="flex items-baseline gap-4 text-[20px] leading-snug tracking-[-0.01em] sm:text-[22px]">
-                      <span className="tnum text-[15px] text-faint">{s.n}</span>
-                      {s.title}
-                    </p>
-                    <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed text-mute">{s.body}</p>
-                  </div>
-                  <div className="min-w-0">
-                    {s.lang === "text" ? (
-                      <LinkBlock title={s.file} value={s.code} className="bg-surface" />
-                    ) : (
-                      <CodeBlock code={s.code} lang={s.lang} title={s.file} className="bg-surface" />
-                    )}
-                    {s.extra && (
-                      <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
-                        In Claude Code: <code className="tnum text-soft [overflow-wrap:anywhere]">{s.extra}</code>
+          <div className="hd-crop">
+            <div className="theme-dark hd-panel hd-sheen border border-line bg-background px-5 py-12 text-foreground [--pg-ring:var(--background)] dark:bg-panel dark:[--pg-ring:var(--panel)] sm:px-12 sm:py-16">
+              <span aria-hidden className="hd-dotgrid" />
+              <div className="relative max-w-[640px]">
+                <span className="hd-index" data-n="02">
+                  <i />
+                  Start
+                </span>
+                <h2 id="start-title" className="t-display-l mt-5 text-foreground">
+                  Connect an agent
+                </h2>
+                <p className="mt-5 max-w-[50ch] text-[17px] leading-[1.6] text-mute">
+                  Three steps, each useful on its own. Everything runs on NEAR testnet, with test tokens from the faucet.
+                </p>
+              </div>
+              <Reveal as="ol" className="pg-steps relative mt-12 border-t border-line" stagger={110}>
+                {STEPS.map((s) => (
+                  <li key={s.n} data-reveal-item className="grid gap-6 py-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+                    <span aria-hidden className="pg-step-node hd-node max-sm:hidden">
+                      {s.n}
+                    </span>
+                    <div>
+                      <p className="flex items-baseline gap-4 text-[20px] leading-snug tracking-[-0.01em] sm:text-[22px]">
+                        <span className="tnum text-[15px] text-faint sm:sr-only">{s.n}</span>
+                        {s.title}
                       </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <div className="relative mt-2 flex flex-wrap gap-x-6 gap-y-2 text-[13.5px]">
-              <Link href="/docs/agents" className="hd-tap text-soft transition-colors hover:text-foreground">
-                Agents guide
-              </Link>
-              <Link href="/docs/agents#spending-limits" className="hd-tap text-soft transition-colors hover:text-foreground">
-                Spending limits
-              </Link>
-              <Link href="/docs/agents#tools" className="hd-tap text-soft transition-colors hover:text-foreground">
-                Every tool
-              </Link>
-              <a
-                href={`${GITHUB}/tree/main/packages/mcp`}
-                target="_blank"
-                rel="noreferrer"
-                className="hd-tap inline-flex items-center gap-1.5 text-soft transition-colors hover:text-foreground"
-              >
-                The MCP server on GitHub <ArrowUpRight />
-              </a>
+                      <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed text-mute">{s.body}</p>
+                    </div>
+                    <div className="min-w-0">
+                      {s.lang === "text" ? (
+                        <LinkBlock title={s.file} value={s.code} className="bg-surface" />
+                      ) : (
+                        <CodeBlock code={s.code} lang={s.lang} title={s.file} className="bg-surface" />
+                      )}
+                      {s.extra && (
+                        <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
+                          In Claude Code: <code className="tnum text-soft [overflow-wrap:anywhere]">{s.extra}</code>
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </Reveal>
+              <div className="relative mt-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-6 text-[13.5px]">
+                <Link href="/docs/agents" className="hd-tap text-soft transition-colors hover:text-foreground">
+                  Agents guide
+                </Link>
+                <Link href="/docs/agents#spending-limits" className="hd-tap text-soft transition-colors hover:text-foreground">
+                  Spending limits
+                </Link>
+                <Link href="/docs/agents#tools" className="hd-tap text-soft transition-colors hover:text-foreground">
+                  Every tool
+                </Link>
+                <a
+                  href={`${GITHUB}/tree/main/packages/mcp`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hd-tap inline-flex items-center gap-1.5 text-soft transition-colors hover:text-foreground"
+                >
+                  The MCP server on GitHub <ArrowUpRight />
+                </a>
+              </div>
             </div>
           </div>
         </section>
@@ -239,8 +278,11 @@ export default function AgentsPage() {
         <section id="x402" aria-labelledby="x402-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 pt-20 sm:px-7 sm:pt-32">
           <div className="grid gap-12 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
             <div>
-              <p className="text-[14px] text-mute">Private x402</p>
-              <h2 id="x402-title" className="t-display-l mt-4 max-w-[14ch]">
+              <span className="hd-index" data-n="03">
+                <i />
+                Private x402
+              </span>
+              <h2 id="x402-title" className="t-display-l mt-5 max-w-[14ch]">
                 Pay per call, from a private balance
               </h2>
               <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.6] text-mute">
@@ -253,47 +295,60 @@ export default function AgentsPage() {
               </Link>
             </div>
             <div className="min-w-0">
-              <CodeBlock code={X402} lang="text" title="The answer a paid resource gives" meta="scheme hushd" />
-              <ul className="mt-6 divide-y divide-line border-y border-line">
+              <div className="hd-frame rounded-[16px] border-transparent">
+                <CodeBlock
+                  code={X402}
+                  lang="text"
+                  title="The answer a paid resource gives"
+                  meta="scheme hushd"
+                  className="shadow-[inset_0_1px_0_var(--pg-rim),var(--pg-drop)]"
+                />
+              </div>
+              <Reveal as="dl" className="pg-bento hd-grid-lines mt-6 grid" stagger={70}>
                 {[
                   ["Agent", "hushd_pay_x402, capped by its spending limits"],
                   ["Server", "paymentRequired and verifyX402Payment from @hushd/sdk"],
                   ["Chain", "One pool call from the relayer: no payer, payee or amount"],
                 ].map(([k, v]) => (
-                  <li key={k} className="grid gap-1 py-3.5 sm:grid-cols-[96px_1fr] sm:gap-6">
-                    <span className="text-[14px] text-foreground">{k}</span>
-                    <span className="text-[14px] leading-relaxed text-mute">{v}</span>
-                  </li>
+                  <div key={k} data-reveal-item className="grid gap-1 px-5 py-4 sm:grid-cols-[96px_1fr] sm:gap-6">
+                    <dt className="text-[14px] text-foreground">{k}</dt>
+                    <dd className="text-[14px] leading-relaxed text-mute">{v}</dd>
+                  </div>
                 ))}
-              </ul>
+              </Reveal>
             </div>
           </div>
         </section>
 
         {/* makers are agents too */}
         <section aria-labelledby="makers" className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-7 sm:pt-32">
-          <div className="hd-panel overflow-clip bg-surface px-5 py-12 sm:px-12 sm:py-16">
-            <SealedField tone="soft" />
-            <div className="relative grid gap-10 lg:grid-cols-[1fr_1.3fr] lg:items-center lg:gap-16">
-              <div>
-                <p className="text-[14px] text-mute">The other side of the desk</p>
-                <h2 id="makers" className="t-display-l mt-4 max-w-[16ch]">
-                  Makers are agents too
-                </h2>
-              </div>
-              <div className="max-w-[56ch]">
-                <p className="text-[17px] leading-[1.6] text-soft">
-                  Every quote on the desk comes from an agent with a NEAR account, a bond and a quote key. It reads only
-                  the asks sealed to it, signs its consent to exact terms, and settles its own leg in the pool. The
-                  reference makers also sell indicative quotes over private x402.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
-                  <AppLink href="/app/makers" className="hd-arrowlink">
-                    See the makers <span aria-hidden>→</span>
-                  </AppLink>
-                  <Link href="/docs/makers" className="hd-arrowlink">
-                    Run your own <span aria-hidden>→</span>
-                  </Link>
+          <div className="hd-crop">
+            <div className="hd-panel hd-sheen overflow-clip border border-line bg-surface px-5 py-12 sm:px-12 sm:py-16">
+              <SealedField tone="soft" />
+              <div className="relative grid gap-10 lg:grid-cols-[1fr_1.3fr] lg:items-center lg:gap-16">
+                <div>
+                  <span className="hd-index" data-n="04">
+                    <i />
+                    The other side of the desk
+                  </span>
+                  <h2 id="makers" className="t-display-l mt-5 max-w-[16ch]">
+                    Makers are agents too
+                  </h2>
+                </div>
+                <div className="max-w-[56ch]">
+                  <p className="text-[17px] leading-[1.6] text-soft">
+                    Every quote on the desk comes from an agent with a NEAR account, a bond and a quote key. It reads only
+                    the asks sealed to it, signs its consent to exact terms, and settles its own leg in the pool. The
+                    reference makers also sell indicative quotes over private x402.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
+                    <AppLink href="/app/makers" className="hd-arrowlink">
+                      See the makers <span aria-hidden>→</span>
+                    </AppLink>
+                    <Link href="/docs/makers" className="hd-arrowlink">
+                      Run your own <span aria-hidden>→</span>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -302,23 +357,26 @@ export default function AgentsPage() {
 
         {/* honesty */}
         <section className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-7 sm:pt-28">
-          <div className="grid gap-10 sm:grid-cols-3">
-            <div className="border-t border-foreground pt-5">
-              <p className="text-[18px] leading-snug tracking-[-0.01em]">Limits the model cannot change</p>
+          <Reveal className="pg-bento hd-grid-lines grid sm:grid-cols-3" stagger={80}>
+            <div data-reveal-item className="flex flex-col p-6 sm:p-8">
+              <span aria-hidden className="tnum text-[12px] font-medium text-faint">01</span>
+              <p className="mt-6 text-[18px] leading-snug tracking-[-0.01em]">Limits the model cannot change</p>
               <p className="mt-3 text-[14px] leading-relaxed text-mute">
                 The caps are read from the server&apos;s environment when it starts. A token with no cap cannot be
                 spent, and what was spent today survives a restart.
               </p>
             </div>
-            <div className="border-t border-foreground pt-5">
-              <p className="text-[18px] leading-snug tracking-[-0.01em]">Testnet, with test tokens</p>
+            <div data-reveal-item className="flex flex-col p-6 sm:p-8">
+              <span aria-hidden className="tnum text-[12px] font-medium text-faint">02</span>
+              <p className="mt-6 text-[18px] leading-snug tracking-[-0.01em]">Testnet, with test tokens</p>
               <p className="mt-3 text-[14px] leading-relaxed text-mute">
                 Every contract runs on NEAR testnet with development proving keys, and nothing has been audited. The
                 tokens have no value.
               </p>
             </div>
-            <div className="border-t border-foreground pt-5">
-              <p className="text-[18px] leading-snug tracking-[-0.01em]">What stays public</p>
+            <div data-reveal-item className="flex flex-col p-6 sm:p-8">
+              <span aria-hidden className="tnum text-[12px] font-medium text-faint">03</span>
+              <p className="mt-6 text-[18px] leading-snug tracking-[-0.01em]">What stays public</p>
               <p className="mt-3 text-[14px] leading-relaxed text-mute">
                 Deposits, cash outs and desk deal outcomes show on chain, and the crowd of private balances is still
                 small.
@@ -327,7 +385,7 @@ export default function AgentsPage() {
                 The privacy model <span aria-hidden>→</span>
               </Link>
             </div>
-          </div>
+          </Reveal>
         </section>
       </main>
 

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { LegalLayout } from "@/components/LegalLayout";
+import { Reveal } from "@/components/ui/Reveal";
+import { Spotlight } from "@/components/ui/Spotlight";
 
 export const metadata: Metadata = {
   title: "Security",
@@ -11,6 +14,42 @@ export const metadata: Metadata = {
 
 const ISSUES = "https://github.com/ArhamKhan117/Hushd/issues";
 
+const icon = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true } as const;
+
+/** Where it stands, as three cells on one hairline grid. */
+const STANDING: { title: string; body: string; icon: ReactNode }[] = [
+  {
+    title: "Testnet only",
+    body: "Every contract runs on NEAR testnet, with test tokens that have no value.",
+    icon: (
+      <svg {...icon}>
+        <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M3.75 12h16.5M12 3.75c2.3 2.4 3.4 5.15 3.4 8.25s-1.1 5.85-3.4 8.25c-2.3-2.4-3.4-5.15-3.4-8.25S9.7 6.15 12 3.75z" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    ),
+  },
+  {
+    title: "Development proving keys",
+    body: "The Groth16 keys come from the public Perpetual Powers of Tau, one phase-2 contribution and a public beacon. Whoever made that contribution could have kept its entropy and forged proofs. Real value needs a multi-party ceremony first.",
+    icon: (
+      <svg {...icon}>
+        <circle cx="8.5" cy="12" r="3.75" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M12.25 12h8M17.5 12v3M20.25 12v2.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    title: "Not audited",
+    body: "The contracts, circuits and services have tests and automated security scans, and every contract on testnet is a reproducible build anyone can rebuild from its commit. No external audit has been done.",
+    icon: (
+      <svg {...icon}>
+        <path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3l7-2.8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M9.5 12h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+];
+
 export default function SecurityPage() {
   return (
     <LegalLayout
@@ -20,21 +59,15 @@ export default function SecurityPage() {
       lede="Where Hushd stands today, without the gloss: what protects you, what it rests on, and how to tell us when something is wrong."
     >
       <h2>Where it stands</h2>
-      <ul>
-        <li>
-          <strong>Testnet only.</strong> Every contract runs on NEAR testnet, with test tokens that have no value.
-        </li>
-        <li>
-          <strong>Development proving keys.</strong> The Groth16 keys come from the public Perpetual Powers of Tau, one
-          phase-2 contribution and a public beacon. Whoever made that contribution could have kept its entropy and
-          forged proofs. Real value needs a multi-party ceremony first.
-        </li>
-        <li>
-          <strong>Not audited.</strong> The contracts, circuits and services have tests and automated security scans,
-          and every contract on testnet is a reproducible build anyone can rebuild from its commit. No external audit
-          has been done.
-        </li>
-      </ul>
+      <Reveal className="pg-facts pg-bento hd-grid-lines grid sm:grid-cols-3" stagger={90}>
+        {STANDING.map((f) => (
+          <Spotlight key={f.title} data-reveal-item className="flex flex-col p-5 sm:p-6">
+            <span className="pg-icon">{f.icon}</span>
+            <strong className="mt-8 block text-[16px] leading-snug tracking-[-0.01em] text-foreground">{f.title}</strong>
+            <span className="mt-2 block text-[14px] leading-[1.6] text-mute">{f.body}</span>
+          </Spotlight>
+        ))}
+      </Reveal>
 
       <h2>What protects your notes</h2>
       <ul>

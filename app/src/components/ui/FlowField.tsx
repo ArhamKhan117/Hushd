@@ -5,7 +5,7 @@ import { isLowEndDevice } from "@/lib/device";
 
 /**
  * The flowing field: a slow, domain-warped noise gradient drawn in WebGL, the
- * Hushd take on a mesh gradient. Silver and white swirls with one iris wash
+ * Hushd take on a mesh gradient. Silver and white swirls with one steel wash
  * low on the right. Colours come from theme tokens (--f-*), so it follows light
  * and dark. Renders at low resolution (it is all soft gradients), animates only
  * while on screen and at 30 frames a second (the drift is slow), holds still

@@ -2,13 +2,17 @@ import Link from "next/link";
 import { AppLink } from "@/components/AppLink";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { HeroDeal } from "@/components/landing/HeroDeal";
 import { LiveDesk } from "@/components/landing/LiveDesk";
+import { Mark } from "@/components/Logo";
 import { SealStream } from "@/components/landing/SealStream";
 import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { FlowField } from "@/components/ui/FlowField";
+import { Reveal } from "@/components/ui/Reveal";
 import { SealDots } from "@/components/ui/SealDots";
 import { SealedField } from "@/components/ui/SealedField";
+import { Spotlight } from "@/components/ui/Spotlight";
 
 /**
  * The Hushd landing. White ground, light display type, one luminous field, and
@@ -213,37 +217,42 @@ export function Landing() {
       <Header />
 
       <main id="main">
-        {/* hero: owns the first screen, aligned to the nav container */}
+        {/* hero: owns the first screen, framed by crop marks; the deal card lights stage by stage */}
         <section className="mx-auto max-w-[1400px] px-4 pt-3 sm:px-7 sm:pt-6">
-          <div className="hd-panel flex min-h-[max(520px,calc(100svh-8rem))] flex-col justify-end px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:h-[calc(100svh-10rem)] lg:max-h-[980px] lg:min-h-[620px] lg:px-14 lg:pb-14">
-            <FlowField />
-            <div className="relative z-10 max-w-[760px]">
-              <p className="t-label inline-flex items-center gap-3">
-                Private OTC desk on NEAR testnet
-                <span aria-hidden>
-                  <SealDots n={3} className="text-faint" />
-                </span>
-              </p>
-              <h1 className="t-display-xl mt-5">Private OTC, run by agents.</h1>
-              <p className="mt-6 max-w-[48ch] text-[18px] leading-[1.55] text-soft">
-                Say what you want to trade. Maker agents quote inside an enclave, both sides settle privately in one
-                call, and you can prove one fact about it to one named reader.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-2">
-                <AppLink href="/app" className="btn btn-ink btn-lg">
-                  Open the desk
-                </AppLink>
-                <Link href="/docs" className="hd-arrowlink ml-4 self-center">
-                  Read the docs <span aria-hidden>→</span>
-                </Link>
+          <div className="hd-crop">
+            <div className="hd-panel grid min-h-[max(520px,calc(100svh-8rem))] items-end gap-10 px-5 pb-8 pt-24 sm:px-10 sm:pb-10 lg:h-[calc(100svh-10rem)] lg:max-h-[980px] lg:min-h-[640px] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:px-14 lg:pb-14">
+              <FlowField />
+              <div className="relative z-10 max-w-[760px]">
+                <p className="t-label inline-flex items-center gap-3">
+                  Private OTC desk on NEAR testnet
+                  <span aria-hidden>
+                    <SealDots n={3} className="text-faint" />
+                  </span>
+                </p>
+                <h1 className="t-display-xl mt-5">Private OTC, run by agents.</h1>
+                <p className="mt-6 max-w-[48ch] text-[18px] leading-[1.55] text-soft">
+                  Say what you want to trade. Maker agents quote inside an enclave, both sides settle privately in one
+                  call, and you can prove one fact about it to one named reader.
+                </p>
+                <div className="mt-8 flex flex-wrap items-center gap-2">
+                  <AppLink href="/app" className="btn btn-ink btn-lg">
+                    Open the desk
+                  </AppLink>
+                  <Link href="/docs" className="hd-arrowlink ml-4 self-center">
+                    Read the docs <span aria-hidden>→</span>
+                  </Link>
+                </div>
               </div>
+              <div className="relative z-10 hidden justify-end self-center lg:flex">
+                <HeroDeal />
+              </div>
+              <a
+                href="#how"
+                className="hd-glass absolute right-8 top-8 z-10 hidden h-10 items-center gap-2 rounded-xl px-4 text-[13.5px] text-foreground transition-colors hover:bg-panel/70 sm:inline-flex lg:right-14 lg:top-12"
+              >
+                How a deal works <span aria-hidden>↓</span>
+              </a>
             </div>
-            <a
-              href="#how"
-              className="hd-glass absolute bottom-8 right-8 z-10 hidden h-10 items-center gap-2 rounded-xl px-4 text-[13.5px] text-foreground transition-colors hover:bg-panel/70 sm:inline-flex lg:bottom-14 lg:right-14"
-            >
-              How a deal works <span aria-hidden>↓</span>
-            </a>
           </div>
         </section>
 
@@ -252,35 +261,38 @@ export function Landing() {
           <h2 id="what-hushd-is" className="sr-only">
             What Hushd is
           </h2>
-          <div className="grid gap-10 sm:grid-cols-3">
-            {WHAT.map((w) => {
+          <Reveal className="hd-grid-lines grid overflow-hidden rounded-[18px] [--grid-cell:var(--panel)] sm:grid-cols-3">
+            {WHAT.map((w, i) => {
               const To = w.href.startsWith("/app") ? AppLink : Link;
               return (
-                <div key={w.label} className="flex flex-col border-t border-foreground pt-5">
-                  <p className="t-label">{w.label}</p>
-                  <p className="mt-3 text-[19px] leading-snug tracking-[-0.01em]">{w.title}</p>
+                <Spotlight key={w.label} data-reveal-item className="flex flex-col p-6 sm:p-8">
+                  <span className="hd-index" data-n={`0${i + 1}`}>
+                    <i />
+                    {w.label}
+                  </span>
+                  <p className="mt-6 text-[20px] leading-snug tracking-[-0.012em]">{w.title}</p>
                   <p className="mt-2 max-w-[38ch] text-[14px] leading-relaxed text-mute">{w.body}</p>
-                  <To href={w.href} className="hd-arrowlink mt-auto pt-4">
+                  <To href={w.href} className="hd-arrowlink mt-auto pt-6">
                     {w.cta} <span aria-hidden>→</span>
                   </To>
-                </div>
+                </Spotlight>
               );
             })}
-          </div>
+          </Reveal>
         </section>
 
         {/* thesis + signature */}
         <section aria-labelledby="thesis" className="pb-6 pt-24 sm:pt-36">
-          <div className="mx-auto max-w-[900px] px-6 text-center">
-            <h2 id="thesis" className="t-display-l">
+          <Reveal className="mx-auto max-w-[900px] px-6 text-center">
+            <h2 id="thesis" className="t-display-l" data-reveal-item>
               Ask for size in public and the price moves. Hushd seals the ask.
             </h2>
-            <p className="mx-auto mt-6 max-w-[58ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]">
+            <p className="mx-auto mt-6 max-w-[58ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]" data-reveal-item>
               On a public chain, an OTC request tells the market what you are about to do. On Hushd it is sealed to an
               enclave before it leaves your browser. Makers see the pair, the side and the size, never your limit, and
               the chain records a hash.
             </p>
-          </div>
+          </Reveal>
           <div className="mt-12">
             <SealStream />
           </div>
@@ -290,65 +302,103 @@ export function Landing() {
           </div>
         </section>
 
-        {/* how a deal works, and the desk live */}
+        {/* how a deal works: a timeline that draws across, then the desk live */}
         <section id="how" aria-labelledby="how-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 pb-10 pt-20 sm:px-7 sm:pb-16 sm:pt-32">
-          <div className="hd-panel overflow-clip bg-surface px-5 py-12 sm:px-10 sm:py-16">
-            <SealedField tone="soft" />
-            <div className="relative mx-auto max-w-[720px] text-center">
-              <h2 id="how-title" className="t-display-l">
-                How a deal works
-              </h2>
-              <p className="mx-auto mt-4 max-w-[52ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]">
-                Four steps, each checked on chain. Who traded and how much stay private. The maker and the outcome are
-                on the record.
-              </p>
-            </div>
-            <ol className="relative mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {STEPS.map((s) => (
-                <li key={s.n} className="flex flex-col rounded-[16px] bg-panel p-5 shadow-card">
-                  <span className="t-label tnum">Step {s.n}</span>
-                  <span className="mt-4 text-[18px] leading-snug tracking-[-0.01em] text-foreground">{s.title}</span>
-                  <span className="mt-2 text-[14px] leading-relaxed text-mute">{s.body}</span>
-                </li>
-              ))}
-            </ol>
-            <div className="relative mx-auto mt-10 max-w-[960px]">
-              <p className="mb-3 text-center text-[13px] text-mute">The desk, as the chain sees it</p>
-              <LiveDesk />
-            </div>
-            <div className="relative mt-8 flex justify-center">
-              <Link href="/docs/desk" className="hd-arrowlink">
-                The desk in detail <span aria-hidden>→</span>
-              </Link>
+          <div className="hd-crop">
+            <div className="hd-panel overflow-clip bg-surface px-5 py-12 sm:px-10 sm:py-16">
+              <SealedField tone="soft" />
+              <Reveal className="relative mx-auto max-w-[720px] text-center">
+                <span className="hd-index" data-n="01" data-reveal-item>
+                  <i />
+                  How it works
+                </span>
+                <h2 id="how-title" className="t-display-l mt-5" data-reveal-item>
+                  How a deal works
+                </h2>
+                <p className="mx-auto mt-4 max-w-[52ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]" data-reveal-item>
+                  Four steps, each checked on chain. Who traded and how much stay private. The maker and the outcome are
+                  on the record.
+                </p>
+              </Reveal>
+              <Reveal className="relative mt-12" stagger={140}>
+                <div aria-hidden className="relative mb-5 hidden lg:block">
+                  <span className="absolute left-[15px] right-[calc(25%-15px)] top-[15px] h-px bg-line-strong" />
+                  <span className="hd-timeline-rule absolute left-[15px] right-[calc(25%-15px)] top-[15px] h-px bg-foreground" />
+                  <div className="relative grid grid-cols-4 gap-3">
+                    {STEPS.map((s) => (
+                      <span key={s.n} className="hd-node" data-reveal-item>
+                        {s.n}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {STEPS.map((s) => (
+                    <Spotlight key={s.n} as="li" data-reveal-item className="hd-sheen flex flex-col rounded-[16px] border border-line bg-panel p-5">
+                      <span className="t-label tnum lg:hidden">Step {s.n}</span>
+                      <span className="mt-4 text-[18px] leading-snug tracking-[-0.01em] text-foreground lg:mt-0">{s.title}</span>
+                      <span className="mt-2 text-[14px] leading-relaxed text-mute">{s.body}</span>
+                    </Spotlight>
+                  ))}
+                </ol>
+              </Reveal>
+              <div className="relative mx-auto mt-12 max-w-[960px]">
+                <p className="mb-3 text-center text-[13px] text-mute">The desk, as the chain sees it</p>
+                <LiveDesk />
+              </div>
+              <div className="relative mt-8 flex justify-center">
+                <Link href="/docs/desk" className="hd-arrowlink">
+                  The desk in detail <span aria-hidden>→</span>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* packages */}
+        {/* packages: one large, two stacked */}
         <section aria-labelledby="packages" className="mx-auto max-w-[1400px] px-4 py-20 sm:px-7 sm:py-32">
-          <div className="max-w-[720px]">
-            <h2 id="packages" className="t-display-l">
+          <Reveal className="max-w-[720px]">
+            <span className="hd-index" data-n="02" data-reveal-item>
+              <i />
+              Packages
+            </span>
+            <h2 id="packages" className="t-display-l mt-5" data-reveal-item>
               One request, one package, one receipt
             </h2>
-            <p className="mt-5 max-w-[56ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]">
+            <p className="mt-5 max-w-[56ch] text-[17px] leading-[1.6] text-mute sm:text-[19px]" data-reveal-item>
               A deal can have more than one leg. Makers quote the whole package, and it settles and is recorded as one.
             </p>
-          </div>
-          <div className="-mx-4 mt-10 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:scroll-px-0 sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
-            {PACKAGES.map((p) => (
-              <Link
+          </Reveal>
+          <Reveal className="mt-10 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:grid-rows-2">
+            {PACKAGES.map((p, i) => (
+              <Spotlight
                 key={p.title}
                 href={p.href}
-                className="hd-tile group flex min-h-[240px] w-[78%] shrink-0 snap-start flex-col p-6 transition-colors hover:bg-surface-2 sm:w-auto"
+                data-reveal-item
+                className={`hd-sheen group flex flex-col rounded-[18px] border border-line bg-panel p-6 transition-colors hover:border-line-strong ${
+                  i === 0 ? "min-h-[260px] lg:row-span-2 lg:min-h-[420px] lg:p-9" : "min-h-[200px]"
+                }`}
               >
-                {p.icon}
-                <div className="pt-14">
-                  <p className="text-[19px] leading-snug tracking-[-0.01em] text-foreground">{p.title}</p>
-                  <p className="mt-2 text-[14px] leading-relaxed text-mute">{p.body}</p>
+                <div className="flex items-center justify-between">
+                  {p.icon}
+                  <span className="text-[12px] tabular-nums text-faint">0{i + 1}</span>
                 </div>
-              </Link>
+                <div className="mt-auto pt-10">
+                  <p className={`leading-snug tracking-[-0.01em] text-foreground ${i === 0 ? "text-[26px] font-light" : "text-[19px]"}`}>{p.title}</p>
+                  <p className={`mt-2 leading-relaxed text-mute ${i === 0 ? "max-w-[44ch] text-[15px]" : "text-[14px]"}`}>{p.body}</p>
+                  {i === 0 && (
+                    <div className="mt-6 flex flex-wrap gap-2 text-[12.5px] text-soft">
+                      {["Two legs, each proven", "One pool call", "One receipt"].map((c) => (
+                        <span key={c} className="rounded-full border border-line px-3 py-1">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Spotlight>
             ))}
-          </div>
+          </Reveal>
           <p className="mt-8 max-w-[70ch] text-[15px] leading-relaxed text-mute">
             <span className="text-foreground">When a hedge misses.</span> The maker posts a bond on chain for every
             hedged deal. If the hedge misses its deadline, the bond is paid to you as a private note, and only your
@@ -362,17 +412,21 @@ export function Landing() {
         {/* proofs to one named reader */}
         <section id="proofs" aria-labelledby="proofs-title" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 sm:px-7">
           <div className="grid gap-3 lg:grid-cols-2">
-            <div className="hd-tile flex flex-col justify-between rounded-[24px] p-7 sm:p-10">
+            <Reveal className="hd-frame flex flex-col justify-between rounded-[24px] bg-panel p-7 sm:p-10">
               <div>
-                <h2 id="proofs-title" className="t-display-l max-w-[14ch]">
+                <span className="hd-index" data-n="03" data-reveal-item>
+                  <i />
+                  Proofs
+                </span>
+                <h2 id="proofs-title" className="t-display-l mt-5 max-w-[14ch]" data-reveal-item>
                   Prove one fact to one reader
                 </h2>
-                <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.6] text-mute sm:text-[18px]">
+                <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.6] text-mute sm:text-[18px]" data-reveal-item>
                   An auditor, a counterparty or a fund admin may need to see one thing. Make a proof for their NEAR
                   account, with an expiry, and show them that and nothing else.
                 </p>
               </div>
-              <div className="mt-10">
+              <div className="mt-10" data-reveal-item>
                 <ul className="divide-y divide-line border-y border-line text-[15px]">
                   {PROOFS.map(([k, v]) => (
                     <li key={k} className="flex flex-wrap justify-between gap-x-6 gap-y-1 py-4">
@@ -390,10 +444,10 @@ export function Landing() {
                   </Link>
                 </div>
               </div>
-            </div>
+            </Reveal>
             <div className="hd-panel flex min-h-[500px] items-center justify-center px-4 py-10 sm:px-10">
               <SealedField drift />
-              <div className="hd-glass relative w-full max-w-[420px] p-2 shadow-pop">
+              <div className="hd-glass hd-sheen relative w-full max-w-[420px] p-2">
                 <div className="rounded-[12px] bg-panel p-5">
                   <div className="flex items-center justify-between gap-3">
                     <p className="t-label">What the reader checks</p>
@@ -430,83 +484,98 @@ export function Landing() {
           </div>
         </section>
 
-        {/* agents */}
+        {/* agents: an ink panel lit by a dot grid */}
         <section aria-labelledby="agents-title" className="mx-auto max-w-[1400px] px-4 pb-20 pt-20 sm:px-7 sm:pb-32 sm:pt-32">
-          <div className="theme-dark hd-panel grid gap-10 border border-transparent bg-background px-6 py-12 text-foreground dark:border-line dark:bg-panel sm:px-12 sm:py-16 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-            <div className="relative min-w-0">
-              <p className="t-label">For agents</p>
-              <h2 id="agents-title" className="t-display-l mt-4 max-w-[15ch] text-foreground">
-                Agents trade inside limits you set
-              </h2>
-              <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-mute sm:text-[18px]">
-                The Hushd MCP server gives an agent its own private balance and a seat at the desk. It proves every
-                payment on its own machine, refuses anything over its limits, and can pay for HTTP resources over
-                private x402.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-2">
-                <Link href="/agents" className="btn btn-ink">
-                  Hushd for agents
-                </Link>
-                <Link href="/docs/agents" className="btn btn-quiet">
-                  MCP guide <span aria-hidden>→</span>
-                </Link>
-              </div>
-            </div>
-            <div className="relative min-w-0">
-              <CodeBlock code={AGENT_SNIPPET} lang="bash" title="MCP server" meta="Terminal" className="bg-surface" />
-              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[13.5px]">
-                {DEV_LINKS.map((l) =>
-                  l.href.startsWith("http") ? (
-                    <a
-                      key={l.label}
-                      href={l.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hd-tap inline-flex items-center gap-1.5 text-soft transition-colors hover:text-foreground"
-                    >
-                      {l.label} <ArrowUpRight />
-                    </a>
-                  ) : (
-                    <Link key={l.label} href={l.href} className="hd-tap text-soft transition-colors hover:text-foreground">
-                      {l.label}
-                    </Link>
-                  ),
-                )}
+          <div className="hd-crop">
+            <div className="theme-dark hd-panel grid gap-10 border border-transparent bg-background px-6 py-12 text-foreground dark:border-line dark:bg-panel sm:px-12 sm:py-16 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+              <div className="hd-dotgrid" />
+              <Reveal className="relative min-w-0">
+                <span className="hd-index" data-n="04" data-reveal-item>
+                  <i />
+                  For agents
+                </span>
+                <h2 id="agents-title" className="t-display-l mt-5 max-w-[15ch] text-foreground" data-reveal-item>
+                  Agents trade inside limits you set
+                </h2>
+                <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-mute sm:text-[18px]" data-reveal-item>
+                  The Hushd MCP server gives an agent its own private balance and a seat at the desk. It proves every
+                  payment on its own machine, refuses anything over its limits, and can pay for HTTP resources over
+                  private x402.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-2" data-reveal-item>
+                  <Link href="/agents" className="btn btn-ink">
+                    Hushd for agents
+                  </Link>
+                  <Link href="/docs/agents" className="btn btn-quiet">
+                    MCP guide <span aria-hidden>→</span>
+                  </Link>
+                </div>
+              </Reveal>
+              <div className="relative min-w-0">
+                <CodeBlock code={AGENT_SNIPPET} lang="bash" title="MCP server" meta="Terminal" className="hd-sheen bg-surface" />
+                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[13.5px]">
+                  {DEV_LINKS.map((l) =>
+                    l.href.startsWith("http") ? (
+                      <a
+                        key={l.label}
+                        href={l.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hd-tap inline-flex items-center gap-1.5 text-soft transition-colors hover:text-foreground"
+                      >
+                        {l.label} <ArrowUpRight />
+                      </a>
+                    ) : (
+                      <Link key={l.label} href={l.href} className="hd-tap text-soft transition-colors hover:text-foreground">
+                        {l.label}
+                      </Link>
+                    ),
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* only on NEAR */}
+        {/* only on NEAR: a hairline grid */}
         <section aria-labelledby="near" className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-7 sm:pb-32">
           <div className="grid gap-12 lg:grid-cols-[1fr_2fr]">
-            <div>
-              <h2 id="near" className="t-display-l max-w-[11ch]">
+            <Reveal className="lg:sticky lg:top-28 lg:self-start">
+              <span className="hd-index" data-n="05" data-reveal-item>
+                <i />
+                Built in
+              </span>
+              <h2 id="near" className="t-display-l mt-5 max-w-[11ch]" data-reveal-item>
                 Only on NEAR
               </h2>
-              <p className="mt-5 max-w-[38ch] text-[15px] leading-relaxed text-mute">
+              <p className="mt-5 max-w-[38ch] text-[15px] leading-relaxed text-mute" data-reveal-item>
                 Hushd leans on things NEAR has built in. Each of these is part of how a deal runs today.
               </p>
-            </div>
-            <div className="grid gap-x-10 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
-              {NEAR_ONLY.map((n) => (
-                <div key={n.title} className="border-t border-foreground pt-5">
-                  <p className="text-[18px] leading-snug tracking-[-0.01em]">{n.title}</p>
-                  <p className="mt-3 text-[14px] leading-relaxed text-mute">{n.body}</p>
-                </div>
+            </Reveal>
+            <Reveal className="hd-grid-lines grid overflow-hidden rounded-[18px] [--grid-cell:var(--panel)] sm:grid-cols-2 xl:grid-cols-3" stagger={45}>
+              {NEAR_ONLY.map((n, i) => (
+                <Spotlight key={n.title} data-reveal-item className="p-6">
+                  <span className="text-[12px] tabular-nums text-faint">{String(i + 1).padStart(2, "0")}</span>
+                  <p className="mt-4 text-[17px] leading-snug tracking-[-0.01em]">{n.title}</p>
+                  <p className="mt-2.5 text-[14px] leading-relaxed text-mute">{n.body}</p>
+                </Spotlight>
               ))}
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* honest limits */}
         <section aria-labelledby="limits" className="mx-auto max-w-[1400px] px-4 sm:px-7">
           <div className="grid gap-12 lg:grid-cols-[1fr_2fr]">
-            <div>
-              <h2 id="limits" className="t-display-l max-w-[11ch]">
+            <Reveal>
+              <span className="hd-index" data-n="06" data-reveal-item>
+                <i />
+                Limits
+              </span>
+              <h2 id="limits" className="t-display-l mt-5 max-w-[11ch]" data-reveal-item>
                 Honest about where it is
               </h2>
-              <div className="mt-6 flex flex-col items-start gap-3">
+              <div className="mt-6 flex flex-col items-start gap-3" data-reveal-item>
                 <Link href="/docs/privacy-model" className="hd-arrowlink">
                   The privacy model <span aria-hidden>→</span>
                 </Link>
@@ -514,38 +583,41 @@ export function Landing() {
                   The threat model <span aria-hidden>→</span>
                 </Link>
               </div>
-            </div>
-            <div className="grid gap-x-10 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+            </Reveal>
+            <Reveal className="grid gap-x-10 gap-y-10 sm:grid-cols-2 xl:grid-cols-3" stagger={45}>
               {LIMITS.map((t) => (
-                <div key={t.title} className="border-t border-foreground pt-5">
+                <div key={t.title} className="border-t border-foreground pt-5" data-reveal-item>
                   <p className="text-[18px] leading-snug tracking-[-0.01em]">{t.title}</p>
                   <p className="mt-3 text-[14px] leading-relaxed text-mute">{t.body}</p>
                 </div>
               ))}
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* the way in */}
         <section aria-labelledby="start" className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-7 sm:pt-32">
-          <div className="hd-panel flex min-h-[420px] flex-col justify-end px-6 pb-10 pt-24 sm:px-12 sm:pb-14">
-            <FlowField />
-            <div className="relative z-10 max-w-[720px]">
-              <h2 id="start" className="t-display-l">
-                Try a private deal on testnet
-              </h2>
-              <p className="mt-5 max-w-[50ch] text-[17px] leading-[1.6] text-soft">
-                Sign in with a NEAR wallet or a passkey, get test tokens from the faucet, add them privately and ask
-                the desk. Everything runs on test tokens with no value.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-2">
-                <AppLink href="/app" className="btn btn-ink btn-lg">
-                  Open the desk
-                </AppLink>
-                <Link href="/docs/quickstart" className="btn btn-ghost btn-lg">
-                  Read the quickstart
-                </Link>
-              </div>
+          <div className="hd-crop">
+            <div className="hd-panel flex min-h-[420px] flex-col justify-end px-6 pb-10 pt-24 sm:px-12 sm:pb-14">
+              <FlowField />
+              <Mark size={420} className="pointer-events-none absolute -right-16 top-1/2 z-0 hidden -translate-y-1/2 opacity-[0.07] md:block" />
+              <Reveal className="relative z-10 max-w-[720px]">
+                <h2 id="start" className="t-display-l" data-reveal-item>
+                  Try a private deal on testnet
+                </h2>
+                <p className="mt-5 max-w-[50ch] text-[17px] leading-[1.6] text-soft" data-reveal-item>
+                  Sign in with a NEAR wallet or a passkey, get test tokens from the faucet, add them privately and ask
+                  the desk. Everything runs on test tokens with no value.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-2" data-reveal-item>
+                  <AppLink href="/app" className="btn btn-ink btn-lg">
+                    Open the desk
+                  </AppLink>
+                  <Link href="/docs/quickstart" className="btn btn-ghost btn-lg">
+                    Read the quickstart
+                  </Link>
+                </div>
+              </Reveal>
             </div>
           </div>
         </section>
