@@ -1212,3 +1212,74 @@ html[data-theme="dark"],
   border-color: var(--ink);
   color: var(--on-ink);
 }
+
+/* The name across the foot of the public pages (FooterWordmark): ink at the top of
+   each letter fading into the iris accent, cut by the page's own edge, with a faint
+   iris glow behind. It rises letter by letter the first time it scrolls into view. */
+.hd-wordmark {
+  --wm-top: #1b1e24;
+  --wm-bottom: color-mix(in srgb, var(--accent) 34%, #e3e5ec);
+  --wm-glow: color-mix(in srgb, var(--accent) 15%, transparent);
+  container-type: inline-size;
+  margin-top: clamp(2rem, 4vw, 3.5rem);
+  user-select: none;
+}
+html[data-theme="dark"] .hd-wordmark {
+  --wm-top: #eceef2;
+  --wm-bottom: color-mix(in srgb, var(--accent) 40%, #17181e);
+  --wm-glow: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* Archivo at this width: the word is 4.72em wide and its capitals stand 0.688em tall,
+   0.147em below the top of the line. The clip shows the top 58% of the capitals. */
+.hd-wordmark-clip {
+  position: relative;
+  overflow: hidden;
+  height: calc(21.1cqw * 0.44);
+}
+.hd-wordmark-glow {
+  position: absolute;
+  inset: 10% -15% -80%;
+  pointer-events: none;
+  background: radial-gradient(45% 55% at 50% 70%, var(--wm-glow), transparent 72%);
+}
+.hd-wordmark-word {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  white-space: nowrap;
+  font-size: 21.1cqw;
+  line-height: 1;
+  margin-top: -0.107em;
+  font-weight: 900;
+  font-variation-settings: "wdth" 125;
+  letter-spacing: -0.02em;
+}
+.hd-wordmark-word span {
+  display: inline-block;
+  color: transparent;
+  background-image: linear-gradient(180deg, var(--wm-top) 17%, var(--wm-bottom) 56%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hd-wordmark[data-state="armed"] .hd-wordmark-word span {
+    transform: translateY(62%);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  .hd-wordmark[data-state="armed"] .hd-wordmark-glow {
+    opacity: 0;
+  }
+  .hd-wordmark[data-state="in"] .hd-wordmark-word span {
+    transition:
+      transform 1.15s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i) * 85ms),
+      opacity 0.7s ease calc(var(--i) * 85ms),
+      filter 0.9s ease calc(var(--i) * 85ms);
+  }
+  .hd-wordmark[data-state="in"] .hd-wordmark-glow {
+    transition: opacity 1.6s ease 0.2s;
+  }
+}
+html.hd-lite .hd-wordmark .hd-wordmark-word span {
+  filter: none;
+}

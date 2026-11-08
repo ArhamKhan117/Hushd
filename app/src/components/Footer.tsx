@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppLink } from "./AppLink";
 import { Mark } from "./Logo";
+import { FooterWordmark } from "./FooterWordmark";
 import { ThemeSegmented } from "./ThemeToggle";
 import { ArrowUpRight } from "./ui/ArrowUpRight";
 
@@ -43,12 +44,6 @@ const legal: FooterLink[] = [
   { href: "/cookies", label: "Cookies" },
 ];
 
-/** Redaction bars across the foot of the panel: the mark's motif at scale, one in iris. */
-const BARS: { w: string; sealed?: boolean }[][] = [
-  [{ w: "18%" }, { w: "27%" }, { w: "12%", sealed: true }, { w: "22%" }, { w: "10%" }],
-  [{ w: "25%" }, { w: "10%" }, { w: "20%" }, { w: "15%" }, { w: "19%" }],
-];
-
 function GitHubIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -82,16 +77,16 @@ function FooterLinkItem({ l }: { l: FooterLink }) {
 }
 
 /**
- * Footer for the public pages: an ink panel in either theme, the links, and two
- * rows of redaction bars bleeding off its foot.
+ * Footer for the public pages: an ink panel in either theme with the links, then the
+ * name across the foot of the page, cut by its edge.
  */
 export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mx-auto w-full max-w-[1400px] px-4 pb-4 pt-24 sm:px-7 sm:pb-7 sm:pt-32">
+    <footer className="mx-auto w-full max-w-[1400px] px-4 pt-24 sm:px-7 sm:pt-32">
       <div className="theme-dark hd-panel rounded-[28px] border border-transparent bg-background text-foreground dark:border-line dark:bg-panel">
-        <div className="relative z-10 mx-auto max-w-[1240px] px-6 pt-12 sm:px-12 sm:pt-16">
+        <div className="relative z-10 mx-auto max-w-[1240px] px-6 pb-8 pt-12 sm:px-12 sm:pb-10 sm:pt-16">
           <div className="grid gap-12 lg:grid-cols-[1.25fr_2fr]">
             <div>
               <div className="flex items-center gap-2.5">
@@ -137,9 +132,7 @@ export function Footer() {
           </div>
 
           <div className="mt-14 flex flex-col gap-5 border-t border-line pt-6 lg:flex-row lg:items-center lg:justify-between">
-            <p className="text-[12.5px] leading-relaxed text-mute">
-              © {year} Arham Khan. Testnet software, not audited. Not investment, legal or tax advice.
-            </p>
+            <p className="text-[12.5px] leading-relaxed text-mute">© {year} Arham Khan</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
               <ThemeSegmented />
               <nav aria-label="Legal" className="flex flex-wrap items-center text-[12.5px] text-mute">
@@ -155,25 +148,8 @@ export function Footer() {
             </div>
           </div>
         </div>
-
-        {/* the redaction bars bleed off the foot of the panel */}
-        <div
-          aria-hidden
-          className="relative mt-14 flex flex-col gap-4 overflow-hidden px-6 pb-0 [mask-image:linear-gradient(180deg,black_40%,transparent)] sm:mt-20 sm:gap-5 sm:px-12"
-        >
-          {BARS.map((row, i) => (
-            <div key={i} className={`flex gap-4 sm:gap-5 ${i === 1 ? "-mb-3 sm:-mb-4" : ""}`}>
-              {row.map((b, j) => (
-                <span
-                  key={j}
-                  style={{ width: b.w }}
-                  className={`block h-5 shrink-0 rounded-full sm:h-7 ${b.sealed ? "bg-sealed/70" : "bg-surface-2"}`}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
       </div>
+      <FooterWordmark />
     </footer>
   );
 }
