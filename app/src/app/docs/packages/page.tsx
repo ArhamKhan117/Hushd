@@ -111,8 +111,9 @@ export default function PackagesPage() {
       </p>
       <p>
         The desk&apos;s <code>min_bond</code> is 1,000 USDC: a hedged quote must bond at least that much, so hedged
-        packages make sense from about 10,000 USDC of notional. The reference makers bond a tenth of the trade&apos;s
-        value, rounded up to one of a few fixed steps and never less than <code>min_bond</code>.
+        packages make sense from about 10,000 USDC of notional. Bonds come only in steps of <code>min_bond</code> (1, 2,
+        5, 10, 20, 50 and so on times it), so a public bond does not give a trade&apos;s size away; the reference makers
+        bond a tenth of the trade&apos;s value, rounded up to the next step.
       </p>
       <ul>
         <li>

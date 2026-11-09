@@ -101,6 +101,11 @@ export default function ThreatModelPage() {
         <li>A maker can decline to quote, quote badly, or fail to settle. An unsettled deal expires, and nothing moves.</li>
         <li>A maker that misses a hedge loses its bond to the trader.</li>
         <li>
+          A bond is public, so the desk takes it only in fixed steps of its minimum (1, 2, 5, 10, 20, 50 and so on
+          times it): the bond says which step a trade falls in, not its size. A hedge order is public on Hyperliquid,
+          so a hedged deal&apos;s size is not private.
+        </li>
+        <li>
           A maker sees the pair, the side and the size of every ask sealed to it, and could act on that elsewhere.
         </li>
       </ul>

@@ -53,6 +53,7 @@ const GROUPS: { id: string; title: string; rows: [string, string][] }[] = [
       ["openRfq({ net, api, relayer, request, ask, windowMs })", "Seal and commit the request, and send each maker its ask"],
       ["awaitMatch(api, id, rfqId)", "Wait for the enclave and open the terms sealed to you"],
       ["checkMatchedTerms(terms, draft)", "Refuse a match below your limit, in another token or another package"],
+      ["isBondStep(bond, minBond), bondStepAtLeast(atLeast, minBond)", "The desk takes a bond only in steps of its minimum (1, 2, 5, 10, 20... times it)"],
       ["settleAsTrader, settleAsMaker", "Each side's settlement, from planning to the settled deal"],
       ["deskView", "config, enclave, makers, deal, deals, stats"],
       ["new DeskApi(url), new RelayerClient(url)", "The API's request intake and deal rooms, and the relayer"],

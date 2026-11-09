@@ -111,8 +111,10 @@ export default function PrivacyModelPage() {
           small.
         </li>
         <li>
-          <strong>The bond.</strong> The reference makers bond a tenth of a hedged trade&apos;s value, so the public
-          bond hints at its size. The hedge order shows the size outright.
+          <strong>A hedged deal&apos;s size.</strong> The desk takes a bond only in fixed steps (its minimum times 1, 2,
+          5, 10, 20, 50 and so on), so a public bond says only which step the trade falls in. The hedge order is
+          different: it runs on Hyperliquid, a public venue, so its size is in the deal record and on Hyperliquid. A
+          spot deal has neither a bond nor a hedge.
         </li>
         <li>
           <strong>Your receive address.</strong> The winning maker learns your hushd1… address, since it makes a note
@@ -157,6 +159,11 @@ export default function PrivacyModelPage() {
             <td>The API</td>
             <td>Passing sealed messages on, and not logging their metadata</td>
             <td>The content of any request, quote or deal room message</td>
+          </tr>
+          <tr>
+            <td>The desk owner</td>
+            <td>Proposing desk settings (the keeper, the pinned matcher build, the minimum bond), which apply only after a public one-day timelock</td>
+            <td>Your notes, your deals&apos; terms, or a pool rule change without the pool&apos;s own timelock</td>
           </tr>
         </tbody>
       </table>

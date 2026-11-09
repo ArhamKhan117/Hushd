@@ -83,7 +83,7 @@ export default function MakersDocsPage() {
         They quote only what they can fill from their own private balance, and each quote holds for five minutes. For
         a hedged package they add the hedge: a short of the perp for the size they give, as an immediate-or-cancel
         order with a limit of 99% of the mid, a ten-minute deadline, and a bond of a tenth of the trade&apos;s value,
-        rounded up to one of a few fixed steps and never less than the desk&apos;s <code>min_bond</code> (1,000 USDC).
+        rounded up to the desk&apos;s next bond step (<code>min_bond</code>, 1,000 USDC, times 1, 2, 5, 10, 20 and so on).
       </p>
 
       <h2 id="quoting">Quoting</h2>
@@ -136,7 +136,8 @@ export default function MakersDocsPage() {
         </li>
         <li>
           <strong>Lock</strong>: each hedged deal locks the bond its quote named. The desk refuses a match the free
-          bond cannot cover.
+          bond cannot cover, and a bond that is not one of its steps (<code>min_bond</code> times 1, 2 or 5, or a
+          power of ten times one of those; <code>bondStepAtLeast</code> in the SDK picks one).
         </li>
         <li>
           <strong>Release or slash</strong>: a filled hedge releases it, and a missed one pays it to the trader as a

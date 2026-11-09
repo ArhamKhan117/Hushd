@@ -158,7 +158,7 @@ export default function ContractsPage() {
           <strong>Rules</strong>: the pool, the bond token and the MPC are fixed at init. The other settings (the owner,
           OutLayer, the matcher project (which can name one build, <code>owner/project@&lt;wasm hash&gt;</code>) and its secrets owner, the keeper, the OutLayer fee and <code>min_bond</code>)
           change only through <code>propose_config</code> and then <code>apply_config</code> after a one-day timelock,
-          so makers can withdraw first. <code>min_bond</code> is 1,000 USDC.
+          so makers can withdraw first. <code>min_bond</code> is 1,000 USDC, and a hedged deal&apos;s bond must be one of its steps (1, 2, 5, 10, 20, 50 and so on times it).
         </li>
       </ul>
       <p>
