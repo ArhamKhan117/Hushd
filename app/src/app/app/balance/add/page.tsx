@@ -30,17 +30,17 @@ export default function AddPage() {
     return raw === null ? null : BigInt(raw);
   }, [s.accountId, token]);
   /**
-   * After a send, reads until the balance moves: the read can reach an RPC node a block
-   * behind the send, and the free RPCs refuse reads for a while when they rate-limit.
+   * After a send, reads until `moved` holds for the balance: the read can reach an RPC node
+   * a block behind the send, and the free RPCs refuse reads for a while when they rate-limit.
    * Keeps trying for up to 90 seconds, a little slower each time.
    */
   const refresh = useCallback(
-    async (before?: bigint | null) => {
+    async (moved?: (balance: bigint) => boolean) => {
       const deadline = Date.now() + 90_000;
       for (let tries = 0; ; tries++) {
         const b = await readBalance();
         if (b !== null) setPublicBal(b);
-        if (before === undefined || (b !== null && b !== before) || Date.now() > deadline) return;
+        if (!moved || (b !== null && moved(b)) || Date.now() > deadline) return;
         await new Promise((r) => setTimeout(r, Math.min(2_000 + tries * 500, 6_000)));
       }
     },
@@ -62,9 +62,12 @@ export default function AddPage() {
     setBusy("faucet");
     setError(null);
     try {
+      // read now, not from the page: a click can come before the page's first read has
+      // landed, and a stale 0 afterwards must not pass for the faucet's tokens
+      const before = (await readBalance()) ?? publicBal ?? 0n;
       const r = s.kind === "passkey" ? await s.relayer.faucet(s.accountId!, token) : await s.call({ contract: token, method: "faucet", args: {}, gas: "30000000000000" });
       setDone({ hash: r.txHash, text: `Test ${symbol(token)} sent to ${s.accountId}.` });
-      await refresh(publicBal);
+      await refresh((b) => b > before);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -77,6 +80,7 @@ export default function AddPage() {
     setBusy("add");
     setError(null);
     try {
+      const before = (await readBalance()) ?? publicBal;
       const { call, selfPost } = s.wallet.shield(token, amount);
       // The note goes on the board, sealed to you, before any token moves: the deposit is then
       // recoverable from your seed alone, even if this tab closes mid-way.
@@ -84,7 +88,7 @@ export default function AddPage() {
       const r = await s.call({ contract: call.contract, method: call.method, args: call.args, gas: call.gas, deposit: call.deposit });
       setDone({ hash: r.txHash, text: `${fmt(token, amount)} ${symbol(token)} is now private.` });
       setInput("");
-      await Promise.all([refresh(publicBal), s.sync()]);
+      await Promise.all([refresh(before === null ? undefined : (b) => b < before), s.sync()]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
