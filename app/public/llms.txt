@@ -4,12 +4,15 @@
 
 Status: NEAR testnet only, test tokens with no value (USDC, wNEAR, BTC from a faucet), development proving keys (not a multi-party ceremony), not audited. No Hushd contract is on NEAR mainnet.
 
-Public on chain: deposits and cash outs with their amounts; that a desk deal happened, its maker, bond, hedge order and outcome. Private: amounts and parties inside the pool, balances, the trader's limit and words, who the trader on a deal was.
+Public on chain: deposits and cash outs with their amounts; that a desk deal happened, its maker, bond (only in fixed steps of the desk minimum, so it does not give a trade's size away), hedge order (which does) and outcome. Private: amounts and parties inside the pool, balances, the trader's limit and words, who the trader on a deal was.
+
+Sanctions screening: public addresses only (the NEAR account a deposit comes from, the account a cash out pays, an address on another chain used through NEAR Intents), against a dated snapshot of the digital currency addresses on OFAC's SDN list, in the app before signing, at the API (POST /v1/screen with {"address"}) and in the relayer before a cash out. A listed address gets one neutral answer: "This address can't be used with Hushd."
 
 ## Site
 
 - [Desk](https://hushd.net/app): the app. Sign in with a NEAR wallet (NEAR Connect) or a passkey; add test tokens privately; ask the desk; send, receive, cash out; prove.
 - [Trade](https://hushd.net/app/trade): the trading screen. Live Hyperliquid prices per pair (from the API's `/v1/market/mids` and `/v1/market/candles`), the request ticket, the makers and their bonds, a payoff chart, and your requests, deals, hedge legs and receipts.
+- Claim a payment: https://hushd.net/app/claim#<code>. A claim link pays whoever opens it first: the code after the # (never sent to a server) holds a one-time key and the opening of a note in the pool. The claimer signs in with a passkey or a NEAR wallet and the relayer moves the payment into a new note only the claimer can spend, with no gas. The payer can take back a link nobody claimed; a spent link answers "This link was already claimed." Made on the Send page ("As a link") or with hushd_pay_link.
 - [Verify a proof](https://hushd.net/verify): checks a hushdproof1… string in the browser and through the pool contract's verify_disclosure view. Proof links put the proof after the #: https://hushd.net/verify#p=hushdproof1…
 - [Agents](https://hushd.net/agents): Hushd for AI agents.
 - [Developers](https://hushd.net/sdk): the SDK and the MCP server.
@@ -26,7 +29,7 @@ Public on chain: deposits and cash outs with their amounts; that a desk deal hap
 - [Agents and MCP](https://hushd.net/docs/agents): tools, local and hosted setup, spending limits (HUSHD_LIMIT_PER_PAYMENT, HUSHD_LIMIT_PER_DAY)
 - [Private x402](https://hushd.net/docs/x402): scheme "hushd", the X-PAYMENT header, server-side checks
 - [Makers](https://hushd.net/docs/makers): reference makers, pricing, quoting, bonds, running one
-- [SDK](https://hushd.net/docs/sdk): @hushd/sdk exports and examples
+- [SDK](https://hushd.net/docs/sdk): @hushd/sdk exports and examples, including claim links (payAsLink, checkLink, claimLink, takeBackLink)
 - [Privacy model](https://hushd.net/docs/privacy-model): who sees what, what can leak, who you trust
 - [Security and threat model](https://hushd.net/docs/threat-model)
 - [Contracts](https://hushd.net/docs/contracts): accounts, methods and NEP-297 events
@@ -34,7 +37,7 @@ Public on chain: deposits and cash outs with their amounts; that a desk deal hap
 ## MCP
 
 - Hosted, read-only: https://hushd.net/mcp (Streamable HTTP, stateless). Tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
-- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. Adds wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_faucet, hushd_shield, hushd_send, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
+- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. Adds wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_faucet, hushd_shield, hushd_send, hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
 
 ## Contracts (NEAR testnet)
 

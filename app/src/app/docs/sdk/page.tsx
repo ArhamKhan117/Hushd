@@ -6,7 +6,7 @@ import { Callout } from "@/components/docs/FlowDiagram";
 export const metadata: Metadata = {
   title: "SDK",
   description:
-    "@hushd/sdk in TypeScript: identities and hushd1 addresses, the private wallet, the desk for traders and makers, proofs to one named reader, NEAR AI intake, private x402 and chain reads.",
+    "@hushd/sdk in TypeScript: identities and hushd1 addresses, the private wallet, claim links, the desk for traders and makers, proofs to one named reader, NEAR AI intake, private x402 and chain reads.",
   alternates: { canonical: "/docs/sdk" },
 };
 
@@ -40,9 +40,23 @@ const GROUPS: { id: string; title: string; rows: [string, string][] }[] = [
       ["balances(), spendable(token), pending()", "What it holds, what it can spend now, what is still landing"],
       ["shield(token, amount)", "A new note, the ft_transfer_call to sign, and the self-post that makes it recoverable"],
       ["send(to, token, amount, memo?)", "Pay a hushd1… address privately, through the relayer"],
+      ["pay(note, { word, beforeSend })", "Pay a note made beforehand, optionally sealing word of it to its owner"],
       ["cashOut(account, token, amount, fee?)", "Pay out to a NEAR account, with a refund note if the payout fails"],
       ["payments(), deals()", "What it paid and traded, ready for a proof"],
       ["MemoryStore, artifactsAt(base)", "An in-memory store, and proving artifacts from a URL"],
+    ],
+  },
+  {
+    id: "links",
+    title: "Claim links",
+    rows: [
+      ["payAsLink(wallet, token, amount)", "Pay into a one-time note and get a link for it; the link is in the wallet's store before the payment goes out"],
+      ["linkUrl(appOrigin, link), parseLink(urlOrCode)", "The URL to share (the code after the #), and back"],
+      ["encodeLink, decodeLink, newLink", "The versioned, checked code on its own; a LinkError says what is wrong with a damaged one"],
+      ["checkLink(net, link)", "ready, claimed or missing, from the pool: only a ready link's amount is real"],
+      ["claimLink(link, { to, artifacts, relayer })", "Spend the link note into a new note for to's receive key, through the relayer: no gas"],
+      ["sentLinks(wallet), takeBackLink(wallet, link, opts)", "The links a wallet paid with their state, and taking back one nobody claimed"],
+      ["ALREADY_CLAIMED", "The one answer for a spent link, claimed or taken back"],
     ],
   },
   {
@@ -178,6 +192,30 @@ await relayer.post(selfPost, "note"); // so your seed alone can recover this not
 
 // Later, from the private balance, through the relayer.
 const { txHash } = await wallet.send("hushd1…", "usdc.hushd.testnet", 10_000_000n, "invoice 7");`}</code>
+      </pre>
+
+      <h2 id="pay-as-a-link">Pay as a link</h2>
+      <p>
+        To pay someone who is not on Hushd yet, pay into a one-time note and hand them a link. The link carries the
+        note&apos;s opening after the <code>#</code>, which browsers never send to a server. Whoever opens it first
+        claims the payment into a new note for their own receive key, made on their device, so after the claim you
+        cannot spend it back. Until then you can take it back.
+      </p>
+      <pre>
+        <code className="language-ts">{`import { checkLink, claimLink, linkUrl, parseLink, payAsLink, sentLinks, takeBackLink, TESTNET } from "@hushd/sdk";
+
+// The payer: the link is saved in the wallet's encrypted store before the payment goes out.
+const { link } = await payAsLink(wallet, "usdc.hushd.testnet", 25_000_000n);
+const url = linkUrl("https://hushd.net", link); // https://hushd.net/app/claim#…, share it privately
+
+// The claimer: check the pool first, then claim into their own wallet. The relayer pays the gas.
+const theirs = parseLink(url);
+const check = await checkLink(TESTNET, theirs); // "ready", "claimed" or "missing"
+if (check.state === "ready") await claimLink(theirs, { to: theirWallet, artifacts, relayer, tree: check.tree });
+
+// Later, the payer: where each link stands, and taking back one nobody claimed.
+const [first] = await sentLinks(wallet); // state: "waiting", "claimed", "taken back", …
+if (first?.state === "waiting") await takeBackLink(wallet, first.link, { artifacts, relayer });`}</code>
       </pre>
 
       <h2 id="exports">Exports</h2>

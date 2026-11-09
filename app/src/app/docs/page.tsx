@@ -33,8 +33,9 @@ export default function DocsOverviewPage() {
       <p>
         Your money sits in a <strong>shielded pool</strong> as notes: Poseidon commitments in a Merkle tree of depth
         20, spent with Groth16 proofs that the pool contract checks on chain. Only the holder of a note&apos;s
-        spending key can spend it. You can send privately, cash out to any NEAR account, share a payment request link,
-        and receive at an address that starts with <code>hushd1</code>.
+        spending key can spend it. You can send privately, pay anyone as a link they claim with a passkey or a wallet,
+        cash out to any NEAR account, share a payment request link, and receive at an address that starts with{" "}
+        <code>hushd1</code>.
       </p>
       <p>
         When someone needs to see one fact, you make a <strong>proof for one named NEAR account</strong>, with an
@@ -60,6 +61,11 @@ export default function DocsOverviewPage() {
         </li>
         <li>Test tokens from a faucet: USDC, wNEAR and BTC, all issued by Hushd on testnet.</li>
         <li>Add privately, send privately, cash out (with a refund note if the payout fails), receive and request.</li>
+        <li>
+          Pay as a link: anyone who opens it claims the payment into their own private balance, with no gas and no
+          seed phrase, and you can take back a link nobody claimed. See{" "}
+          <Link href="/docs/privacy-model#claim-links">claim links</Link>.
+        </li>
         <li>
           The desk: <Link href="/docs/packages">spot, spot + hedge, and cash and carry</Link>, matched in the enclave
           and settled atomically in the pool.

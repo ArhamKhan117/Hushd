@@ -23,6 +23,10 @@ const TOOLS: [string, string, string][] = [
   ["hushd_faucet", "Wallet", "Testnet tokens to the agent's NEAR account"],
   ["hushd_shield", "Wallet", "Move tokens from its NEAR account into its private balance"],
   ["hushd_send", "Wallet, limited", "Pay a hushd1… address privately"],
+  ["hushd_pay_link", "Wallet, limited", "Pay anyone as a claim link: whoever opens it first claims it, with no gas"],
+  ["hushd_claim_link", "Wallet", "Claim a link into its own private balance (its own link: a take back)"],
+  ["hushd_my_links", "Wallet", "Links it paid, read from the pool: waiting, claimed or taken back"],
+  ["hushd_take_back_link", "Wallet", "Take back a link it paid that nobody claimed"],
   ["hushd_cash_out", "Wallet, limited", "Pay out to a NEAR account"],
   ["hushd_trade", "Wallet, limited", "Ask the desk, match in the enclave, settle privately"],
   ["hushd_my_deals", "Wallet", "Deals it took part in, with the terms only it can read"],
@@ -47,6 +51,7 @@ const ENV: [string, string][] = [
   ["HUSHD_CIRCUITS_DIR", "Proving artifacts on disk (found on its own inside the repo)"],
   ["HUSHD_CIRCUITS_URL", "Or where to fetch them (default https://hushd.net/circuits)"],
   ["HUSHD_VERIFY_URL", "The checker proof links point to (default https://hushd.net/verify)"],
+  ["HUSHD_APP_URL", "The app claim links open in, as <origin>/app/claim#… (default https://hushd.net)"],
 ];
 
 export default function AgentsDocsPage() {
@@ -143,6 +148,13 @@ claude mcp add hushd \\
         the maker and what was given and received. <code>hushd_prove</code> takes a reader and a validity of 1 to 90
         days, and returns the proof with a link to check it.
       </p>
+      <p>
+        To pay a counterparty who is not on Hushd yet, <code>hushd_pay_link</code> takes a token and an amount and
+        returns a claim link (<code>https://hushd.net/app/claim#…</code>). Hand it over privately: whoever opens it
+        claims the payment into their own private balance with a passkey or a NEAR wallet, and needs no gas. If nobody
+        claims it, <code>hushd_take_back_link</code> returns the amount. An agent paid with a link claims it with{" "}
+        <code>hushd_claim_link</code>.
+      </p>
 
       <h2 id="spending-limits">Spending limits</h2>
       <p>
@@ -155,8 +167,13 @@ HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250,BTC=0.01"       # the default`}</code>
       </pre>
       <ul>
         <li>
-          <code>hushd_send</code>, <code>hushd_cash_out</code> and <code>hushd_trade</code> (for the amount sold)
-          check both caps before anything is proved, and record what was spent once it is.
+          <code>hushd_send</code>, <code>hushd_pay_link</code>, <code>hushd_cash_out</code> and{" "}
+          <code>hushd_trade</code> (for the amount sold) check both caps before anything is proved, and record what was
+          spent once it is.
+        </li>
+        <li>
+          Anyone holding a link can claim it, so an agent with a payee list (<code>HUSHD_ALLOW_TO</code>) may not pay
+          as a link at all.
         </li>
         <li>
           <code>hushd_pay_x402</code> pays a 402 only up to the smaller of the per-payment cap and what is left of

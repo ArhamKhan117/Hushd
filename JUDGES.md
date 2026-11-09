@@ -33,6 +33,9 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 | NEAR AI intake is end-to-end encrypted and verified | `packages/sdk/src/intake.ts`, `services/src/intake.ts` |
 | Private x402 | `packages/sdk/src/x402.ts` and its tests, `services/src/makers.ts` |
 | Agents spend only inside limits | `packages/mcp/src/limits.ts`, `packages/mcp/test/mcp.test.ts` |
+| Pay anyone as a link; the claim moves the payment into a note only the claimer knows, with no gas | `packages/sdk/src/links.ts` and `packages/sdk/test/links.test.ts`, `app/src/app/app/claim/page.tsx`, `app/e2e/claim.spec.ts` |
+| Sanctions screening of public addresses only, in the app, the API and the relayer | `packages/sdk/src/screening.ts` and its tests, `services/src/relayer.ts` (`transact`), `services/src/api.ts` (`/v1/screen`) |
+| A bond does not give a trade's size away: the desk takes bonds only in fixed steps | `contracts/desk/src/lib.rs` (`is_bond_step`), `packages/sdk/src/desk.ts` (`bondStepAtLeast`) |
 | Agents and makers hold no NEAR key: policy wallets on OutLayer custody, policy stored and frozen on chain by the owner | `packages/sdk/src/custody.ts`, `services/scripts/policy-wallet.ts`, `services/src/makers.ts` (`makerAccount`), `packages/mcp/src/agent.ts` |
 | Direct trades on NEAR Intents: NEP-413 signed `token_diff`s, simulated, then one `execute_intents` | `packages/sdk/src/intents.ts` and its tests, `services/src/intents-trade.ts`, `services/scripts/intents-sandbox.ts` |
 | Bytes agree across TypeScript and both Rust codebases | `packages/protocol/test/protocol.test.ts`, `matcher/tests/interop.json`, `contracts/desk/src/hedge.rs` tests |
@@ -47,3 +50,5 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 - The NEAR Intents Agent API (mainnet only) is wired (`services/src/agent-api.ts`, `scripts/agent-api.ts`: an agent owned by the demo's dev wallet, its policy signed by that key, swaps through a grant) and checked against the live API's public endpoints; creating the agent waits for a partner key and the owner's go-ahead.
 - The contract review and automated scans, with every finding and fix: [SECURITY.md](SECURITY.md).
 - Deposits and cash outs are public, and timing can link them; the docs say how to reduce that.
+- A hedged deal's hedge order is public on Hyperliquid, so its size is not private; its bond shows only a size step.
+- Sanctions screening uses a dated snapshot of OFAC's list and covers public addresses only.

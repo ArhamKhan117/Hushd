@@ -12,7 +12,6 @@ import { SealedField } from "@/components/ui/SealedField";
 import { Spotlight } from "@/components/ui/Spotlight";
 import type { CSSProperties } from "react";
 import { CodeTabs, type CodeTab } from "./SdkClient";
-import "@/styles/pages.css";
 
 export const metadata: Metadata = {
   title: "Developers",
@@ -188,6 +187,7 @@ const MCP_TOOLS = [
   { name: "hushd_pay_x402", body: "Pay a 402 resource from the private balance" },
   { name: "hushd_prove", body: "A proof for one named reader" },
   { name: "hushd_send", body: "Pay a hushd1… address privately" },
+  { name: "hushd_pay_link", body: "Pay anyone as a link they claim, no gas" },
   { name: "hushd_balance", body: "The agent's private balance" },
   { name: "hushd_limits", body: "What it may spend, and what is left today" },
 ];
@@ -410,7 +410,8 @@ export default function SdkPage() {
                   <span className="pg-icon">{s.icon}</span>
                   <span className="pg-tag">{s.fn}</span>
                 </div>
-                <div className="mt-auto pt-8 sm:pt-10">
+                {/* from the top, so titles in a row line up however many lines each body takes */}
+                <div className="pt-8 sm:pt-10">
                   <p className="text-[19px] leading-snug tracking-[-0.01em] text-foreground">{s.title}</p>
                   <p className="mt-2 text-[14px] leading-relaxed text-mute">{s.body}</p>
                 </div>
@@ -502,7 +503,7 @@ export default function SdkPage() {
                     <span className="pg-tag">{r.env}</span>
                     <ArrowUpRight className="text-mute transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
                   </div>
-                  <div className="mt-auto pt-8">
+                  <div className="pt-8">
                     <p className="text-[18px] leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{r.path}</p>
                     <p className="mt-1.5 text-[14px] leading-relaxed text-mute">{r.body}</p>
                   </div>

@@ -33,6 +33,9 @@ Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
 2. `hushd_faucet` then `hushd_shield`: test tokens to the NEAR account, then into the private balance.
 3. `hushd_balance`: always sync before deciding what can be spent.
 4. Pay: `hushd_send` to a `hushd1...` address, `hushd_cash_out` to a NEAR account, or `hushd_pay_x402` for a URL that answers 402 with scheme `hushd`.
+   To pay someone not on Hushd yet, `hushd_pay_link` returns a claim link (`https://hushd.net/app/claim#...`); whoever opens it first claims the payment with a passkey or a NEAR wallet and no gas.
+   `hushd_my_links` shows whether each link is waiting or claimed, and `hushd_take_back_link` takes back one nobody claimed.
+   If the agent is paid with a link, `hushd_claim_link` claims it into its own balance.
 5. Trade: `hushd_trade` with `kind` spot, spot_hedge or carry, the sell token and amount, the buy token and optionally `min_receive`.
    The request and its limit are sealed to the matcher enclave; makers only see the pair, side and size.
    Spot settles atomically in the pool; the hedge kinds add a Hyperliquid testnet order backed by the maker's bond.
@@ -45,10 +48,11 @@ Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
 - Respect the limits. A refusal from a limit is final for that call; ask the operator to raise the limit rather than splitting a payment to get around it.
 - Amounts are in token units ("25.5"), not base units.
 - Deposits (`hushd_shield`) and cash outs are public on NEAR. Payments, trades and balances inside the pool are not.
+- A claim link is the payment itself: anyone holding it can claim it. Send it only to the intended payee, over a private channel, and never log it.
 - A proof shows one fact to one reader until it expires. Make a new proof for each reader.
 - Testnet only: the tokens are test tokens and the proving keys are development keys.
 
 ## SDK
 
-For code instead of MCP, use `@hushd/sdk` from this repo: `PrivateWallet` (sync, send, cashOut, shield), `openRfq`, `awaitMatch`, `settleAsTrader`, `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, `x402Fetch` and `verifyX402Payment`.
+For code instead of MCP, use `@hushd/sdk` from this repo: `PrivateWallet` (sync, send, cashOut, shield), `payAsLink`, `claimLink`, `openRfq`, `awaitMatch`, `settleAsTrader`, `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, `x402Fetch` and `verifyX402Payment`.
 See `packages/mcp/src/tools.ts` for each tool's exact use of the SDK.

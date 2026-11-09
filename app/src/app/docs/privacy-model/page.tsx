@@ -16,6 +16,7 @@ const ROWS: [string, string][] = [
   ["That a private transfer happened: a pool call from the relayer with two new notes", "Anyone"],
   ["Who paid whom inside the pool, and how much", "The two sides only"],
   ["Your private balance", "You only"],
+  ["A claim link, and so its amount and the right to claim it", "Whoever holds the link"],
   ["Your request: your limit, your address, your words", "You and the matcher enclave"],
   ["The ask: the package kind, the pair, the side and the size", "Each registered maker"],
   ["Quotes, including the ones that lose", "The maker that made each, and the enclave"],
@@ -114,6 +115,19 @@ export default function PrivacyModelPage() {
         &ldquo;This address can&apos;t be used with Hushd.&rdquo;, and nothing else.
       </p>
 
+      <h2 id="claim-links">Claim links</h2>
+      <p>
+        Paying as a link pays a one-time note and puts what opens it in the link itself, after the <code>#</code>.
+        Browsers never send that part to a server, so neither the app nor the API sees it. On chain, paying into a link
+        and claiming it are two private transfers sent by the relayer, like any other.
+      </p>
+      <p>
+        The link is the payment: whoever opens it first can claim it, so share it the way you would share cash.
+        Claiming moves it into a new note made in the claimer&apos;s browser for their own key, so once it is claimed
+        the payer cannot take it back. Until then, the payer can. Anyone who opens a spent link sees only that it was
+        already claimed, not by whom or whether it was taken back.
+      </p>
+
       <h2 id="what-can-leak">What can leak</h2>
       <ul>
         <li>
@@ -198,6 +212,10 @@ export default function PrivacyModelPage() {
           secret is stored.
         </li>
         <li>With a passkey, the seed comes from the passkey itself, and the browser remembers only which account it opens.</li>
+        <li>
+          Links you paid are kept only in that encrypted store, not on the board. If it is cleared, you can no longer
+          take back an unclaimed link, though the link still works for whoever holds it.
+        </li>
       </ul>
       <Callout title="Losing the seed loses the balance">
         Nobody else can spend your notes, so nobody else can recover them. Keep the wallet key or the passkey that

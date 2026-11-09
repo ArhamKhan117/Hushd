@@ -22,6 +22,7 @@ Everything runs on NEAR testnet with test tokens.
 
 - **Hold a private balance.** Tokens become notes in a shielded pool. Only your key spends them, and nobody can see what you hold.
 - **Send, receive and cash out privately.** A relayer sends every proven action from its own account, so your NEAR account never appears next to your payments. Payment request links fill in the amount for the payer.
+- **Pay anyone as a link.** The payment waits in a one-time note, and whoever opens the link claims it into their own private balance with a passkey or a NEAR wallet, with no gas and no seed phrase (the Send page, or `hushd_pay_link` for agents). An unclaimed link can be taken back.
 - **Ask for a price without showing your hand.** Your request, including the least you accept, is sealed to the matcher enclave. Makers see the pair, the side and the size, never your limit.
 - **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry add a Hyperliquid testnet perp order signed by NEAR Chain Signatures and backed by the maker's bond (at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC).
 - **Describe the trade in plain words.** A NEAR AI Cloud model inside a TEE drafts the request. Your words are encrypted to the model's attested key in the browser, and the answer's TEE signature is checked in the browser too. You confirm every number.
@@ -101,7 +102,7 @@ claude mcp add hushd \
   -- pnpm --silent --dir "$PWD" mcp
 ```
 
-- 18 tools: balance and address, faucet and shield, send and cash out, `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
+- 22 tools: balance and address, faucet and shield, send and cash out, claim links (pay, claim, list, take back), `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
 - A policy wallet instead of a NEAR key: `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or the Agents page) stores the policy from the owner's account, then the agent gets `HUSHD_POLICY_WALLET_KEY`. The TEE enforces which contracts it may call and the NEAR it may attach; this server adds token limits, `HUSHD_LIMITS_EXPIRE` and `HUSHD_ALLOW_TO` (payees), and refuses to spend while the wallet is frozen.
 - Read-only, hosted: `claude mcp add --transport http hushd-read https://hushd.net/mcp`.
 - Private x402: a resource answers 402 with scheme `hushd`; the agent pays a private note to the resource's `hushd1...` address and sends the note's opening sealed to it; the server checks the pool created exactly that note. The reference makers sell indicative quotes this way.
