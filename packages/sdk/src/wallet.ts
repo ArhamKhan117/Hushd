@@ -178,7 +178,9 @@ export class PrivateWallet {
       const note = own(makeNote(this.id.pk, e.token, BigInt(e.amount), BigInt(e.blinding)), this.id);
       const i = this.tree.indexOf(note.commitment);
       if (i < 0) return true;
-      this.notes.set(note.commitment, { ...note, leafIndex: i, ...(e.memo ? { memo: e.memo } : {}), ...(e.dealId ? { dealId: e.dealId } : {}) });
+      const kept = this.notes.get(note.commitment);
+      if (kept) kept.leafIndex ??= i;
+      else this.notes.set(note.commitment, { ...note, leafIndex: i, ...(e.memo ? { memo: e.memo } : {}), ...(e.dealId ? { dealId: e.dealId } : {}) });
       return false;
     });
     for (const n of this.notes.values()) {
@@ -202,9 +204,12 @@ export class PrivateWallet {
     return [...this.notes.values()].filter((n) => !n.spent && n.leafIndex !== undefined && !this.held.has(n.commitment) && (!token || n.token === token));
   }
 
-  /** What legs in flight are holding, by token. */
+  /**
+   * What legs in flight are holding, by token. A held note a sync already saw spent still
+   * counts: its leg's change comes back once that leg records its settlement.
+   */
   private heldTotal(token: string): bigint {
-    return [...this.notes.values()].filter((n) => this.held.has(n.commitment) && !n.spent && n.token === token).reduce((s, n) => s + n.amount, 0n);
+    return [...this.notes.values()].filter((n) => this.held.has(n.commitment) && n.token === token).reduce((s, n) => s + n.amount, 0n);
   }
 
   balances(): Map<string, bigint> {
@@ -372,10 +377,16 @@ export class PrivateWallet {
     // held until the deal settles or the leg is released, so a second deal cannot spend them too
     for (const n of inputs) this.held.add(n.commitment);
     const have = inputs.reduce((s, n) => s + n.amount, 0n);
-    return { dealId, inputs, outputs: [makeNote(dest.pk, give.token, give.amount), makeNote(this.id.pk, give.token, have - give.amount)] };
+    const change = makeNote(this.id.pk, give.token, have - give.amount);
+    // if the pool settles this leg after this side gave up waiting, the change is still found
+    await this.expect(change, { dealId: dealId.toString() });
+    return { dealId, inputs, outputs: [makeNote(dest.pk, give.token, give.amount), change] };
   }
 
-  /** A leg that will not settle (expired, refused): its notes are free again. A note the pool did spend is caught by the next sync. */
+  /**
+   * A leg that will not settle (expired, refused): its notes are free again. If the pool did
+   * spend them after all, the next sync marks them spent and finds the change planLeg expects.
+   */
   release(plan: LegPlan): void {
     for (const n of plan.inputs) this.held.delete(n.commitment);
   }

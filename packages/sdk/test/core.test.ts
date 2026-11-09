@@ -204,3 +204,29 @@ test("a note picked for a leg in flight is held: a second leg picks another, and
   const third = await wallet.planLeg(3n, { token, amount: 60n }, them.address);
   assert.equal(third.inputs[0]!.commitment, first.inputs[0]!.commitment);
 });
+
+test("a held note a sync saw spent still counts: the next leg waits for its change instead of refusing", async () => {
+  const { PrivateWallet } = await import("../src/wallet.ts");
+  const me = identityFromSeed(new Uint8Array(32).fill(7));
+  const them = identityFromSeed(new Uint8Array(32).fill(8));
+  const saved: { expected?: { blinding: string }[] }[] = [];
+  const relayer = { post: async () => ({}) } as never;
+  const wallet = new PrivateWallet(TESTNET, me, { artifacts: src, relayer, store: { load: async () => null, save: async (s) => void saved.push(s) } });
+  const token = "usdc.hushd.testnet";
+  wallet.track({ ...makeNote(me.pk, token, 100n), leafIndex: 0 });
+  const first = await wallet.planLeg(1n, { token, amount: 60n }, them.address);
+  // the change is on record before the leg leaves this side, in case it settles after this side gives up
+  assert.ok(saved.at(-1)?.expected?.some((e) => e.blinding === first.outputs[1].blinding.toString()));
+  // another deal's sync sees the first leg's nullifier on chain before the first deal records its settlement
+  let syncs = 0;
+  wallet.sync = async () => {
+    syncs++;
+    first.inputs[0]!.spent = true;
+    if (syncs < 2) return;
+    await wallet.settled(first);
+    const change = wallet.pending().find((n) => n.commitment === first.outputs[1].commitment)!;
+    change.leafIndex = 1;
+  };
+  const second = await wallet.planLeg(2n, { token, amount: 30n }, them.address);
+  assert.equal(second.inputs[0]!.commitment, first.outputs[1].commitment, "the second leg spends the first leg's change");
+});
