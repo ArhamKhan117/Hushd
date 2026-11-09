@@ -9,6 +9,7 @@
  *   outputs, the opening of the note each makes for the other, their proven legs).
  * - NEAR Intents: dry 1Click quotes for deposits from and cash-outs to other chains, and
  *   the mainnet trades between our agents (intents.ts).
+ * - Market: Hyperliquid mainnet mids and candles for the trading screen (market.ts).
  */
 import { sha256 } from "@noble/hashes/sha2.js";
 import { boardView, poolView, view, type HushdNetwork } from "@hushd/sdk";
@@ -17,6 +18,7 @@ import { Db } from "./db.js";
 import { app, BadRequest, listen, rateLimit } from "./http.js";
 import { intakeRoutes } from "./intake.js";
 import { intentsRoutes, type IntentsDeps } from "./intents.js";
+import { marketRoutes, type MarketDeps } from "./market.js";
 
 const hex = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 const isB64 = (s: unknown, max: number): s is string => typeof s === "string" && s.length > 0 && s.length <= max && /^[A-Za-z0-9+/]+={0,2}$/.test(s);
@@ -28,7 +30,15 @@ export interface DeskRfq {
   deal_id: string | null;
 }
 
-export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), intents: IntentsDeps = {}) {
+/** Which rate budget a request path draws on (see `buildApi`). */
+export function limitFor<T>(path: string, limits: { market: T; makers: T; flow: T; rest: T }): T {
+  if (path.startsWith("/v1/market/")) return limits.market;
+  if (path === "/v1/rfq/open" || /^\/v1\/rfq\/\d+\/quotes$/.test(path)) return limits.makers;
+  if (/^\/v1\/(rfq(\/|$)|deals\/\d+\/messages)/.test(path)) return limits.flow;
+  return limits.rest;
+}
+
+export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), intents: IntentsDeps = {}, market: MarketDeps = {}) {
   const desk = () => {
     if (!net.desk) throw new BadRequest(`no desk on ${net.id}`);
     return net.desk;
@@ -46,7 +56,16 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), inte
     const r = await db.q<{ height: string }>("select height from cursor where name = 'indexer'");
     return { indexerCursor: r.rows[0] ? Number(r.rows[0].height) : null };
   });
-  a.use("/v1/*", rateLimit(settings.num("API_PER_MINUTE", 240)));
+  // separate budgets per client, so background reads never use up what a trade in progress
+  // needs: cached market data, the makers' own routes (open requests, quotes), the trade flow
+  // (requests, matches, the per-deal mailbox), and the rest
+  const limits = {
+    market: rateLimit(settings.num("API_MARKET_PER_MINUTE", 600)),
+    makers: rateLimit(settings.num("API_MAKERS_PER_MINUTE", 600)),
+    flow: rateLimit(settings.num("API_FLOW_PER_MINUTE", 900)),
+    rest: rateLimit(settings.num("API_PER_MINUTE", 240)),
+  };
+  a.use("/v1/*", (c, next) => limitFor(c.req.path, limits)(c, next));
 
   a.get("/v1/stats", async (c) => {
     const [pool, deskStats, assets, posts] = await Promise.all([
@@ -86,6 +105,7 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), inte
 
   intakeRoutes(a);
   intentsRoutes(a, { now, ...intents });
+  marketRoutes(a, net, { now, ...market });
 
   // ---------- RFQs ----------
 

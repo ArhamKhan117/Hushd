@@ -8,7 +8,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { base64 } from "@scure/base";
 import { decodeSignedDelegateAction, encodeSignedDelegateAction } from "near-kit";
 import { AGENT_API_USDC, AGENT_API_WNEAR, hushdAgentPolicy, ownerKey, signOwnerIntent } from "../src/agent-api.js";
-import { buildApi } from "../src/api.js";
+import { buildApi, limitFor } from "../src/api.js";
 import { Db } from "../src/db.js";
 import { addressOfKey, approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
 import { eventsInBlock, eventsInTx } from "../src/indexer.js";
@@ -111,6 +111,9 @@ describe("makers", () => {
     assert.equal(spreadBps("fixed", { volBps: 999, inventoryRatio: 0 }), 25);
     assert.equal(spreadBps("volatility", { volBps: 100, inventoryRatio: 1 }), 70);
     assert.equal(spreadBps("volatility", { volBps: 0, inventoryRatio: 1 }), 15);
+    // a measured volatility is rarely whole: the spread still is, so the market cap can use it
+    assert.equal(spreadBps("volatility", { volBps: 117.0333, inventoryRatio: 1 }), 80);
+    assert.equal(capByMarket(1_000_000n, 1_000_000n, spreadBps("volatility", { volBps: 117.0333, inventoryRatio: 1 })), 992_000n);
     assert.equal(spreadBps("inventory", { volBps: 0, inventoryRatio: 1 }), 15);
     assert.equal(spreadBps("inventory", { volBps: 0, inventoryRatio: 0 }), 75);
   });
@@ -435,4 +438,17 @@ describe("NEAR Intents Agent API owner", () => {
     assert.equal(bytes[bytes.length - 65], 0);
     assert.ok(ed25519.verify(bytes.slice(bytes.length - 64), sha256(new Uint8Array([...prefix, ...actionBytes])), ed25519.getPublicKey(owner.secret)));
   });
+});
+
+test("background reads and makers draw on their own rate budgets, not on a trade in progress", () => {
+  const budgets = { market: "market", makers: "makers", flow: "flow", rest: "rest" };
+  assert.equal(limitFor("/v1/market/mids", budgets), "market");
+  assert.equal(limitFor("/v1/market/candles", budgets), "market");
+  assert.equal(limitFor("/v1/rfq/open", budgets), "makers");
+  assert.equal(limitFor("/v1/rfq/12/quotes", budgets), "makers");
+  assert.equal(limitFor("/v1/rfq", budgets), "flow");
+  assert.equal(limitFor("/v1/rfq/12/result", budgets), "flow");
+  assert.equal(limitFor("/v1/deals/7/messages", budgets), "flow");
+  assert.equal(limitFor("/v1/deals", budgets), "rest");
+  assert.equal(limitFor("/v1/stats", budgets), "rest");
 });

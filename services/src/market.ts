@@ -4,9 +4,14 @@
  * (1Click) dry quotes as a second price: what the open market would pay right now.
  * Prices come from mainnet (public data, no account, nothing is traded); hedge orders
  * go to Hyperliquid testnet, or mainnet when Hushd runs on mainnet (`hedgeTestnet`).
+ *
+ * The API serves the same prices to the app (`marketRoutes`), so a trader sees what the
+ * makers price from without the browser calling Hyperliquid itself.
  */
-import { OneClick, quoteRequest } from "@hushd/sdk";
+import { CANDLE_INTERVALS, INTERVAL_MS, OneClick, quoteRequest, realizedVolBps, type Candle, type CandleInterval, type HushdNetwork, type MarketCandles, type MarketMids } from "@hushd/sdk";
+import type { Hono } from "hono";
 import { settings } from "./config.js";
+import { BadRequest } from "./http.js";
 
 const HL_MAIN = () => settings.str("HYPERLIQUID_INFO_URL", "https://api.hyperliquid.xyz/info");
 const HL_TEST = () => settings.str("HYPERLIQUID_TESTNET_INFO_URL", "https://api.hyperliquid-testnet.xyz/info");
@@ -37,12 +42,8 @@ export async function mids(): Promise<Record<string, number>> {
 export async function hourVolBps(coin: string): Promise<number> {
   const end = Date.now();
   const candles = await info<{ c: string }[]>(HL_MAIN(), { type: "candleSnapshot", req: { coin, interval: "1m", startTime: end - 3_600_000, endTime: end } });
-  const closes = candles.map((c) => Number(c.c)).filter((x) => x > 0);
-  if (closes.length < 10) return 50;
-  const rets = closes.slice(1).map((c, i) => Math.log(c / closes[i]!));
-  const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
-  const sd = Math.sqrt(rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1));
-  return sd * Math.sqrt(60) * 10_000;
+  // the app shows the same measure (`hourStats` in the SDK); with too few closes, assume 50 bps
+  return realizedVolBps(candles.map((c) => Number(c.c))) ?? 50;
 }
 
 export interface PerpMeta {
@@ -128,4 +129,113 @@ export function capByMarket(give: bigint, marketOut: bigint | null, spreadBps: n
   if (marketOut === null) return give;
   const capped = (marketOut * BigInt(10_000 - spreadBps)) / 10_000n;
   return capped < give ? capped : give;
+}
+
+/** What the market routes need from outside, so tests can stand in for Hyperliquid and the clock. */
+export interface MarketDeps {
+  fetch?: typeof fetch;
+  now?: () => number;
+}
+
+const MIDS_TTL_MS = 3_000;
+const CANDLES_TTL_MS = 5_000;
+/** Candles read per coin and size; a request takes the last `limit` of them. */
+const MAX_CANDLES = 500;
+
+interface HlCandle {
+  t: number;
+  o: string;
+  h: string;
+  l: string;
+  c: string;
+  v: string;
+}
+
+/** Hyperliquid's candles as numbers, oldest first, without any that do not parse. */
+export function parseCandles(raw: unknown): Candle[] {
+  if (!Array.isArray(raw)) throw new Error("Hyperliquid answered something other than candles");
+  return (raw as HlCandle[])
+    .map((x) => ({ t: Number(x.t), o: Number(x.o), h: Number(x.h), l: Number(x.l), c: Number(x.c), v: Number(x.v) }))
+    .filter((x) => [x.t, x.o, x.h, x.l, x.c, x.v].every(Number.isFinite) && x.c > 0)
+    .sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Read-only market routes for the app, from Hyperliquid mainnet, for the coins the network's
+ * tokens hedge with (only those: the API is not an open proxy):
+ *
+ * - `GET /v1/market/mids`: USD mid prices, cached three seconds.
+ * - `GET /v1/market/candles?coin=BTC&interval=5m&limit=200`: the last `limit` candles (at most
+ *   500), cached five seconds per coin and size.
+ *
+ * One read to Hyperliquid at a time per key; while Hyperliquid is unreachable the last answer
+ * is served with the time it was read (`at`), and with none yet the route answers 502.
+ */
+export function marketRoutes(a: Hono, net: HushdNetwork, deps: MarketDeps = {}) {
+  const now = deps.now ?? (() => Date.now());
+  const fetchImpl = deps.fetch ?? ((input, init) => fetch(input, init));
+  const coins = [...new Set(net.tokens.flatMap((t) => (t.hedgeCoin ? [t.hedgeCoin] : [])))];
+
+  const ask = async (body: object): Promise<unknown> => {
+    const r = await fetchImpl(HL_MAIN(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) throw new Error(`Hyperliquid answered ${r.status}`);
+    return r.json();
+  };
+
+  const kept = new Map<string, { at: number; data: unknown }>();
+  const loading = new Map<string, Promise<{ at: number; data: unknown }>>();
+  async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<{ at: number; data: T }> {
+    const hit = kept.get(key);
+    if (hit && now() - hit.at < ttlMs) return hit as { at: number; data: T };
+    let p = loading.get(key);
+    if (!p) {
+      p = load()
+        .then((data) => {
+          const v = { at: now(), data };
+          kept.set(key, v);
+          return v;
+        })
+        .catch((e: Error) => {
+          // an older answer beats none while Hyperliquid is unreachable
+          if (hit) {
+            console.error(`api: Hyperliquid read for ${key} failed (${e.message}); serving the one from ${new Date(hit.at).toISOString()}`);
+            return hit;
+          }
+          throw e;
+        })
+        .finally(() => loading.delete(key));
+      loading.set(key, p);
+    }
+    return p as Promise<{ at: number; data: T }>;
+  }
+
+  a.get("/v1/market/mids", async (c) => {
+    try {
+      const { at, data } = await cached("mids", MIDS_TTL_MS, async () => {
+        const raw = (await ask({ type: "allMids" })) as Record<string, string>;
+        return Object.fromEntries(coins.flatMap((k) => (Number(raw[k]) > 0 ? [[k, Number(raw[k])]] : [])));
+      });
+      return c.json({ source: "hyperliquid", at, mids: data } satisfies MarketMids);
+    } catch (e) {
+      return c.json({ error: `Hyperliquid prices are unavailable: ${(e as Error).message}` }, 502);
+    }
+  });
+
+  a.get("/v1/market/candles", async (c) => {
+    const coin = c.req.query("coin") ?? "";
+    const interval = (c.req.query("interval") ?? "5m") as CandleInterval;
+    const limitText = c.req.query("limit") ?? "200";
+    if (!coins.includes(coin)) throw new BadRequest(`coin is one of ${coins.join(", ")}`);
+    if (!CANDLE_INTERVALS.includes(interval)) throw new BadRequest(`interval is one of ${CANDLE_INTERVALS.join(", ")}`);
+    if (!/^\d{1,3}$/.test(limitText) || Number(limitText) < 1 || Number(limitText) > MAX_CANDLES) throw new BadRequest(`limit is a whole number from 1 to ${MAX_CANDLES}`);
+    try {
+      const { at, data } = await cached(`candles:${coin}:${interval}`, CANDLES_TTL_MS, async () => {
+        const end = now();
+        return parseCandles(await ask({ type: "candleSnapshot", req: { coin, interval, startTime: end - MAX_CANDLES * INTERVAL_MS[interval], endTime: end } }));
+      });
+      return c.json({ source: "hyperliquid", coin, interval, at, candles: data.slice(-Number(limitText)) } satisfies MarketCandles);
+    } catch (e) {
+      return c.json({ error: `Hyperliquid candles are unavailable: ${(e as Error).message}` }, 502);
+    }
+  });
 }

@@ -73,7 +73,8 @@ export function bondFor(notionalUsd: number, usdcDecimals: number, minBond: bigi
 /** Spread in basis points for a style. */
 export function spreadBps(style: Style, ctx: { volBps: number; inventoryRatio: number }): number {
   if (style === "fixed") return 25;
-  if (style === "volatility") return Math.min(150, Math.max(15, 10 + 0.6 * ctx.volBps));
+  // whole basis points: the spread is also used in bigint math (capByMarket)
+  if (style === "volatility") return Math.round(Math.min(150, Math.max(15, 10 + 0.6 * ctx.volBps)));
   return Math.round(15 + 60 * Math.max(0, 1 - ctx.inventoryRatio));
 }
 

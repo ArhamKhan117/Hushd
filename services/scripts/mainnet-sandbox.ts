@@ -37,7 +37,7 @@ import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { createAgent, createServer } from "@hushd/mcp";
-import { MAINNET, MAINNET_USDC, type ProofKind } from "@hushd/sdk";
+import { MAINNET, MAINNET_USDC, type MarketCandles, type MarketMids, type ProofKind } from "@hushd/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Near } from "near-kit";
@@ -253,6 +253,13 @@ async function main() {
     const relayerInfo = (await (await fetch(`http://localhost:${GATEWAY}/v1/relay/info`)).json()) as { network: string; cashOutFeeBps: number };
     assert.equal(relayerInfo.network, "mainnet");
     pass("relayer, API, indexer, matcher, makers and keeper run on mainnet settings", `relayer fee ${relayerInfo.cashOutFeeBps} bps on cash outs`);
+    // the trading screen's prices: Hyperliquid mainnet through the API, for the mainnet tokens' hedge coins
+    const mids = (await (await fetch(`http://localhost:${GATEWAY}/v1/market/mids`)).json()) as MarketMids;
+    assert.deepEqual(Object.keys(mids.mids).sort(), ["BTC", "NEAR"]);
+    const candles = (await (await fetch(`http://localhost:${GATEWAY}/v1/market/candles?coin=BTC&interval=5m&limit=50`)).json()) as MarketCandles;
+    assert.equal(candles.candles.length, 50);
+    assert.ok(candles.candles.every((c) => c.c > 0));
+    pass("the API serves the trading screen's prices on mainnet settings", `BTC ${mids.mids.BTC} USD, NEAR ${mids.mids.NEAR} USD, 50 five-minute BTC candles`);
 
     step("an agent, through the MCP server's tools");
     const traderKey = key.privateKey;
