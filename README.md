@@ -76,8 +76,10 @@ It names the commit and the pinned `sourcescan/cargo-near` Docker image it was b
 
 What stays private: who holds what, who paid whom, the amounts inside the pool, the parties and amounts of a desk deal, and the trader's limit.
 
-What is public: deposits into the pool and cash outs out of it, with their amounts; that a deal exists, its settlement class, its maker and its outcome; a hedge order on Hyperliquid.
+What is public: deposits into the pool and cash outs out of it, with their amounts; that a deal exists, its settlement class, its maker and its outcome; a hedged deal's bond (only in fixed steps of the desk minimum, so it does not give the size away) and its hedge order on Hyperliquid (which does).
 Timing can link a deposit to a later action, so wait and use round amounts when that matters.
+
+Sanctions screening covers public addresses only: the NEAR account a deposit comes from, the account a cash out pays, and an address on another chain used through NEAR Intents. They are checked against a dated snapshot of the digital currency addresses on OFAC's SDN list (`packages/sdk/src/screening.ts`), in the app before you sign, at the API (`POST /v1/screen`) and again by the relayer before it sends a cash out. A listed address sees one neutral line. Notes, amounts and hushd1… addresses are never screened.
 
 Who you trust, and for what:
 

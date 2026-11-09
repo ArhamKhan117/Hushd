@@ -148,6 +148,22 @@ test.describe("NEAR Intents previews (Hushd API stubbed)", () => {
     await noOverflow(page);
   });
 
+  test("an address on the sanctions list sees one neutral line, and the API is never asked", async ({ page }) => {
+    const asked: Record<string, unknown>[] = [];
+    await stub(page, asked);
+    await page.goto("/app/balance/add");
+    await choose(page, "From another chain");
+    await page.getByLabel("You send").fill("25");
+    await page.getByRole("button", { name: /^From chain:/ }).click();
+    await page.getByRole("option", { name: /^Aptos/ }).click();
+    // a digital currency address on OFAC's SDN list (published 2026-11-06)
+    await page.getByLabel("Your Aptos address, for refunds").fill("TNiq9AXBp9EjUqhDhrwrfvAA8U3GUQZH81");
+    const card = page.getByRole("region", { name: "Live quote" });
+    await expect(card.getByRole("alert")).toHaveText("This address can't be used with Hushd.");
+    await expect(card.getByRole("button", { name: /try again/i })).toHaveCount(0);
+    expect(asked).toHaveLength(0);
+  });
+
   test("a cash out to another chain names the route and the fee to deliver there", async ({ page }) => {
     const asked: Record<string, unknown>[] = [];
     await stub(page, asked);

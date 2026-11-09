@@ -1,5 +1,6 @@
 "use client";
 
+import { screenAddresses } from "@hushd/sdk";
 import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { Segmented } from "@/components/app/desk";
@@ -32,6 +33,9 @@ export default function CashOutPage() {
     setBusy(true);
     setError(null);
     try {
+      // the recipient is public: screened before anything is proven or signed
+      const screen = screenAddresses([to.trim()]);
+      if (!screen.allowed) throw new Error(screen.message);
       const r = await s.wallet.cashOut(to.trim(), token, amount);
       setDone({ hash: r.txHash, text: `${fmt(token, amount)} ${symbol(token)} is on its way to ${to}.` });
       setInput("");

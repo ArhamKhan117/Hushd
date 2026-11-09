@@ -1,6 +1,7 @@
 "use client";
 
 import { formatUnits, parseUnits } from "@hushd/protocol";
+import { screenAddresses } from "@hushd/sdk";
 import { useEffect, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/app/desk";
 import { AmountCard, Field } from "@/components/app/forms";
@@ -232,6 +233,9 @@ export function OtherChainPreview({ direction, balances }: { direction: Directio
     if (!req || !key) return;
     const ctl = new AbortController();
     const t = setTimeout(() => {
+      // a public address on the sanctions list is refused here, before the API is asked
+      const screen = screenAddresses([(JSON.parse(req) as { address: string }).address]);
+      if (!screen.allowed) return setResult({ key, route, error: screen.message, retry: false, at: Date.now() });
       intentsQuote(JSON.parse(req), ctl.signal).then(
         (quote) => setResult({ key, route, quote, at: Date.now() }),
         (e: Error) => {

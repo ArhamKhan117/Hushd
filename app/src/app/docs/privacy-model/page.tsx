@@ -100,6 +100,20 @@ export default function PrivacyModelPage() {
         posted, and every recipient reads every post and keeps what opens for it, so nobody learns who a post is for.
       </p>
 
+      <h2 id="screening">Sanctions screening</h2>
+      <p>
+        Hushd screens public addresses only: the NEAR account a deposit comes from, the NEAR account a cash out pays,
+        and the address on another chain that a deposit or a cash out through NEAR Intents uses. It never screens a
+        note, a hushd1… address or an amount.
+      </p>
+      <p>
+        The list is a dated snapshot of the digital currency addresses on OFAC&apos;s SDN list, kept in the SDK as
+        hashes and rebuilt from OFAC&apos;s own file by a script. The app checks before you sign, so the check needs
+        nothing from a server; the API answers <code>POST /v1/screen</code> for agents and other clients; and the
+        relayer checks a cash out&apos;s recipient again before it sends it. A listed address sees one line,
+        &ldquo;This address can&apos;t be used with Hushd.&rdquo;, and nothing else.
+      </p>
+
       <h2 id="what-can-leak">What can leak</h2>
       <ul>
         <li>

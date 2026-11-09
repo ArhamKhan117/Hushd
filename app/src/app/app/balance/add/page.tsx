@@ -1,6 +1,6 @@
 "use client";
 
-import { view } from "@hushd/sdk";
+import { screenAddresses, view } from "@hushd/sdk";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { Segmented } from "@/components/app/desk";
@@ -80,6 +80,9 @@ export default function AddPage() {
     setBusy("add");
     setError(null);
     try {
+      // the deposit's NEAR account is public: screened before anything is signed
+      const screen = screenAddresses([s.accountId]);
+      if (!screen.allowed) throw new Error(screen.message);
       const before = (await readBalance()) ?? publicBal;
       const { call, selfPost } = s.wallet.shield(token, amount);
       // The note goes on the board, sealed to you, before any token moves: the deposit is then

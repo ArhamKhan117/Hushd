@@ -147,6 +147,11 @@ export default function ThreatModelPage() {
 
       <h2 id="not-covered">Not covered</h2>
       <ul>
+        <li>
+          Sanctions screening beyond its list: it checks public addresses against a dated OFAC snapshot, so it misses
+          an address listed later or one that is not listed at all. Transfers inside the pool are private and are not
+          screened.
+        </li>
         <li>Network privacy: your IP address, as seen by the API, the relayer and NEAR RPC nodes.</li>
         <li>A compromised device or browser.</li>
         <li>Real value: there is none on testnet, by design.</li>
