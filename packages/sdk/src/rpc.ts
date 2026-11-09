@@ -63,7 +63,7 @@ export function keepRpcErrorBodies(urls: readonly string[]): void {
 
 async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): Promise<T> {
   let last: unknown;
-  for (const url of rpcOrder(net.rpc)) {
+  for (const url of [...rpcOrder(net.rpc), ...(net.rpcFallback ?? [])]) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const res = await fetch(url, {

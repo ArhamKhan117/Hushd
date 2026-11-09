@@ -23,6 +23,14 @@ export interface HushdNetwork {
    * transaction with more than about 2 KB of arguments, which every pool `transact` has.
    */
   rpcSend?: string[];
+  /**
+   * The endpoints a browser reads from first: providers whose every answer, a rate-limited one
+   * included, carries CORS headers. FastNEAR answers a rate-limited call without them, which a
+   * browser logs as a CORS error, so in a browser it is only a fallback (`forBrowser`).
+   */
+  browserRpc?: string[];
+  /** Tried, in order, only after every endpoint in `rpc` has failed. */
+  rpcFallback?: string[];
   pool: string | null;
   desk: string | null;
   board: string | null;
@@ -42,6 +50,7 @@ export const TESTNET: HushdNetwork = {
   deployed: true,
   rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org"],
   rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
+  browserRpc: ["https://near-testnet.drpc.org"],
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
   board: "board.hushd.testnet",
@@ -66,6 +75,7 @@ export const MAINNET: HushdNetwork = {
   deployed: false,
   rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
   rpcSend: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
+  browserRpc: ["https://near.drpc.org", "https://near.api.pocket.network"],
   pool: "pool.hushd.near",
   desk: "desk.hushd.near",
   board: "board.hushd.near",
@@ -87,10 +97,18 @@ export function withOverrides(base: HushdNetwork, o: Partial<HushdNetwork>): Hus
   return { ...base, ...o };
 }
 
-/** The endpoints to send transactions through: `rpcSend` where it overlaps `rpc` (an override of `rpc` alone, like a sandbox, sends there). */
+/** The endpoints to send transactions through: `rpcSend` where it overlaps `rpc` or `rpcFallback` (an override of `rpc` alone, like a sandbox, sends there). */
 export function sendEndpoints(net: HushdNetwork): string[] {
-  const send = (net.rpcSend ?? []).filter((u) => net.rpc.includes(u));
+  const known = [...net.rpc, ...(net.rpcFallback ?? [])];
+  const send = (net.rpcSend ?? []).filter((u) => known.includes(u));
   return send.length ? send : net.rpc;
+}
+
+/** The network as a browser should read it: `browserRpc` first, the other endpoints only as a fallback. Sends still use `rpcSend`. */
+export function forBrowser(net: HushdNetwork): HushdNetwork {
+  const first = net.browserRpc ?? [];
+  if (!first.length) return net;
+  return { ...net, rpc: first, rpcFallback: [...net.rpc.filter((u) => !first.includes(u)), ...(net.rpcFallback ?? [])] };
 }
 
 export function tokenInfo(net: HushdNetwork, id: string): TokenInfo {

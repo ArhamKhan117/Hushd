@@ -10,9 +10,9 @@ import { openJson, sealJson } from "../src/box.ts";
 import { closeHedgeMessage, closeHedgeSignature, ownerKeyFor } from "../src/desk.ts";
 import { extHash } from "../src/field.ts";
 import { decodeAddress, identityFromSeed, isAddress } from "../src/keys.ts";
-import { sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
+import { forBrowser, MAINNET, sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
 import { makeNote, own } from "../src/note.ts";
-import { keepRpcErrorBodies, restEndpoint, rpcOrder } from "../src/rpc.ts";
+import { keepRpcErrorBodies, restEndpoint, rpcOrder, view } from "../src/rpc.ts";
 import { loadPoseidon } from "../src/poseidon.ts";
 import { proveJoinsplit, type ArtifactSource } from "../src/prove.ts";
 import { MerkleTree } from "../src/tree.ts";
@@ -154,6 +154,32 @@ test("RPC calls rotate across endpoints and put a resting one last", () => {
   const later = Date.now() + 61_000;
   assert.equal([0, 1, 2].filter(() => rpcOrder(urls, later)[0] === "https://b.example").length, 1);
   assert.deepEqual(rpcOrder(["https://only.example"]), ["https://only.example"]);
+});
+
+test("a browser reads from endpoints that keep CORS headers, falls back to the rest, and sends where it always did", async () => {
+  for (const net of [TESTNET, MAINNET]) {
+    const b = forBrowser(net);
+    assert.deepEqual(b.rpc, net.browserRpc);
+    assert.ok(b.rpcFallback!.length > 0 && b.rpcFallback!.every((u) => net.rpc.includes(u) && !b.rpc.includes(u)));
+    assert.deepEqual(sendEndpoints(b), sendEndpoints(net));
+  }
+  // the fallback is asked only when every first endpoint fails
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    asked.push(url);
+    if (url === "https://first.example") return new Response("{}", { status: 503 });
+    const result = { result: [...new TextEncoder().encode('"ok"')], logs: [], block_height: 1, block_hash: "x" };
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: "hushd", result }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const net = withOverrides(TESTNET, { rpc: ["https://first.example"], rpcFallback: ["https://fallback.example"] });
+    assert.equal(await view<string>(net, "pool.hushd.testnet", "anything"), "ok");
+    assert.deepEqual([...new Set(asked)], ["https://first.example", "https://fallback.example"]);
+  } finally {
+    globalThis.fetch = real;
+  }
 });
 
 test("an RPC's HTTP 400 with a JSON-RPC error reaches near-kit as an answer; other 400s stay", async () => {
