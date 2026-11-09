@@ -13,7 +13,6 @@ import { Spotlight } from "@/components/ui/Spotlight";
 import { NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol, tokenWords } from "@/lib/hushd/format";
 import { intentsTrades, type IntentsTrades } from "@/lib/hushd/intents";
-import "@/styles/pages.css";
 
 /**
  * /transparency: what anyone can see about Hushd, read live in the browser. The
@@ -329,9 +328,13 @@ export function TransparencyView() {
                         ["Amounts in the pool", "Hidden", true],
                       ] as const
                     ).map(([k, v, sealed]) => (
-                      <li key={k} className="flex min-h-[52px] items-center justify-between gap-4 py-2 text-[14px] lg:block lg:min-h-0 lg:px-6 lg:py-3">
+                      // on a phone the value goes under its label: side by side, both wrap mid-phrase
+                      <li
+                        key={k}
+                        className="flex min-h-[52px] items-center justify-between gap-4 py-2 text-[14px] max-sm:flex-col max-sm:items-start max-sm:justify-center max-sm:gap-0.5 max-sm:py-2.5 lg:block lg:min-h-0 lg:px-6 lg:py-3"
+                      >
                         <span className="text-mute lg:block">{k}</span>
-                        <span className="inline-flex items-center gap-2 text-right text-foreground lg:mt-1.5 lg:text-left lg:text-[17px]">
+                        <span className="inline-flex items-center gap-2 text-right text-foreground max-sm:text-left lg:mt-1.5 lg:text-left lg:text-[17px]">
                           <span
                             aria-hidden
                             className={`grid h-5 w-5 shrink-0 place-items-center rounded-full max-lg:order-2 ${sealed ? "bg-sealed-soft text-sealed" : "bg-surface text-soft"}`}

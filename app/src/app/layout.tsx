@@ -5,8 +5,16 @@ import { SkipLink } from "@/components/SkipLink";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { VercelAnalytics } from "@/components/VercelAnalytics";
 import { DEVICE_BOOT_SCRIPT } from "@/lib/device";
+import { wide } from "@/lib/fonts";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
+// The page styles load with the site rather than per route. Next preloads a route's own
+// stylesheet whenever a link to that route is prefetched (and the not-found page's on
+// every page), and the browser warns about each preload the page does not then use.
+import "@/styles/pages.css";
+import "@/styles/docs.css";
+import "@/styles/landing.css";
+import "@/components/app/trade/terminal.css";
 
 const siteTitle = "Hushd · Private OTC desk on NEAR";
 const siteDescription =
@@ -62,7 +70,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full antialiased ${GeistSans.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`h-full antialiased ${GeistSans.variable} ${wide.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: DEVICE_BOOT_SCRIPT }} />

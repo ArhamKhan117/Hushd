@@ -1,0 +1,113 @@
+@layer theme, base, components, utilities;
+
+/* The landing's seal stream (components/landing/SealStream.tsx): requests travel left
+   to right through a frosted slab. Two identical tracks move in lockstep; the left half
+   shows the request as the trader writes it, the right half what the chain records,
+   and the slab hides the seam. */
+
+@layer components {
+  .hd-stream {
+    position: relative;
+    height: 196px;
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
+  }
+  .hd-stream-track {
+    position: absolute;
+    inset: 0 auto 0 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: max-content;
+    padding-left: 16px;
+  }
+  .hd-stream-half {
+    position: absolute;
+    inset: 0;
+  }
+  .hd-stream-readable {
+    clip-path: inset(0 50% 0 0);
+  }
+  .hd-stream-sealed {
+    clip-path: inset(0 0 0 50%);
+  }
+  .hd-stream-slab {
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 50%;
+    width: 132px;
+    transform: translateX(-50%);
+    border-radius: 22px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel) 70%, transparent),
+      color-mix(in srgb, var(--field-base) 70%, transparent)
+    );
+    border: 1px solid var(--glass-line);
+    box-shadow:
+      0 24px 60px -30px color-mix(in srgb, var(--sealed) 45%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--sealed) 12%, transparent),
+      inset 0 1px 0 var(--glass-line);
+    -webkit-backdrop-filter: blur(22px) saturate(1.15);
+    backdrop-filter: blur(22px) saturate(1.15);
+    overflow: hidden;
+  }
+  .hd-stream-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 49.5%, color-mix(in srgb, var(--sealed) 40%, transparent) 50%, transparent 50.5%),
+      radial-gradient(70% 45% at 50% 100%, color-mix(in srgb, var(--field-deep) 80%, transparent), transparent 75%);
+  }
+  .hd-stream-card {
+    flex: none;
+    width: 236px;
+    height: 128px;
+    border-radius: 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hd-stream-move {
+      animation: hd-stream 38s linear infinite;
+    }
+    .hd-stream[data-paused] .hd-stream-move {
+      animation-play-state: paused;
+    }
+  }
+  @media (max-width: 640px) {
+    .hd-stream-slab {
+      width: 84px;
+    }
+    .hd-stream-card {
+      width: 200px;
+    }
+  }
+
+  /* html.hd-lite (slow devices): no backdrop blur behind the moving cards; an almost opaque slab costs far less. */
+  html.hd-lite .hd-stream-slab {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel) 94%, transparent),
+      color-mix(in srgb, var(--field-base) 94%, transparent)
+    );
+  }
+}
+
+@keyframes hd-stream {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

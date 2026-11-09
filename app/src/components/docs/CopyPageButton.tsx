@@ -238,11 +238,14 @@ export function CopyPageButton({ title, lede }: { title: string; lede?: string }
       <button
         type="button"
         onClick={() => copy("text")}
-        className={`${segment} gap-1.5 rounded-l-full pl-3 pr-2.5 text-[13px] font-medium`}
+        // on a phone the icon alone (a check once copied), so the breadcrumb beside it keeps one line
+        className={`${segment} gap-1.5 rounded-l-full pl-3 pr-2.5 text-[13px] font-medium max-sm:w-10 max-sm:justify-center max-sm:pl-1 max-sm:pr-0`}
         aria-label={done ? DONE_LABEL[done] : "Copy page as plain text"}
       >
         {done ? <CheckIcon /> : <CopyIcon />}
-        <span aria-live="polite">{done ? DONE_LABEL[done] : "Copy page"}</span>
+        <span aria-live="polite" className="max-sm:sr-only">
+          {done ? DONE_LABEL[done] : "Copy page"}
+        </span>
       </button>
       <button
         type="button"

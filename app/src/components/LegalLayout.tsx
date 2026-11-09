@@ -4,7 +4,6 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { LegalToc, type LegalSection } from "@/components/legal/LegalToc";
 import { PagerCard } from "@/components/pages/PagerCard";
-import "@/styles/pages.css";
 
 const DOCS = [
   { href: "/terms", label: "Terms of use", title: "Terms of use", group: "Legal" },

@@ -376,7 +376,7 @@ export function Landing() {
                 href={p.href}
                 data-reveal-item
                 className={`hd-sheen group flex flex-col rounded-[18px] border border-line bg-panel p-6 transition-colors hover:border-line-strong ${
-                  i === 0 ? "min-h-[260px] lg:row-span-2 lg:min-h-[420px] lg:p-9" : "min-h-[200px]"
+                  i === 0 ? "min-h-[260px] lg:row-span-2 lg:min-h-[420px] lg:px-9 lg:pb-9" : "min-h-[200px]"
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -554,7 +554,8 @@ export function Landing() {
             </Reveal>
             <Reveal className="hd-grid-lines grid overflow-hidden rounded-[18px] [--grid-cell:var(--panel)] sm:grid-cols-2 xl:grid-cols-3" stagger={45}>
               {NEAR_ONLY.map((n, i) => (
-                <Spotlight key={n.title} data-reveal-item className="p-6">
+                // two columns until xl: a last odd cell spans both rather than leave a grey gap
+                <Spotlight key={n.title} data-reveal-item className="p-6 sm:max-xl:last:odd:col-span-2">
                   <span className="text-[12px] tabular-nums text-faint">{String(i + 1).padStart(2, "0")}</span>
                   <p className="mt-4 text-[17px] leading-snug tracking-[-0.01em]">{n.title}</p>
                   <p className="mt-2.5 text-[14px] leading-relaxed text-mute">{n.body}</p>

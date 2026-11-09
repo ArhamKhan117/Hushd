@@ -1,10 +1,6 @@
 "use client";
 
-import { Archivo } from "next/font/google";
 import { useEffect, useRef } from "react";
-
-// expanded black, only for the word itself; fetched when it first renders
-const wide = Archivo({ subsets: ["latin"], axes: ["wdth"], display: "swap", preload: false });
 
 const LETTERS = ["H", "U", "S", "H", "D"];
 
@@ -39,7 +35,7 @@ export function FooterWordmark() {
     <div ref={ref} aria-hidden className="hd-wordmark">
       <div className="hd-wordmark-clip">
         <div className="hd-wordmark-glow" />
-        <p className={`hd-wordmark-word ${wide.className}`}>
+        <p className="hd-wordmark-word">
           {LETTERS.map((l, i) => (
             <span key={i} style={{ "--i": i } as React.CSSProperties}>
               {l}

@@ -1258,6 +1258,7 @@ html[data-theme="dark"] .hd-wordmark {
 .hd-wordmark-word {
   position: relative;
   display: flex;
+  font-family: var(--font-wide), system-ui, sans-serif;
   justify-content: space-between;
   white-space: nowrap;
   font-size: 21.1cqw;

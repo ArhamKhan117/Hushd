@@ -1,6 +1,7 @@
 import { PauseOffscreen } from "@/components/ui/PauseOffscreen";
 import { SealDots } from "@/components/ui/SealDots";
-import styles from "./landing.module.css";
+
+/* Styles: .hd-stream* in styles/landing.css. */
 
 /** The kinds of request the desk takes, on the test tokens it lists. Words only: no amounts. */
 const REQUESTS = [
@@ -15,7 +16,7 @@ const REQUESTS = [
 
 function Readable({ r }: { r: (typeof REQUESTS)[number] }) {
   return (
-    <div className={styles.card}>
+    <div className="hd-stream-card">
       <div className="flex items-center justify-between">
         <span className="text-[13px] text-mute">{r.kind}</span>
         <span className="text-[12px] text-faint">Your request</span>
@@ -32,7 +33,7 @@ function Readable({ r }: { r: (typeof REQUESTS)[number] }) {
 
 function Sealed() {
   return (
-    <div className={styles.card}>
+    <div className="hd-stream-card">
       <div className="flex items-center justify-between">
         <span className="text-[13px] text-mute">open_rfq</span>
         <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-sealed">
@@ -55,26 +56,26 @@ export function SealStream() {
   const loop = [...REQUESTS, ...REQUESTS];
   return (
     <PauseOffscreen
-      className={styles.stream}
+      className="hd-stream"
       role="img"
       aria-label="Trade requests going in readable and coming out as a sealed hash on chain"
     >
-      <div className={`${styles.half} ${styles.readable}`} aria-hidden>
-        <div className={`${styles.track} ${styles.move}`}>
+      <div className="hd-stream-half hd-stream-readable" aria-hidden>
+        <div className="hd-stream-track hd-stream-move">
           {loop.map((r, i) => (
             <Readable key={i} r={r} />
           ))}
         </div>
       </div>
-      <div className={`${styles.half} ${styles.sealed}`} aria-hidden>
-        <div className={`${styles.track} ${styles.move}`}>
+      <div className="hd-stream-half hd-stream-sealed" aria-hidden>
+        <div className="hd-stream-track hd-stream-move">
           {loop.map((_, i) => (
             <Sealed key={i} />
           ))}
         </div>
       </div>
-      <div className={styles.slab} aria-hidden>
-        <div className={styles.slabGlow} />
+      <div className="hd-stream-slab" aria-hidden>
+        <div className="hd-stream-glow" />
       </div>
     </PauseOffscreen>
   );

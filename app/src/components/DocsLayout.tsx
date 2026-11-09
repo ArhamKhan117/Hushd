@@ -6,8 +6,6 @@ import { ArrowUpRight } from "@/components/ui/ArrowUpRight";
 import { PagerCard } from "@/components/pages/PagerCard";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import "@/styles/pages.css";
-import "@/styles/docs.css";
 import { ThemeSegmented } from "./ThemeToggle";
 import { Footer } from "./Footer";
 import { DocsCopyEnhancer } from "./DocsCopyEnhancer";
@@ -332,7 +330,7 @@ export function DocsLayout({
               {/* keyed to the page, so the title rises again on each one */}
               <header key={pathname} className="docs-head pg-band hd-crop">
                 <div className="pg-band-light" aria-hidden />
-                <div className="flex min-h-10 items-center justify-between gap-3 px-4 pt-4 sm:px-7 sm:pt-6">
+                <div className="flex min-h-10 items-center justify-between gap-2 px-4 pt-4 sm:gap-3 sm:px-7 sm:pt-6">
                   <nav aria-label="Breadcrumb" className="pg-crumbs pg-rise">
                     <Link href="/docs" className="max-sm:hidden">
                       Docs
