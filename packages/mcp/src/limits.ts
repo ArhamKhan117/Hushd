@@ -80,6 +80,15 @@ export class Limits {
     if (after > day) throw new Error(`That would make ${formatUnits(after, t.decimals)} ${t.symbol} today, over the daily limit of ${formatUnits(day, t.decimals)}`);
   }
 
+  /**
+   * A link pays whoever opens it first, so it counts like any payment, and an agent the
+   * owner limited to a list of payees may not pay one at all.
+   */
+  checkLink(token: string, amount: bigint): void {
+    this.check(token, amount);
+    if (this.rules.allowTo) throw new Error("This agent may pay only the payees on its list, and anyone holding a link can claim it, so it may not pay as a link");
+  }
+
   record(token: string, amount: bigint): void {
     this.roll();
     this.ledger.spent[token] = (this.spentToday(token) + amount).toString();

@@ -6,20 +6,28 @@
 import { formatUnits, parseUnits } from "@hushd/protocol";
 import {
   awaitMatch,
+  claimLink,
   CUSTODY,
   custodyView,
   checkMatchedTerms,
   decodeProof,
   deskView,
   encodeProof,
+  isOwnLink,
+  linkToken,
+  linkUrl,
   makeNote,
   openRfq,
   packageRequest,
+  parseLink,
+  payAsLink,
   poolView,
   proveFunds,
   proveReceipt,
   proveVolume,
+  sentLinks,
   settleAsTrader,
+  takeBackLink,
   tokenInfo,
   verifyProof,
   x402Fetch,
@@ -92,7 +100,7 @@ export function registerReadTools(server: McpServer, net: HushdNetwork, vkey: (k
   );
 }
 
-export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyBase: string }) {
+export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyBase: string; appUrl: string }) {
   const { net, wallet } = a;
 
   server.registerTool(
@@ -182,6 +190,79 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         const r = await wallet.send(to, x.token, x.amount, memo);
         a.limits.record(x.token, x.amount);
         return { sent: human(net, x.token, x.amount), to, tx: r.txHash };
+      }),
+  );
+
+  server.registerTool(
+    "hushd_pay_link",
+    {
+      title: "Pay as a link",
+      description:
+        "Pay someone who is not on Hushd yet: moves the amount from the private balance into a one-time note and returns a claim link. Whoever opens the link first claims it into their own private balance with a passkey or a NEAR wallet, and needs no gas. Inside the spending limits, like hushd_send. Anyone with the link can claim it, so share it privately; hushd_take_back_link takes back one nobody claimed.",
+      inputSchema: { token: TOKEN, amount: AMOUNT },
+    },
+    ({ token, amount }) =>
+      run(async () => {
+        const x = amountIn(net, token, amount);
+        await a.assertNotFrozen();
+        a.limits.checkLink(x.token, x.amount);
+        const r = await payAsLink(wallet, x.token, x.amount);
+        a.limits.record(x.token, x.amount);
+        return { link: linkUrl(opts.appUrl, r.link), amount: human(net, x.token, x.amount), tx: r.txHash, handling: "Anyone with this link can claim it. Share it privately." };
+      }),
+  );
+
+  server.registerTool(
+    "hushd_claim_link",
+    {
+      title: "Claim a link",
+      description: "Claim a Hushd claim link (https://hushd.net/app/claim#…, or the code after the #) into this agent's private balance. The payment is checked in the pool first; the relayer sends the claim, so it needs no gas. Claiming a link this agent paid takes it back.",
+      inputSchema: { link: z.string().min(8).max(2048).describe("The claim link, or the code after its #") },
+    },
+    ({ link: input }) =>
+      run(async () => {
+        const link = parseLink(input);
+        linkToken(net, link);
+        const own = isOwnLink(wallet, link);
+        const r = own ? await takeBackLink(wallet, link, { artifacts: a.artifacts, relayer: a.relayer }) : await claimLink(link, { to: wallet, artifacts: a.artifacts, relayer: a.relayer });
+        return { [own ? "taken_back" : "claimed"]: human(net, link.token, link.amount), tx: r.txHash };
+      }),
+  );
+
+  server.registerTool(
+    "hushd_my_links",
+    {
+      title: "My links",
+      description: "Claim links this agent paid, newest first, read from the pool: waiting, claimed, taken back, sending (not in the pool yet) or not sent. A waiting link comes with its url, to share again; the index is what hushd_take_back_link takes.",
+      annotations: { readOnlyHint: true },
+    },
+    () =>
+      run(async () =>
+        (await sentLinks(wallet)).map((l, index) => ({
+          index,
+          amount: human(net, l.link.token, l.link.amount),
+          state: l.state,
+          at: new Date(l.atMs).toISOString(),
+          tx: l.txHash ?? null,
+          ...(l.state === "waiting" ? { link: linkUrl(opts.appUrl, l.link) } : {}),
+        })),
+      ),
+  );
+
+  server.registerTool(
+    "hushd_take_back_link",
+    {
+      title: "Take back a link",
+      description: "Take back a link this agent paid that nobody has claimed yet (its index in hushd_my_links): the amount returns to the private balance, and the link stops working.",
+      inputSchema: { index: z.number().int().min(0) },
+    },
+    ({ index }) =>
+      run(async () => {
+        const l = (await sentLinks(wallet))[index];
+        if (!l) throw new Error(`No link #${index} from this agent (see hushd_my_links)`);
+        if (l.state !== "waiting") throw new Error(`That link is ${l.state}, so there is nothing to take back`);
+        const r = await takeBackLink(wallet, l.link, { artifacts: a.artifacts, relayer: a.relayer });
+        return { taken_back: human(net, l.link.token, l.link.amount), tx: r.txHash };
       }),
   );
 

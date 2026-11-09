@@ -31,7 +31,7 @@ async function main() {
     env.HUSHD_CIRCUITS_DIR ? JSON.parse(await readFile(join(env.HUSHD_CIRCUITS_DIR, `${kind}.vkey.json`), "utf8")) : (await fetch(`${circuitsUrl}/${kind}.vkey.json`)).json();
   const agent = seed ? await createAgent(env, seed) : undefined;
   if (!agent) console.error("hushd-mcp: no seed (run `hushd-mcp init`, or `pnpm mcp init` in the repo, or set HUSHD_SEED); serving read-only tools.");
-  const server = createServer({ net, vkey, ...(agent ? { agent } : {}), verifyBase: env.HUSHD_VERIFY_URL ?? "https://hushd.net/verify" });
+  const server = createServer({ net, vkey, ...(agent ? { agent } : {}), verifyBase: env.HUSHD_VERIFY_URL ?? "https://hushd.net/verify", appUrl: env.HUSHD_APP_URL ?? "https://hushd.net" });
   await server.connect(new StdioServerTransport());
 }
 

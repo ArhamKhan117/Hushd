@@ -1,19 +1,19 @@
 /** The MCP server's surface and its spending limits, with no network. */
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { TESTNET } from "@hushd/sdk";
+import { encodeLink, identityFromSeed, linkUrl, newLink, TESTNET } from "@hushd/sdk";
 import { createAgent, createServer, Limits, parseCaps } from "../src/index.ts";
 import { parseRules } from "../src/limits.ts";
 
 const circuits = join(import.meta.dirname, "../../../app/public/circuits");
 
-async function connect(withAgent: boolean, home = mkdtempSync(join(tmpdir(), "hushd-mcp-"))) {
-  const env = { HUSHD_HOME: home, HUSHD_CIRCUITS_DIR: circuits, HUSHD_LIMIT_PER_PAYMENT: "USDC=10", HUSHD_LIMIT_PER_DAY: "USDC=15" };
+async function connect(withAgent: boolean, home = mkdtempSync(join(tmpdir(), "hushd-mcp-")), extra: Record<string, string> = {}) {
+  const env = { HUSHD_HOME: home, HUSHD_CIRCUITS_DIR: circuits, HUSHD_LIMIT_PER_PAYMENT: "USDC=10", HUSHD_LIMIT_PER_DAY: "USDC=15", ...extra };
   const agent = withAgent ? await createAgent(env, new Uint8Array(32).fill(3)) : undefined;
   const server = createServer({ net: TESTNET, vkey: async () => ({}), ...(agent ? { agent } : {}) });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -32,7 +32,7 @@ test("without a seed only read tools are offered", async () => {
 test("with a seed the wallet tools appear, and limits refuse before anything is proved", async () => {
   const c = await connect(true);
   const names = (await c.listTools()).tools.map((t) => t.name);
-  for (const n of ["hushd_address", "hushd_send", "hushd_trade", "hushd_prove", "hushd_pay_x402", "hushd_limits"]) assert.ok(names.includes(n), n);
+  for (const n of ["hushd_address", "hushd_send", "hushd_trade", "hushd_prove", "hushd_pay_x402", "hushd_limits", "hushd_pay_link", "hushd_claim_link", "hushd_my_links", "hushd_take_back_link"]) assert.ok(names.includes(n), n);
   const addr = await c.callTool({ name: "hushd_address", arguments: {} });
   assert.match((addr.content as { text: string }[])[0]!.text, /hushd1/);
   const over = await c.callTool({ name: "hushd_send", arguments: { to: "hushd1qqqq", token: "USDC", amount: "11" } });
@@ -76,5 +76,42 @@ test("without a NEAR account the policy tool says so, and spending tools name bo
   assert.equal(JSON.parse((p.content as { text: string }[])[0]!.text).near_account, null);
   const s = await c.callTool({ name: "hushd_shield", arguments: { token: "USDC", amount: "1" } });
   assert.match((s.content as { text: string }[])[0]!.text, /HUSHD_POLICY_WALLET_KEY/);
+  await c.close();
+});
+
+const text = (r: Awaited<ReturnType<Client["callTool"]>>) => (r.content as { text: string }[])[0]!.text;
+
+test("paying as a link counts against the same limits as a private send, before anything is proved", async () => {
+  const home = mkdtempSync(join(tmpdir(), "hushd-mcp-"));
+  // 8 USDC already spent today, in the ledger every spending tool shares
+  const tag = identityFromSeed(new Uint8Array(32).fill(3)).address.slice(-12);
+  writeFileSync(join(home, `testnet-${tag}.spent.json`), JSON.stringify({ day: new Date().toISOString().slice(0, 10), spent: { "usdc.hushd.testnet": "8000000" } }));
+  const c = await connect(true, home);
+  const over = await c.callTool({ name: "hushd_pay_link", arguments: { token: "USDC", amount: "11" } });
+  assert.equal(over.isError, true);
+  assert.match(text(over), /over the limit of 10 per payment/);
+  assert.match(text(await c.callTool({ name: "hushd_pay_link", arguments: { token: "USDC", amount: "8" } })), /over the daily limit of 15/);
+  assert.match(text(await c.callTool({ name: "hushd_pay_link", arguments: { token: "wNEAR", amount: "1" } })), /No spending limit is set for wNEAR/);
+  assert.deepEqual(JSON.parse(text(await c.callTool({ name: "hushd_my_links", arguments: {} }))), []);
+  assert.match(text(await c.callTool({ name: "hushd_take_back_link", arguments: { index: 0 } })), /No link #0/);
+  await c.close();
+});
+
+test("an agent limited to a list of payees may not pay as a link", async () => {
+  const c = await connect(true, undefined, { HUSHD_ALLOW_TO: "bob.testnet" });
+  const r = await c.callTool({ name: "hushd_pay_link", arguments: { token: "USDC", amount: "1" } });
+  assert.equal(r.isError, true);
+  assert.match(text(r), /may not pay as a link/);
+  await c.close();
+});
+
+test("a claim refuses a damaged link and a token the network does not list, before reading the pool", async () => {
+  const c = await connect(true);
+  const good = linkUrl("https://hushd.net", newLink("usdc.hushd.testnet", 1_000_000n));
+  const damaged = await c.callTool({ name: "hushd_claim_link", arguments: { link: good.slice(0, -3) } });
+  assert.equal(damaged.isError, true);
+  assert.match(text(damaged), /not a complete Hushd claim link/);
+  const other = await c.callTool({ name: "hushd_claim_link", arguments: { link: encodeLink(newLink("unknown-token.testnet", 1_000_000n)) } });
+  assert.match(text(other), /does not list on NEAR testnet/);
   await c.close();
 });
