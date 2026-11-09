@@ -45,6 +45,7 @@ const TOOLS: [string, string][] = [
   ["hushd_address, hushd_balance", "The agent's receive address and private balance"],
   IS_TESTNET ? ["hushd_faucet, hushd_shield", "Testnet tokens to its NEAR account, then into the pool"] : ["hushd_shield", "Tokens from its NEAR account into the pool"],
   ["hushd_send, hushd_cash_out", "Pay a hushd1… address, or out to a NEAR account"],
+  ["hushd_pay_link, hushd_claim_link", "Pay anyone as a claim link, or claim one (hushd_my_links, hushd_take_back_link)"],
   ["hushd_trade", "Ask the desk's makers, match in the enclave, settle privately"],
   ["hushd_pay_x402", "Pay a 402 resource from the private balance"],
   ["hushd_prove, hushd_my_payments", "A payment, funds or volume proof for one named reader"],

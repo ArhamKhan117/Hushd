@@ -1,6 +1,35 @@
 import { expect, test } from "@playwright/test";
 
-const PAGES = ["/", "/app", "/app/trade", "/app/deals", "/app/makers", "/app/agents", "/app/prove", "/verify", "/docs", "/agents", "/sdk", "/transparency", "/privacy", "/terms", "/security"];
+const DOCS = ["quickstart", "desk", "packages", "makers", "agents", "sdk", "contracts", "proofs", "x402", "privacy-model", "threat-model"];
+
+/** Every page that renders without signing in. */
+const PAGES = [
+  "/",
+  "/agents",
+  "/sdk",
+  "/verify",
+  "/transparency",
+  "/privacy",
+  "/terms",
+  "/cookies",
+  "/security",
+  "/docs",
+  ...DOCS.map((d) => `/docs/${d}`),
+  "/app",
+  "/app/trade",
+  "/app/deals",
+  "/app/deals/2",
+  "/app/makers",
+  "/app/agents",
+  "/app/prove",
+  "/app/settings",
+  "/app/balance",
+  "/app/balance/add",
+  "/app/balance/send",
+  "/app/balance/receive",
+  "/app/balance/cash-out",
+  "/app/claim",
+];
 
 test.beforeEach(async ({ context }) => {
   // essential cookies only, so the banner stays out of the way
@@ -12,14 +41,28 @@ test.beforeEach(async ({ context }) => {
 });
 
 for (const path of PAGES) {
-  test(`${path} renders without overflow or errors`, async ({ page }) => {
+  test(`${path} renders without overflow or errors`, async ({ page, baseURL }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    // A failed response also logs "Failed to load resource": only this site's own responses must
+    // not fail, since the free RPCs answer 429 under load and the pages handle that.
+    page.on("console", (m) => {
+      if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) errors.push(m.text());
+    });
+    page.on("response", (r) => {
+      if (r.status() >= 400 && new URL(r.url()).origin === new URL(baseURL!).origin) errors.push(`${r.status()} ${r.url()}`);
+    });
+    // the CSP is report-only: what it would block shows up as these events, not as failures
+    await page.addInitScript(() => {
+      const seen: string[] = ((window as unknown as { __csp: string[] }).__csp = []);
+      document.addEventListener("securitypolicyviolation", (e) => seen.push(`CSP ${e.effectiveDirective} ${e.blockedURI} at ${e.sourceFile}:${e.lineNumber}`));
+    });
     const res = await page.goto(path);
     expect(res?.status(), `${path} status`).toBeLessThan(400);
     await expect(page.locator("h1").first()).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, "horizontal scroll").toBeLessThanOrEqual(0);
+    errors.push(...(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)));
     expect(errors).toEqual([]);
   });
 }
@@ -30,6 +73,13 @@ test("the proof checker refuses something that is not a proof", async ({ page })
   await page.getByRole("button", { name: "Check" }).click();
   // Next adds an empty route announcer with role=alert: look for ours, the one with text
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
+});
+
+test("a damaged claim link says so, and shows no amount", async ({ page }) => {
+  await page.goto("/app/claim#AQIDBAUGBwgJ");
+  await expect(page.getByRole("heading", { name: "This link does not work" })).toBeVisible();
+  await expect(page.getByText("This is not a complete Hushd claim link. Copy all of it and try again.")).toBeVisible();
+  await expect(page.getByText("You were paid")).toHaveCount(0);
 });
 
 test("the app asks to sign in before the desk", async ({ page }) => {
