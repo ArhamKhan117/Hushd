@@ -3,6 +3,7 @@
  *
  *   pnpm --filter @hushd/services intents:mainnet            # plan + dry run: costs, quotes, a simulated trade
  *   pnpm --filter @hushd/services intents:mainnet --execute  # run it (only with the owner's yes)
+ *   pnpm --filter @hushd/services intents:mainnet --execute --again  # one more round, after a finished one
  *
  * Accounts (keys in the repo .env, made on the first run): a dev wallet the owner funds with
  * about 0.8 NEAR, and two agents, a trader and a maker, each an implicit account.
@@ -16,7 +17,10 @@
  *     less 25 bps); both sign a token_diff, the pair is simulated, the maker submits it
  *  5. both withdraw everything back to their own accounts
  *  6. both send everything back to the dev wallet (wNEAR unwrapped, USDC transferred)
- * Each step's transactions are written to deployments/mainnet-intents.json.
+ * Each step's transactions are written to deployments/mainnet-intents.json; with --again the
+ * finished round moves to its `earlier` list and a new round starts on what came back. A round
+ * spends about 0.03 NEAR and brings the 0.15 NEAR it swapped back as about 0.54 USDC, so a
+ * second round needs about 0.16 NEAR more in the dev wallet (0.78 to start one).
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -32,6 +36,7 @@ if (existsSync(ENV)) process.loadEnvFile(ENV);
 const STATE = join(ROOT, "services/data/intents-mainnet.json");
 const RECORD = join(ROOT, "deployments/mainnet-intents.json");
 const EXECUTE = process.argv.includes("--execute");
+const AGAIN = process.argv.includes("--again");
 
 const NEAR = 10n ** 24n;
 const milli = (n: number) => (BigInt(n) * NEAR) / 1000n;
@@ -48,12 +53,16 @@ function secret(name: string): Uint8Array {
 }
 
 type Step = { step: string; txs: string[]; note?: string; at: string };
-const state: { steps: Record<string, Step> } = existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : { steps: {} };
-function save(step: string, txs: string[], note?: string) {
-  state.steps[step] = { step, txs, ...(note ? { note } : {}), at: new Date().toISOString() };
+const state: { steps: Record<string, Step>; earlier?: Step[][] } = existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : { steps: {} };
+function write() {
   mkdirSync(join(ROOT, "services/data"), { recursive: true });
   writeFileSync(STATE, JSON.stringify(state, null, 2));
-  writeFileSync(RECORD, `${JSON.stringify({ network: "mainnet", verifier: I.verifier, explorer: "https://nearblocks.io/txns/", steps: Object.values(state.steps) }, null, 2)}\n`);
+  const earlier = state.earlier?.length ? { earlier: state.earlier } : {};
+  writeFileSync(RECORD, `${JSON.stringify({ network: "mainnet", verifier: I.verifier, explorer: "https://nearblocks.io/txns/", steps: Object.values(state.steps), ...earlier }, null, 2)}\n`);
+}
+function save(step: string, txs: string[], note?: string) {
+  state.steps[step] = { step, txs, ...(note ? { note } : {}), at: new Date().toISOString() };
+  write();
 }
 const done = (s: string) => !!state.steps[s];
 
@@ -83,7 +92,8 @@ async function main() {
     ["6 everything back to the dev wallet (~6 calls)", "storage 0.00125 (dev on USDC), gas ~0.006"],
   ];
   for (const [a, b] of rows) console.log(`  ${a.padEnd(48)} ${b}`);
-  console.log(`  total spent: about 0.03 NEAR (${usd(milli(30))}); the rest returns to the dev wallet`);
+  console.log(`  total spent: about 0.03 NEAR (${usd(milli(30))}); the rest returns to the dev wallet (the 0.15 NEAR swapped comes back as about 0.54 USDC)`);
+  console.log(`  a round needs ${fmt(PLAN.trader + PLAN.maker + PLAN.devFloor)} NEAR in the dev wallet to start; one more round after a finished one: --execute --again`);
 
   // dry run: a real quote and the real agents' signed trade, simulated by intents.near (nothing is sent)
   const dry = await oneClick.quote(quoteRequest({ dry: true, originAsset: mt(I.wnear.id), destinationAsset: mt(I.usdc.id), amount: PLAN.swapIn.toString(), recipient: trader.accountId, refundTo: trader.accountId, depositType: "INTENTS", refundType: "INTENTS", recipientType: "INTENTS", ...(process.env.ONECLICK_API_KEY ? { confidentiality: "basic" as const } : {}) }));
@@ -103,6 +113,13 @@ async function main() {
     return;
   }
 
+  if (AGAIN) {
+    if (!done("return")) throw new Error("--again starts a new round after a finished one; this round has not finished (run --execute to resume it)");
+    // the finished round stays on the record; a new one starts on what came back
+    state.earlier = [...(state.earlier ?? []), Object.values(state.steps)];
+    state.steps = {};
+    write();
+  }
   // 1. fund the agents
   if (!done("fund")) {
     const have = (await dev.nearBalance()) ?? 0n;

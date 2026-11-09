@@ -18,7 +18,8 @@
     "mainnet:sandbox": "tsx scripts/mainnet-sandbox.ts",
     "intents:mainnet": "tsx scripts/intents-mainnet.ts",
     "policy-wallet": "tsx scripts/policy-wallet.ts",
-    "agent-api": "tsx scripts/agent-api.ts"
+    "agent-api": "tsx scripts/agent-api.ts",
+    "hedge:check": "tsx scripts/hedge-check.ts"
   },
   "devDependencies": {
     "@msgpack/msgpack": "^3.1.3",
