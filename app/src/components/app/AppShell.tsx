@@ -249,9 +249,10 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
           <div className="rise rise-1">{children}</div>
         </main>
         <footer className="mx-auto w-full max-w-[1120px] px-4 pb-8 sm:px-8">
-          <div className="flex flex-col gap-3 border-t border-line pt-5 text-[12.5px] text-mute sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-t border-line pt-5 text-[12.5px] text-mute sm:flex-row sm:items-center sm:justify-between sm:gap-8">
             <p>Hushd on NEAR {NETWORK.id}. {IS_TESTNET ? "Test tokens only." : "Real tokens."} Not investment, legal or tax advice.</p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {/* the links keep one line beside the note; the note wraps instead */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:shrink-0">
               <Link href="/verify" className="hover:text-foreground">Verify a proof</Link>
               <Link href="/transparency" className="hover:text-foreground">Transparency</Link>
               <Link href="/privacy" className="hover:text-foreground">Privacy</Link>

@@ -26,8 +26,11 @@
 - Mainnet cash outs pay the relayer a fee in the token itself: the relayer must be registered for storage on every token (the deploy does it).
 - Design is graphite: no hue anywhere (accent is steel, `--accent` in `app/src/app/globals.css`). Shared parts: `hd-frame`, `hd-crop` (crop marks), `hd-sheen`, `Spotlight`, `Reveal`, `hd-index`, `hd-grid-lines`.
   CSS written outside an `@layer` beats Tailwind utilities (`fixed`, `absolute`, `bg-*`): put new classes in `@layer components`.
+- Import stylesheets (and declare `next/font` fonts, `app/src/lib/fonts.ts`) only from the root layout: Next preloads a route's own CSS whenever a link to that route is prefetched, and the browser warns about every preload a page leaves unused. No CSS modules.
+- The app's CSP (report-only) has no `'unsafe-eval'`, and the browser reports every string evaluated as code: Node's `assert` maps to `app/src/lib/assert-browser.cjs` in the browser build and zod runs jitless (`app/src/lib/zodJitless.ts`). Check a new browser dependency for `new Function`.
 - The mark lives in `app/src/components/Logo.tsx` (paths); `node app/scripts/make-icons.mjs` redraws the favicon and app icons from it, and `tools/make_readme_art.py` the README art (Pillow).
 - A second `next dev` beside another needs `NEXT_DIST_DIR=.next-<port>`; Next then rewrites `app/tsconfig.json` with those paths, so restore that file before committing.
+  A testnet e2e run against `next dev` fails when any file under `app/` changes mid-run (a Fast Refresh full reload drops the unlocked key); while others edit, run it against `next build` and `next start` in their own `NEXT_DIST_DIR`.
 - The API rate-limits per client in four budgets (`limitFor` in `services/src/api.ts`: market, makers, flow, rest). Local test runs share one address, so many parallel browsers can still exhaust the free RPCs (FastNEAR answers 429 without CORS headers, which a browser sees as "Failed to fetch").
 - `PrivateWallet.planLeg` holds the notes it picks until `settled` or `release`: a wallet settling two deals at once never spends one note twice.
   A held note counts toward the balance even after a sync sees it spent, and the leg's change is an expected note from the start: deals overlap all the time on the makers.

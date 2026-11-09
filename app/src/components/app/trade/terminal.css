@@ -61,6 +61,12 @@
   .tt-head .hd-index {
     white-space: nowrap;
   }
+  /* Signed out, the ticket holds the app's sign-in card. Its crop marks would sit in the
+     12px gutter, against the panels above and below. */
+  .tt-ticket > .hd-crop::before,
+  .tt-ticket > .hd-crop::after {
+    content: none;
+  }
 
   /* ---------- Instrument bar ---------- */
   .tt-bar {

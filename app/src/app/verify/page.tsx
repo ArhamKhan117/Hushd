@@ -9,7 +9,6 @@ import { ErrorLine, Field } from "@/components/app/forms";
 import { BusyLabel } from "@/components/ui/Spinner";
 import { CIRCUITS_BASE, EXAMPLE_READER, NETWORK } from "@/lib/hushd/config";
 import { fmt, symbol, TOKENS } from "@/lib/hushd/format";
-import "@/styles/pages.css";
 
 const rise = (d: number) => ({ "--d": d }) as CSSProperties;
 

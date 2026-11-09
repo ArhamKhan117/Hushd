@@ -148,8 +148,11 @@ export default function AddPage() {
                     </span>
                     {/* the test tokens' faucet exists only on testnet */}
                     {IS_TESTNET && (
-                      <button type="button" className="text-foreground underline decoration-line-strong underline-offset-4" onClick={faucet} disabled={busy !== null}>
-                        <BusyLabel busy={busy === "faucet"} busyText="Getting test tokens…">Get test {symbol(token)}</BusyLabel>
+                      <button type="button" className="text-foreground" onClick={faucet} disabled={busy !== null}>
+                        <BusyLabel busy={busy === "faucet"} busyText="Getting test tokens…" start>
+                          {/* on the text itself: an underline does not reach into the label's inline grid */}
+                          <span className="underline decoration-line-strong underline-offset-4">Get test {symbol(token)}</span>
+                        </BusyLabel>
                       </button>
                     )}
                   </span>

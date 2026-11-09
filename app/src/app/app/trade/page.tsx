@@ -7,7 +7,6 @@
  * deals, hedge legs and receipts below. Prices come through the Hushd API; nothing on this
  * screen is made up.
  */
-import "@/components/app/trade/terminal.css";
 import type { CandleInterval } from "@hushd/sdk";
 import { tokenInfo } from "@hushd/sdk";
 import { useEffect, useState } from "react";

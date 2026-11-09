@@ -10,7 +10,6 @@ import { Reveal } from "@/components/ui/Reveal";
 import { SealedField } from "@/components/ui/SealedField";
 import { Spotlight } from "@/components/ui/Spotlight";
 import type { CSSProperties } from "react";
-import "@/styles/pages.css";
 
 export const metadata: Metadata = {
   title: "Agents",

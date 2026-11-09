@@ -5,7 +5,6 @@ import { Header } from "@/components/Header";
 import { FlowField } from "@/components/ui/FlowField";
 import { SealDots } from "@/components/ui/SealDots";
 import type { CSSProperties } from "react";
-import "@/styles/pages.css";
 
 const rise = (d: number) => ({ "--d": d }) as CSSProperties;
 
