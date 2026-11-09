@@ -1,8 +1,8 @@
 @layer theme, base, components, utilities;
 
 /* Graphite pages: the docs, the legal pages and the other public pages
-   (developers, agents, verify, transparency, not found). They share the
-   set in globals.css: hd-frame, hd-crop, hd-sheen, hd-spot, hd-reveal,
+   (developers, agents, verify, transparency, not found). They share the set
+   in globals.css: hd-frame, hd-crop, hd-sheen, hd-spot, hd-reveal,
    hd-index and hd-grid-lines. No hue: light, shade and hairlines do the work.
    Everything but the tokens and keyframes sits in the components layer, so
    Tailwind utilities on the same element still win. */
