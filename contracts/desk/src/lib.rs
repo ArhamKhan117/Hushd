@@ -379,6 +379,21 @@ pub struct Desk {
     next_config_change: u64,
 }
 
+/// Whether a bond is one of the desk's steps: the minimum times 1, 2 or 5, or ten, a hundred
+/// (and so on) times one of those. A deal's bond is public, so it says only which step the
+/// deal's size falls in, never the size itself.
+pub fn is_bond_step(bond: u128, min_bond: u128) -> bool {
+    let unit = min_bond.max(1);
+    if bond == 0 || bond % unit != 0 {
+        return false;
+    }
+    let mut q = bond / unit;
+    while q % 10 == 0 {
+        q /= 10;
+    }
+    matches!(q, 1 | 2 | 5)
+}
+
 fn now_ms() -> u64 {
     env::block_timestamp_ms()
 }
@@ -1004,8 +1019,11 @@ impl Desk {
                 if m.trader_inner.as_deref().and_then(parse_field_hex).is_none() {
                     return Err("A bonded deal names the trader's payout note (a nonzero field element, 0x and 64 hex digits)".into());
                 }
-                if m.bond.0 == 0 || m.bond.0 < self.config.min_bond.0 {
+                if m.bond.0 < self.config.min_bond.0 {
                     return Err("The bond is below the desk minimum".into());
+                }
+                if !is_bond_step(m.bond.0, self.config.min_bond.0) {
+                    return Err("The bond must be one of the desk's steps: the minimum times 1, 2, 5, 10, 20, 50 and so on".into());
                 }
             }
             _ => {

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { encode } from "@msgpack/msgpack";
-import { nep413Hash, TESTNET } from "@hushd/sdk";
+import { isBondStep, nep413Hash, TESTNET } from "@hushd/sdk";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64 } from "@scure/base";
@@ -122,8 +122,11 @@ describe("makers", () => {
     assert.equal(bondFor(500, 6, usdc(1_000)), usdc(1_000));
     assert.equal(bondFor(12_000, 6, usdc(1_000)), usdc(2_000));
     assert.equal(bondFor(30_000, 6, usdc(1_000)), usdc(5_000));
-    assert.equal(bondFor(2_500_000, 6, usdc(1_000)), usdc(300_000));
+    assert.equal(bondFor(2_500_000, 6, usdc(1_000)), usdc(500_000));
     assert.equal(bondFor(500, 6, usdc(3_000)), usdc(3_000));
+    assert.equal(bondFor(160_000, 6, usdc(3_000)), usdc(30_000));
+    // every bond a maker quotes is a step the desk takes
+    for (const n of [1, 999, 12_345, 400_001, 7_654_321]) assert.ok(isBondStep(bondFor(n, 6, usdc(1_000)), usdc(1_000)), `${n}`);
   });
   test("a hedge needs margin at half the coin's maximum leverage", () => {
     assert.equal(hedgeMargin(10_000, 40), 500);

@@ -225,6 +225,31 @@ fn a_match_beyond_free_bond_is_refused() {
 }
 
 #[test]
+fn bonds_come_only_in_steps_of_the_minimum() {
+    let min = 1_000_000;
+    for step in [1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 5_000_000] {
+        assert!(is_bond_step(step * min, min), "{step} times the minimum is a step");
+    }
+    for off in [0, 3, 4, 7, 15, 25, 30, 99, 101, 150, 250] {
+        assert!(!is_bond_step(off * min, min), "{off} times the minimum is not a step");
+    }
+    assert!(!is_bond_step(min + 1, min) && !is_bond_step(min / 2, min));
+    assert!(is_bond_step(20, 0) && !is_bond_step(0, 0), "a zero minimum still takes steps, never a zero bond");
+}
+
+#[test]
+fn a_bond_between_steps_is_refused() {
+    let mut d = desk();
+    // 30 USDC on a 1 USDC minimum: covered by the free bond, but not a step
+    let m = matched(SettlementClass::BondedHedge, 30_000_000);
+    let out = json!({ "success": true, "result": { "matched": true, "match": m } }).to_string();
+    set(ctx("desk.test", NearToken::from_yoctonear(0), T0 + 1_000));
+    assert!(d.on_match(U64(0), Ok(serde_json::Value::String(out))).is_none());
+    assert!(get_logs().iter().any(|l| l.contains("one of the desk's steps")));
+    assert_eq!(maker(&d).locked.0, 0, "nothing was locked");
+}
+
+#[test]
 #[should_panic(expected = "already has a deal")]
 fn one_deal_per_rfq() {
     let mut d = desk();

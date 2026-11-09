@@ -17,6 +17,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { quoteConsent, type PackageQuote } from "@hushd/protocol";
 import {
+  bondStepAtLeast,
   CUSTODY,
   CustodyWallet,
   DeskApi,
@@ -53,21 +54,14 @@ export type Style = "fixed" | "volatility" | "inventory";
 const hexBytes = (h: string) => new Uint8Array(Buffer.from(h.replace(/^0x/, ""), "hex"));
 const toHexStr = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 
-/** Bond sizes in whole USDC: a bond says roughly how big a deal is, so it comes from a few fixed steps. */
-export const BOND_STEPS = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000];
-
 /** USDC of margin a hedge of this notional needs: at half the coin's maximum leverage, so a move does not liquidate it at once. */
 export function hedgeMargin(notionalUsd: number, maxLeverage: number): number {
   return notionalUsd / Math.max(1, maxLeverage / 2);
 }
 
-/** A tenth of the notional, rounded up to the next step, never below the desk's minimum (base units). */
+/** A tenth of the notional in whole USDC, rounded up to the desk's next bond step (base units; `bondStepAtLeast`). */
 export function bondFor(notionalUsd: number, usdcDecimals: number, minBond: bigint): bigint {
-  const unit = 10n ** BigInt(usdcDecimals);
-  const tenth = notionalUsd * 0.1;
-  const step = BOND_STEPS.find((s) => s >= tenth) ?? Math.ceil(tenth / 100_000) * 100_000;
-  const bond = BigInt(step) * unit;
-  return bond < minBond ? minBond : bond;
+  return bondStepAtLeast(BigInt(Math.ceil(notionalUsd * 0.1)) * 10n ** BigInt(usdcDecimals), minBond);
 }
 
 /** Spread in basis points for a style. */

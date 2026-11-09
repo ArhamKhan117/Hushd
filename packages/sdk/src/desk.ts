@@ -261,6 +261,27 @@ export async function openRfq(p: {
 }
 
 /**
+ * Whether a bond is one of the desk's steps: `minBond` times 1, 2 or 5, or ten, a hundred
+ * (and so on) times one of those. The desk refuses any other bond (`is_bond_step` in
+ * contracts/desk), so a deal's public bond says only which step its size falls in.
+ */
+export function isBondStep(bond: bigint, minBond: bigint): boolean {
+  const unit = minBond > 0n ? minBond : 1n;
+  if (bond <= 0n || bond % unit !== 0n) return false;
+  let q = bond / unit;
+  while (q % 10n === 0n) q /= 10n;
+  return q === 1n || q === 2n || q === 5n;
+}
+
+/** The smallest bond step at or above `atLeast` (base units of the bond token). */
+export function bondStepAtLeast(atLeast: bigint, minBond: bigint): bigint {
+  const unit = minBond > 0n ? minBond : 1n;
+  for (let scale = unit; ; scale *= 10n) {
+    for (const k of [1n, 2n, 5n]) if (k * scale >= atLeast) return k * scale;
+  }
+}
+
+/**
  * The trader's own check of a match before settling anything: the enclave is trusted to
  * pick the best quote, but never to go below what the trader asked for. Throws in plain
  * words when the terms are not what the draft asked; the deal then simply expires.
