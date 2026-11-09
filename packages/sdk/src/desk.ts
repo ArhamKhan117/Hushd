@@ -327,6 +327,17 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
   const maker = decodeAddress(p.makerAddress);
   p.onStep?.("planning");
   const plan = await p.wallet.planLeg(BigInt(p.dealId), { token: p.terms.traderGives.token, amount: BigInt(p.terms.traderGives.amount) }, maker);
+  try {
+    return await traderLeg(p, plan, maker);
+  } catch (e) {
+    // the notes go back to the balance; any the pool did spend are caught by the next sync
+    p.wallet.release(plan);
+    throw e;
+  }
+}
+
+async function traderLeg(p: Parameters<typeof settleAsTrader>[0], plan: LegPlan, maker: ReturnType<typeof decodeAddress>): Promise<{ received: Note; plan: LegPlan }> {
+  const me = p.wallet.id;
   const aOut = plan.outputs.map((o) => o.commitment.toString()) as [string, string];
   await p.api.send(p.dealId, maker.encPublic, { t: "plan", outputs: aOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) } satisfies RoomMsg);
   p.onStep?.("waiting_plan");
@@ -363,6 +374,22 @@ export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relaye
   const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, me, "plan", 120_000);
   const received = checkNoteForMe(me, theirs.noteForYou, p.terms.traderGives, theirs.outputs[0]);
   const plan = await p.wallet.planLeg(BigInt(p.dealId), { token: p.terms.makerGives.token, amount: BigInt(p.terms.makerGives.amount) }, trader);
+  try {
+    return await makerLeg(p, plan, theirs, received, trader);
+  } catch (e) {
+    p.wallet.release(plan);
+    throw e;
+  }
+}
+
+async function makerLeg(
+  p: Parameters<typeof settleAsMaker>[0],
+  plan: LegPlan,
+  theirs: Extract<RoomMsg, { t: "plan" }>,
+  received: Note,
+  trader: ReturnType<typeof decodeAddress>,
+): Promise<{ txHash: string; received: Note }> {
+  const me = p.wallet.id;
   const bOut = plan.outputs.map((o) => o.commitment.toString()) as [string, string];
   await p.api.send(p.dealId, trader.encPublic, { t: "plan", outputs: bOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) } satisfies RoomMsg);
   const legB = await p.wallet.proveLeg(plan, theirs.outputs.map(BigInt) as [bigint, bigint], bOut.map(BigInt) as [bigint, bigint]);

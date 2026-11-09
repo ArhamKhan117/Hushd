@@ -187,3 +187,20 @@ test("the settle message is the same text the desk contract checks", async () =>
   // the vector in contracts/desk/src/tests.rs (the_settle_message_names_the_desk_the_deal_and_the_outputs_in_leg_order)
   assert.equal(settleMessage(withOverrides(TESTNET, { desk: "desk.test" }), 7, ["1", "2", "3", "4"]), "hushd.settle.v1:desk.test:7:1,2,3,4");
 });
+
+test("a note picked for a leg in flight is held: a second leg picks another, and a released leg frees it", async () => {
+  const { PrivateWallet } = await import("../src/wallet.ts");
+  const me = identityFromSeed(new Uint8Array(32).fill(7));
+  const them = identityFromSeed(new Uint8Array(32).fill(8));
+  const wallet = new PrivateWallet(TESTNET, me, { artifacts: src });
+  const token = "usdc.hushd.testnet";
+  // two notes already in the tree
+  for (const leafIndex of [0, 1]) wallet.track({ ...makeNote(me.pk, token, 100n), leafIndex });
+  const first = await wallet.planLeg(1n, { token, amount: 60n }, them.address);
+  const second = await wallet.planLeg(2n, { token, amount: 60n }, them.address);
+  assert.notEqual(first.inputs[0]!.commitment, second.inputs[0]!.commitment, "two legs in flight picked the same note");
+  assert.equal(wallet.spendable(token).length, 0);
+  wallet.release(first);
+  const third = await wallet.planLeg(3n, { token, amount: 60n }, them.address);
+  assert.equal(third.inputs[0]!.commitment, first.inputs[0]!.commitment);
+});

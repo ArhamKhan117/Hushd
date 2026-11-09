@@ -12,6 +12,7 @@ import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 - Proofs: `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, checked again on chain by `pool.verify_disclosure`.
 - Agents: `x402Fetch` pays a `hushd` x402 resource from the private balance.
 - Intake: `intake` drafts a package from plain words through a NEAR AI Cloud model in a TEE, encrypted to the model's attested key.
+- Market: `MarketApi` reads the Hyperliquid mainnet prices the makers price from, through the Hushd API; `crossRate` and `hourStats` give a cross rate and the last hour's change, range and realized volatility.
 
 The contracts live on NEAR testnet (`pool.hushd.testnet`, `desk.hushd.testnet`, `board.hushd.testnet`).
 Docs: https://hushd.net/docs/sdk. Source: https://github.com/ArhamKhan117/Hushd.

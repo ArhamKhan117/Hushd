@@ -7,6 +7,7 @@ export * from "./field.js";
 export * from "./intake.js";
 export * from "./intents.js";
 export * from "./keys.js";
+export * from "./market.js";
 export * from "./network.js";
 export * from "./note.js";
 export * from "./pool.js";

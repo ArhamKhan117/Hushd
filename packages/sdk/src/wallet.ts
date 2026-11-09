@@ -110,6 +110,8 @@ export interface LegPlan {
 
 export class PrivateWallet {
   private notes = new Map<bigint, Note & { spent?: boolean; memo?: string; dealId?: string }>();
+  /** Notes chosen for a leg in flight (by commitment): nothing else may pick them until it settles or is released. */
+  private held = new Set<bigint>();
   private tree = new MerkleTree();
   private boardCursor = 0;
   private paid: StoredPayment[] = [];
@@ -195,9 +197,14 @@ export class PrivateWallet {
     await this.persist();
   }
 
-  /** Spendable notes (in the tree, not spent). */
+  /** Spendable notes (in the tree, not spent, not held for a leg in flight). */
   spendable(token?: string): Note[] {
-    return [...this.notes.values()].filter((n) => !n.spent && n.leafIndex !== undefined && (!token || n.token === token));
+    return [...this.notes.values()].filter((n) => !n.spent && n.leafIndex !== undefined && !this.held.has(n.commitment) && (!token || n.token === token));
+  }
+
+  /** What legs in flight are holding, by token. */
+  private heldTotal(token: string): bigint {
+    return [...this.notes.values()].filter((n) => this.held.has(n.commitment) && !n.spent && n.token === token).reduce((s, n) => s + n.amount, 0n);
   }
 
   balances(): Map<string, bigint> {
@@ -249,14 +256,16 @@ export class PrivateWallet {
   }
 
   private async ensureCovered(token: string, amount: bigint): Promise<Note[]> {
-    for (let i = 0; i < 12; i++) {
+    // a leg in flight may be holding the notes this needs: its change frees up when it settles
+    const deadline = Date.now() + 4 * 60_000;
+    while (Date.now() < deadline) {
       const picked = this.select(token, amount);
       if (picked) return picked;
       const total = this.spendable(token).reduce((s, n) => s + n.amount, 0n);
       if (total < amount) {
-        // change from a payment a moment ago is still landing: wait for it rather than refuse
+        // change from a payment a moment ago is still landing, or held by a leg in flight: wait rather than refuse
         const landing = this.pending().filter((n) => n.token === token).reduce((s, n) => s + n.amount, 0n);
-        if (total + landing < amount) throw new Error("not enough in your private balance");
+        if (total + landing + this.heldTotal(token) < amount) throw new Error("not enough in your private balance");
         await new Promise((r) => setTimeout(r, 2_500));
         await this.sync();
         continue;
@@ -360,8 +369,15 @@ export class PrivateWallet {
   async planLeg(dealId: bigint, give: { token: string; amount: bigint }, counterparty: string | ReceiveAddress): Promise<LegPlan> {
     const dest = typeof counterparty === "string" ? decodeAddress(counterparty) : counterparty;
     const inputs = await this.ensureCovered(give.token, give.amount);
+    // held until the deal settles or the leg is released, so a second deal cannot spend them too
+    for (const n of inputs) this.held.add(n.commitment);
     const have = inputs.reduce((s, n) => s + n.amount, 0n);
     return { dealId, inputs, outputs: [makeNote(dest.pk, give.token, give.amount), makeNote(this.id.pk, give.token, have - give.amount)] };
+  }
+
+  /** A leg that will not settle (expired, refused): its notes are free again. A note the pool did spend is caught by the next sync. */
+  release(plan: LegPlan): void {
+    for (const n of plan.inputs) this.held.delete(n.commitment);
   }
 
   /** Step 2: prove your leg bound to both sides' outputs (leg A is the trader's, B the maker's). */
@@ -374,6 +390,7 @@ export class PrivateWallet {
   async settled(plan: LegPlan, received?: Note, txHash?: string): Promise<void> {
     this.record("deal", plan.outputs[0], plan.inputs[0]!, { dealId: plan.dealId.toString(), ...(txHash ? { txHash } : {}) });
     await this.afterSpend(plan.inputs, [plan.outputs[1]]);
+    this.release(plan);
     if (received) {
       this.track(received);
       const kept = this.notes.get(received.commitment);
