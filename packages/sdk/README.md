@@ -8,6 +8,7 @@ import { cachedArtifacts, EncryptedFileStore } from "@hushd/sdk/node";
 ```
 
 - `PrivateWallet`: notes, balances, `send`, `cashOut`, payment requests, and the deal records of a trader or maker.
+- Claim links: `payAsLink` pays anyone as a link, `checkLink` and `claimLink` claim it into the claimer's own wallet through the relayer (no gas), `sentLinks` and `takeBackLink` follow up on the links a wallet paid.
 - Desk: `packageRequest`, `openRfq`, `awaitMatch`, `checkMatchedTerms`, `settleAsTrader`, `settleAsMaker`.
 - Proofs: `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, checked again on chain by `pool.verify_disclosure`.
 - Agents: `x402Fetch` pays a `hushd` x402 resource from the private balance.

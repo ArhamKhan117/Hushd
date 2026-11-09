@@ -15,6 +15,7 @@ import type { HushdNetwork } from "./network.js";
 import { makeNote, own, type Note } from "./note.js";
 import { loadTree, poolView, shieldCall, transactRequest } from "./pool.js";
 import { proveJoinsplit, type ArtifactSource, type JoinsplitArgs } from "./prove.js";
+import { screenAddresses } from "./screening.js";
 import type { RelayerClient } from "./relayer.js";
 import { MerkleTree } from "./tree.js";
 
@@ -69,6 +70,23 @@ export interface DealRecord {
   settledAtMs?: number;
 }
 
+/** A claim link this wallet paid (links.ts), kept only in its own encrypted store. */
+export interface StoredLink {
+  /** The link's one-time seed, hex. It is the link: whoever holds it can claim the payment. */
+  seed: string;
+  token: string;
+  amount: string;
+  /** The link note's blinding. */
+  blinding: string;
+  atMs: number;
+  /** The payment into the link, once the relayer sent it. */
+  txHash?: string;
+  /** Blinding of the note a take back makes for this wallet, kept before it is sent. */
+  takeBack?: string;
+  /** How it ended, once the pool shows the link note spent. */
+  ended?: "claimed" | "taken back";
+}
+
 export interface WalletState {
   notes: StoredNote[];
   boardCursor: number;
@@ -76,6 +94,7 @@ export interface WalletState {
   /** Notes that may land later without a board post (a bond paid to you if a maker defaults). */
   expected?: StoredNote[];
   deals?: DealRecord[];
+  links?: StoredLink[];
 }
 
 /** Where notes are kept between sessions (memory, an encrypted browser store, a file). */
@@ -100,6 +119,15 @@ export interface SendResult {
   note: Note;
 }
 
+export interface PayOptions {
+  /** Seal word of the note to its owner on the board, so their wallet finds it (leave out when they learn of it another way). */
+  word?: { to: ReceiveAddress; memo?: string };
+  /** The hushd1… address paid, kept with the payment record. */
+  to?: string;
+  /** Runs once the payment is proven, just before it goes out: keep here whatever must survive a crash mid-send. */
+  beforeSend?: () => Promise<void>;
+}
+
 /** Your half of a swap before proving: your two outputs, so both sides can bind all four. */
 export interface LegPlan {
   dealId: bigint;
@@ -113,16 +141,22 @@ export class PrivateWallet {
   /** Notes chosen for a leg in flight (by commitment): nothing else may pick them until it settles or is released. */
   private held = new Set<bigint>();
   private tree = new MerkleTree();
+  /** The tree load in flight: loads add leaves to one tree in place, so they run one at a time. */
+  private treeLoad: Promise<void> | null = null;
   private boardCursor = 0;
   private paid: StoredPayment[] = [];
   private expected: StoredNote[] = [];
   private dealLog: DealRecord[] = [];
+  private linkLog: StoredLink[] = [];
 
   constructor(
     readonly net: HushdNetwork,
     readonly id: Identity,
-    private readonly opts: { artifacts: ArtifactSource; relayer?: RelayerClient; store?: NoteStore },
-  ) {}
+    /** `tree`: a tree already loaded from the pool, to sync on from. */
+    private readonly opts: { artifacts: ArtifactSource; relayer?: RelayerClient; store?: NoteStore; tree?: MerkleTree },
+  ) {
+    if (opts.tree) this.tree = opts.tree;
+  }
 
   get address(): string {
     return this.id.address;
@@ -135,6 +169,7 @@ export class PrivateWallet {
     this.paid = s.payments ?? [];
     this.expected = s.expected ?? [];
     this.dealLog = s.deals ?? [];
+    this.linkLog = s.links ?? [];
     for (const n of s.notes) {
       const note = own(makeNote(this.id.pk, n.token, BigInt(n.amount), BigInt(n.blinding)), this.id);
       this.notes.set(note.commitment, { ...note, ...(n.leafIndex !== undefined ? { leafIndex: n.leafIndex } : {}), spent: n.spent, memo: n.memo, dealId: n.dealId });
@@ -147,6 +182,7 @@ export class PrivateWallet {
       payments: this.paid,
       expected: this.expected,
       deals: this.dealLog,
+      links: this.linkLog,
       notes: [...this.notes.values()].map((n) => ({
         token: n.token,
         amount: n.amount.toString(),
@@ -166,10 +202,13 @@ export class PrivateWallet {
     if (!this.notes.has(owned.commitment)) this.notes.set(owned.commitment, owned);
   }
 
-  /** Pull new leaves and board posts, place notes in the tree, mark spent ones. */
-  async sync(): Promise<void> {
-    this.tree = await loadTree(this.net, 500, this.tree);
-    if (this.net.board) {
+  /**
+   * Pull new leaves and board posts, place notes in the tree, mark spent ones. `board: false`
+   * skips the board, for a wallet that already knows its notes (a claim link's).
+   */
+  async sync(opts: { board?: boolean } = {}): Promise<void> {
+    await this.refreshTree();
+    if (this.net.board && opts.board !== false) {
       const { notes, next } = await scanBoard(this.net, this.id, this.boardCursor);
       for (const n of notes) if (n && n.amount > 0n && !this.notes.has(n.commitment)) this.notes.set(n.commitment, n);
       this.boardCursor = next;
@@ -197,6 +236,30 @@ export class PrivateWallet {
         }),
     );
     await this.persist();
+  }
+
+  /** Pull the pool's new leaves into the tree, after any load already in flight. */
+  private async refreshTree(): Promise<void> {
+    while (this.treeLoad) await this.treeLoad.catch(() => undefined);
+    const load = (async () => {
+      this.tree = await loadTree(this.net, 500, this.tree);
+    })();
+    this.treeLoad = load;
+    try {
+      await load;
+    } finally {
+      if (this.treeLoad === load) this.treeLoad = null;
+    }
+  }
+
+  /**
+   * A restored wallet knows where its notes sit before its tree is loaded again (a page load
+   * empties it): load the tree up to the notes about to be spent before proving.
+   */
+  private async treeHolding(notes: Note[]): Promise<void> {
+    const held = () => notes.every((n) => n.leafIndex === undefined || this.tree.leaf(n.leafIndex) === n.commitment);
+    if (!held()) await this.refreshTree();
+    if (!held()) throw new Error("a note to spend is not in the pool's tree");
   }
 
   /** Spendable notes (in the tree, not spent, not held for a leg in flight). */
@@ -254,6 +317,7 @@ export class PrivateWallet {
     const notes = this.spendable(token).sort((a, b) => (a.amount < b.amount ? 1 : -1)).slice(0, 2);
     if (notes.length < 2) throw new Error("nothing to merge");
     const merged = makeNote(this.id.pk, token, notes[0]!.amount + notes[1]!.amount);
+    await this.treeHolding(notes);
     const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs: notes, outputs: [merged, makeNote(this.id.pk, token, 0n)] });
     const r = await this.relayer().transact(transactRequest(j, 0n, null));
     await this.afterSpend(notes, [merged]);
@@ -323,6 +387,24 @@ export class PrivateWallet {
     return [...this.dealLog];
   }
 
+  /** Remember (or update) a claim link this wallet paid, by its seed, in its encrypted store. */
+  async rememberLink(l: StoredLink): Promise<void> {
+    const i = this.linkLog.findIndex((x) => x.seed === l.seed);
+    if (i >= 0) this.linkLog[i] = l;
+    else this.linkLog.unshift(l);
+    await this.persist();
+  }
+
+  async forgetLink(seed: string): Promise<void> {
+    this.linkLog = this.linkLog.filter((x) => x.seed !== seed);
+    await this.persist();
+  }
+
+  /** Claim links this wallet paid, newest first. */
+  links(): StoredLink[] {
+    return this.linkLog.map((l) => ({ ...l }));
+  }
+
   /** Payments this wallet made, newest first (private sends and desk deal legs). */
   payments(): Payment[] {
     return this.paid.map((p) => ({
@@ -340,30 +422,43 @@ export class PrivateWallet {
   /** Pay `amount` of `token` privately to a hushd1… address. */
   async send(to: string | ReceiveAddress, token: string, amount: bigint, memo?: string): Promise<SendResult> {
     const dest = typeof to === "string" ? decodeAddress(to) : to;
-    const inputs = await this.ensureCovered(token, amount);
+    return this.pay(makeNote(dest.pk, token, amount), { word: { to: dest, ...(memo ? { memo } : {}) }, ...(typeof to === "string" ? { to } : {}) });
+  }
+
+  /** Pay a note made beforehand (`makeNote` for its owner's receive key) privately, through the relayer. */
+  async pay(payment: Note, opts: PayOptions = {}): Promise<SendResult> {
+    const inputs = await this.ensureCovered(payment.token, payment.amount);
     const have = inputs.reduce((s, n) => s + n.amount, 0n);
-    const payment = makeNote(dest.pk, token, amount);
-    const change = makeNote(this.id.pk, token, have - amount);
+    const change = makeNote(this.id.pk, payment.token, have - payment.amount);
+    await this.treeHolding(inputs);
     // the payment goes first: the pool's receipt and volume checks count only output 0
     const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs, outputs: [payment, change] });
+    await opts.beforeSend?.();
+    // the change is on record before the send, so a send that lands as the tab closes still finds it
+    await this.expect(change);
     const r = await this.relayer().transact(transactRequest(j, 0n, null));
-    await this.relayer().post(sealNote(dest, payment, memo ? { memo } : {}), "note");
-    this.record("send", payment, inputs[0]!, { to: typeof to === "string" ? to : undefined, txHash: r.txHash });
+    if (opts.word) await this.relayer().post(sealNote(opts.word.to, payment, opts.word.memo ? { memo: opts.word.memo } : {}), "note");
+    this.record("send", payment, inputs[0]!, { to: opts.to, txHash: r.txHash });
     await this.afterSpend(inputs, [change]);
     return { txHash: r.txHash, note: payment };
   }
 
   /** Cash out to a NEAR account. A refund note comes back to you if the payout cannot be paid. */
   async cashOut(recipient: string, token: string, amount: bigint, fee = 0n): Promise<{ txHash: string }> {
+    // the recipient is public: screened before anything is proven (the relayer checks again)
+    const screen = screenAddresses([recipient]);
+    if (!screen.allowed) throw new Error(screen.message);
     const inputs = await this.ensureCovered(token, amount);
     const have = inputs.reduce((s, n) => s + n.amount, 0n);
     const change = makeNote(this.id.pk, token, have - amount);
     const refund = makeNote(this.id.pk, token, amount - fee);
     const info = await this.relayer().info();
     const ext: ExtData = { recipient, relayer: info.account, fee, refundInner: refund.inner };
+    await this.treeHolding(inputs);
     const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs, outputs: [change, makeNote(this.id.pk, token, 0n)], publicAmount: amount, ext });
     // the refund note only exists if the payout fails; posting it to self keeps it recoverable either way
     await this.relayer().post(sealNote(this.id, refund, { memo: "refund if the cash out could not be paid" }), "note");
+    await this.expect(change);
     const r = await this.relayer().transact(transactRequest(j, amount, token, ext));
     this.track(refund);
     await this.afterSpend(inputs, [change]);
@@ -394,6 +489,7 @@ export class PrivateWallet {
   /** Step 2: prove your leg bound to both sides' outputs (leg A is the trader's, B the maker's). */
   async proveLeg(plan: LegPlan, aOutputs: [bigint, bigint], bOutputs: [bigint, bigint]): Promise<JoinsplitArgs> {
     const binding = swapExtHash(plan.dealId, aOutputs, bOutputs);
+    await this.treeHolding(plan.inputs);
     return proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs: plan.inputs, outputs: plan.outputs, binding });
   }
 
