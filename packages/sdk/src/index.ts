@@ -16,6 +16,7 @@ export * from "./proofs.js";
 export * from "./prove.js";
 export * from "./relayer.js";
 export * from "./rpc.js";
+export * from "./screening.js";
 export * from "./tree.js";
 export * from "./wallet.js";
 export * from "./x402.js";
