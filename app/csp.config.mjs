@@ -14,8 +14,8 @@ const origin = (u) => {
 };
 
 /**
- * Per network: the free RPC endpoints (the same lists as `TESTNET.rpc` and `MAINNET.rpc` in
- * packages/sdk/src/network.ts; change them together) and OutLayer's custody API
+ * Per network: the free RPC endpoints (the same lists as `rpc` and `browserRpc` of `TESTNET` and
+ * `MAINNET` in packages/sdk/src/network.ts; change them together) and OutLayer's custody API
  * (`CUSTODY` in packages/sdk/src/custody.ts).
  */
 const NETWORKS = {
@@ -24,7 +24,7 @@ const NETWORKS = {
     outlayer: "https://testnet-api.outlayer.ai",
   },
   mainnet: {
-    rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
+    rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org", "https://near.api.pocket.network"],
     outlayer: "https://api.outlayer.ai",
   },
 };

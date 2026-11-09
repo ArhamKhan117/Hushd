@@ -3,7 +3,7 @@
  * `NEXT_PUBLIC_HUSHD_NETWORK` picks testnet (the default) or mainnet; the other
  * variables override single fields, for a local sandbox node or a self-hosted API.
  */
-import { MAINNET, TESTNET, withOverrides, type HushdNetwork } from "@hushd/sdk";
+import { forBrowser, MAINNET, TESTNET, withOverrides, type HushdNetwork } from "@hushd/sdk";
 
 const BASE: HushdNetwork = process.env.NEXT_PUBLIC_HUSHD_NETWORK === "mainnet" ? MAINNET : TESTNET;
 
@@ -12,7 +12,8 @@ export const API_URL = process.env.NEXT_PUBLIC_HUSHD_API_URL || BASE.api;
 const list = (v: string | undefined) => (v ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const rpc = list(process.env.NEXT_PUBLIC_NEAR_RPC_URL);
 
-export const NETWORK: HushdNetwork = withOverrides(BASE, {
+// the browser reads from endpoints that keep CORS headers even when they rate-limit
+export const NETWORK: HushdNetwork = withOverrides(rpc.length ? BASE : forBrowser(BASE), {
   api: API_URL,
   ...(rpc.length ? { rpc } : {}),
   ...(process.env.NEXT_PUBLIC_HUSHD_POOL ? { pool: process.env.NEXT_PUBLIC_HUSHD_POOL } : {}),

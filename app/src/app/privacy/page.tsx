@@ -15,7 +15,7 @@ export default function PrivacyPage() {
   return (
     <LegalLayout
       title="Privacy"
-      updated="6 November 2026"
+      updated="9 November 2026"
       lede="Hushd is built so that we learn as little as possible about you. This page says what that means in practice, including what we cannot keep private."
     >
       <h2>Who runs Hushd</h2>
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
       <h2>Other services your browser talks to</h2>
       <ul>
         <li>
-          <strong>NEAR RPC nodes</strong> (FastNEAR and the NEAR testnet RPC), which your browser reads the chain from.
+          <strong>NEAR RPC nodes</strong> (dRPC, with FastNEAR as a fallback), which your browser reads the chain from and sends your own transactions through.
           They see your IP address and what you read.
         </li>
         <li>

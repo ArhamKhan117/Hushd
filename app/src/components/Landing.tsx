@@ -160,7 +160,7 @@ const NEAR_ONLY = [
   },
   {
     title: "Events anyone can index",
-    body: "The contracts log NEP-297 events, read by the indexer from FastNEAR's neardata block stream.",
+    body: "The contracts log NEP-297 events, read by the indexer from FastNEAR's transactions API.",
   },
 ];
 
