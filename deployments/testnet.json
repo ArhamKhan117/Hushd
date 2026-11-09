@@ -35,9 +35,9 @@
     },
     "desk": {
       "account": "desk.hushd.testnet",
-      "codeHash": "9x1XLyLLXUwGDxZbkauJsTruVJTuHNjkMQorD1P1zucF",
+      "codeHash": "Cj72o2ebn5Yab58bB3PPDjJK8gR2pSPSfRZ8vknvgoJ4",
       "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
-      "redeployed": "6fX9f8QXj1p3wUaes8mHFueMiBJNYpKXie8cMAA1sMwW"
+      "redeployed": "2QUkdRnmMp5Gy4gY4YgzeVWV5MhmhA8N35Tgb95HxvSB"
     }
   },
   "services": {

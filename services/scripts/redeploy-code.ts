@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
-import { sendEndpoints, TESTNET, withOverrides } from "@hushd/sdk";
+import { keepRpcErrorBodies, rpcOrder, sendEndpoints, TESTNET, withOverrides } from "@hushd/sdk";
 import { Near } from "near-kit";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
@@ -22,11 +22,22 @@ if (!existsSync(wasm)) throw new Error(`${wasm} is missing: build it first`);
 const key = process.env.DEPLOYER_PRIVATE_KEY ?? (JSON.parse(readFileSync(join(homedir(), ".near-credentials/testnet", `${DEPLOYER}.json`), "utf8")) as { private_key: string }).private_key;
 const account = `${name}.${DEPLOYER}`;
 const net = withOverrides(TESTNET, process.env.NEAR_RPC_URL ? { rpc: process.env.NEAR_RPC_URL.split(",") } : {});
-const near = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
 const code = new Uint8Array(readFileSync(wasm));
 // the deployed contracts name their commit and build image (NEP-330 build_info); keep it that way
 if (!Buffer.from(code).includes("source_code_snapshot")) throw new Error(`${wasm} is not a reproducible build: run \`cargo near build reproducible-wasm\` in contracts/${wasmName} on a clean, committed tree`);
-const out = (await near.transaction(account).deployContract(account, code).send()) as unknown as { transaction?: { hash?: string } };
+// a free endpoint may be rate-limiting this machine: try each, with the RPC's own reason when one refuses
+keepRpcErrorBodies(net.rpc);
+let out: { transaction?: { hash?: string } } | undefined;
+for (const rpcUrl of rpcOrder(sendEndpoints(net))) {
+  const near = new Near({ network: { networkId: "testnet", rpcUrl }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
+  try {
+    out = (await near.transaction(account).deployContract(account, code).send()) as unknown as { transaction?: { hash?: string } };
+    break;
+  } catch (e) {
+    console.error(`${rpcUrl}: ${(e as Error)?.message ?? String(e)}`);
+  }
+}
+if (!out) throw new Error(`no endpoint took the deploy of ${account}`);
 const tx = out.transaction?.hash ?? "";
 // the recorded hash is what `pnpm verify` holds the deployed code to
 const file = join(ROOT, "deployments/testnet.json");
