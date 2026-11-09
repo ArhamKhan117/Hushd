@@ -24,6 +24,7 @@ import {
   type WalletState,
 } from "@hushd/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import "@/lib/zodJitless";
 import { CIRCUITS_BASE, IS_TESTNET, NETWORK } from "./config";
 import { b64ToBytes, createPasskey, nearKeyFromSeed, SEED_NONCE, SEED_RECIPIENT, storeKey, unlockPasskey } from "./keys";
 

@@ -39,9 +39,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // snarkjs and circomlibjs reach for Node modules the browser never needs.
     config.resolve.fallback = { ...config.resolve.fallback, fs: false, net: false, tls: false, readline: false, os: false };
+    // circomlibjs checks inputs with Node's assert; Next's browser copy of it evaluates a
+    // string as code on load, which the CSP's script-src refuses. A plain check does.
+    // (an alias: Next sets its polyfills as a rule's fallback, which a top-level fallback cannot replace)
+    if (!isServer) config.resolve.alias = { ...config.resolve.alias, assert$: path.join(__dirname, "src/lib/assert-browser.cjs") };
     // The workspace packages use NodeNext ".js" specifiers for their ".ts" sources.
     config.resolve.extensionAlias = { ...(config.resolve.extensionAlias || {}), ".js": [".ts", ".tsx", ".js"] };
     // web-worker's Node shim (under snarkjs) imports a module by a computed name; harmless.
