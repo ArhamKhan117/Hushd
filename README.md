@@ -13,6 +13,7 @@ Everything runs on NEAR testnet with test tokens.
 ## Try it
 
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
+- **The trading screen:** [hushd.net/app/trade](https://hushd.net/app/trade). Live Hyperliquid prices for each pair the desk trades, a ticket that seals the request, the makers and their bonds, a payoff chart for hedged packages, and your requests, deals, hedge legs and receipts below.
 - **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
 - **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
 - **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts, their code and the commit each was built from, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a trade checked by `intents.near` on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
@@ -155,7 +156,7 @@ That finding, the three Medium and six Low, and what changed for each are in [SE
 ## Mainnet
 
 Hushd runs on testnet, and every part is built to run on mainnet too: going live is a deploy and environment switches, with no code changes.
-`pnpm --filter @hushd/services mainnet:sandbox` runs the mainnet build end to end on a local node holding the real mainnet USDC, `wrap.near` and nBTC code: a deploy as `hushd.near`, the services on mainnet settings, and an agent that shields, sends, trades two pairs, cashes out, proves and pays over x402 (16 of 16 checks pass).
+`pnpm --filter @hushd/services mainnet:sandbox` runs the mainnet build end to end on a local node holding the real mainnet USDC, `wrap.near` and nBTC code: a deploy as `hushd.near`, the services on mainnet settings, and an agent that shields, sends, trades two pairs, cashes out, proves and pays over x402 (17 of 17 checks pass).
 Mainnet still needs a multi-party proving-key ceremony first (`circuits/scripts/ceremony.mjs`); [MAINNET.md](MAINNET.md) has what is ready, how it was tested and the steps to go live.
 
 ## Repository

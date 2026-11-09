@@ -7,7 +7,7 @@ A five-minute path through Hushd, then where to look in the code.
 1. Open [hushd.net/app](https://hushd.net/app) and sign in with a passkey (no wallet needed; the relayer opens the account on testnet).
 2. Balance, then Add privately: the faucet gives test USDC and one click moves it into the pool.
 3. Desk, then Describe it: type "sell 500 USDC for BTC at the best price". The draft comes from a NEAR AI model in a TEE; the line under the box shows the attestation the API verified, and the draft shows the signature your browser checked. (Or use Fill the form: Spot, 500 USDC, BTC.)
-4. Ask for quotes and watch the steps: committed on chain, sealed quotes arriving, matched in the enclave, settled in the pool. Open the deal page: the chain shows a deal and an outcome, not the amounts or you.
+4. Ask for quotes and watch the steps: committed on chain, sealed quotes arriving, matched in the enclave, settled in the pool. Open the deal page: the chain shows a deal and an outcome, not the amounts or you. Or trade from [Trade](https://hushd.net/app/trade): the same flow beside a live chart, with your deal settling in the panel below.
 5. Prove, then Exact payment for that deal, reader `judge.testnet`, then open the link. The checker verifies the proof in your browser and asks the pool contract to check it again.
 
 Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC), both for `judge.testnet` until 6 December 2026. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.

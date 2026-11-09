@@ -18,10 +18,11 @@ pnpm --filter @hushd/services mainnet:sandbox
 - **The deploy:** `scripts/deploy.ts` with the mainnet profile deploys `pool.hushd.near`, `desk.hushd.near` and `board.hushd.near` from the reproducible wasm.
   It then runs again once the makers hold tokens, which is how their inventory and bonds go in on mainnet.
 - **The services:** relayer, API, indexer, matcher, three makers and keeper, all with `HUSHD_NETWORK=mainnet`.
+- **The trading screen's prices:** the API's market routes answer on mainnet settings.
 - **The flows:** an agent drives the MCP server's tools: shield, a private send to a second agent, two spot trades (USDC for wNEAR, wNEAR for BTC) matched in the sealed auction and settled privately, a cash out with the mainnet relayer fee, a payment proof checked by the pool, and a private x402 payment to a maker.
 - **The books:** the pool's notes plus anything waiting to be claimed equal its real token balances, and the relayer received its fee.
 
-Result on 7 November 2026: 16 of 16 checks pass.
+Result on 9 November 2026: 17 of 17 checks pass.
 The deploy moved 26.1 NEAR into the new accounts, most of it held there to pay for contract storage rather than spent.
 
 Three things a sandbox cannot hold are stood in for:

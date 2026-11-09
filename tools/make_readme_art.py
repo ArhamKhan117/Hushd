@@ -5,7 +5,7 @@
 
 Why it is built this way (each rule exists because the alternative was measured broken):
 - Colours come from the app's own CSS tokens (app/src/app/globals.css), parsed here, so a
-  figure cannot disagree with the product. The accent is the iris `--accent`.
+  figure cannot disagree with the product. The accent is the graphite steel `--accent`.
 - Every other light colour is the fixed diagram palette, so figures read as one set.
 - The text accent is derived (`readable_accent`) to clear 4.5:1 on both the card and the
   tinted band; the raw accent is decorative only. `audit` runs first and writes nothing on

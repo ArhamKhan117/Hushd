@@ -9,6 +9,7 @@ Public on chain: deposits and cash outs with their amounts; that a desk deal hap
 ## Site
 
 - [Desk](https://hushd.net/app): the app. Sign in with a NEAR wallet (NEAR Connect) or a passkey; add test tokens privately; ask the desk; send, receive, cash out; prove.
+- [Trade](https://hushd.net/app/trade): the trading screen. Live Hyperliquid prices per pair (from the API's `/v1/market/mids` and `/v1/market/candles`), the request ticket, the makers and their bonds, a payoff chart, and your requests, deals, hedge legs and receipts.
 - [Verify a proof](https://hushd.net/verify): checks a hushdproof1… string in the browser and through the pool contract's verify_disclosure view. Proof links put the proof after the #: https://hushd.net/verify#p=hushdproof1…
 - [Agents](https://hushd.net/agents): Hushd for AI agents.
 - [Developers](https://hushd.net/sdk): the SDK and the MCP server.

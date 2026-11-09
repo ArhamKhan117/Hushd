@@ -23,4 +23,10 @@
 - Mainnet is one code path with testnet: `HUSHD_NETWORK` (services, MCP) and `NEXT_PUBLIC_HUSHD_NETWORK` (app) pick everything. Never add a testnet-only constant; put it in the SDK's network config or a deploy profile (`services/scripts/deploy.ts`).
 - `mainnet:sandbox` needs the doubles' wasm, a native matcher build (`cargo build --release --target <host>` in matcher/) and Postgres; it uses ports 9080 and 9787-9792 and database hushd_sandbox, so it runs beside the testnet stack. It patches mainnet account ids into the node; the real tokens' admin roles belong to the sandbox's operators.
 - Mainnet cash outs pay the relayer a fee in the token itself: the relayer must be registered for storage on every token (the deploy does it).
+- Design is graphite: no hue anywhere (accent is steel, `--accent` in `app/src/app/globals.css`). Shared parts: `hd-frame`, `hd-crop` (crop marks), `hd-sheen`, `Spotlight`, `Reveal`, `hd-index`, `hd-grid-lines`.
+  CSS written outside an `@layer` beats Tailwind utilities (`fixed`, `absolute`, `bg-*`): put new classes in `@layer components`.
+- The mark lives in `app/src/components/Logo.tsx` (paths); `node app/scripts/make-icons.mjs` redraws the favicon and app icons from it, and `tools/make_readme_art.py` the README art (Pillow).
+- A second `next dev` beside another needs `NEXT_DIST_DIR=.next-<port>`; Next then rewrites `app/tsconfig.json` with those paths, so restore that file before committing.
+- The API rate-limits per client in four budgets (`limitFor` in `services/src/api.ts`: market, makers, flow, rest). Local test runs share one address, so many parallel browsers can still exhaust the free RPCs (FastNEAR answers 429 without CORS headers, which a browser sees as "Failed to fetch").
+- `PrivateWallet.planLeg` holds the notes it picks until `settled` or `release`: a wallet settling two deals at once never spends one note twice.
 - npm: `pnpm publish:packages` publishes protocol, sdk and mcp in that order; the `@hushd` scope is an npm org.
