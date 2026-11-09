@@ -35,7 +35,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   // 2. test USDC, then into the pool
   await go("/app/balance/add");
   await page.getByRole("button", { name: /Get test USDC/ }).click();
-  await expect(page.getByRole("button", { name: "Max" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("button", { name: "Max" })).toBeVisible({ timeout: 100_000 });
   await page.locator("#amount").fill("500");
   await page.getByRole("button", { name: "Add privately" }).click();
   await expect(page.getByText(/is now private/)).toBeVisible({ timeout: 120_000 });

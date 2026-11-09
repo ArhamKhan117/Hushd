@@ -8,6 +8,8 @@ import { CSP_REPORT_ONLY } from "./csp.config.mjs";
  */
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
+  // a second dev server beside the first needs its own build directory (NEXT_DIST_DIR=.next-3301)
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   poweredByHeader: false,
   // The SDK and protocol packages ship TypeScript source; Next compiles them.
   transpilePackages: ["@hushd/sdk", "@hushd/protocol", "@hushd/mcp"],

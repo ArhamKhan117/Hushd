@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const PAGES = ["/", "/app", "/app/deals", "/app/makers", "/app/agents", "/app/prove", "/verify", "/docs", "/agents", "/sdk", "/transparency", "/privacy", "/terms", "/security"];
+const PAGES = ["/", "/app", "/app/trade", "/app/deals", "/app/makers", "/app/agents", "/app/prove", "/verify", "/docs", "/agents", "/sdk", "/transparency", "/privacy", "/terms", "/security"];
 
 test.beforeEach(async ({ context }) => {
   // essential cookies only, so the banner stays out of the way
