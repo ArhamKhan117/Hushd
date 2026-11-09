@@ -13,10 +13,10 @@
  */
 import { readFile } from "node:fs/promises";
 import { formatUnits } from "@hushd/protocol";
-import { OneClick, quoteRequest, type OneClickToken, type QuoteRequest, type QuoteResponse } from "@hushd/sdk";
+import { OneClick, quoteRequest, screenAddresses, type OneClickToken, type QuoteRequest, type QuoteResponse } from "@hushd/sdk";
 import type { Hono } from "hono";
 import { settings } from "./config.js";
-import { BadRequest, rateLimit } from "./http.js";
+import { BadRequest, Forbidden, rateLimit } from "./http.js";
 import { INTENTS_ASSET } from "./market.js";
 
 /** The NEAR account on the Hushd side of every preview: the implicit account of no key anyone holds. */
@@ -185,6 +185,9 @@ export function intentsRoutes(a: Hono, deps: IntentsDeps = {}) {
     if (typeof amount !== "string" || !/^\d{1,40}$/.test(amount) || BigInt(amount) === 0n) throw new BadRequest("amount is a whole number of the sent asset's smallest unit, above zero");
     if (typeof address !== "string" || address.trim() === "" || address.length > 128 || /\s/.test(address.trim())) throw new BadRequest("address is your address on the other chain");
     if (typeof asset !== "string" || typeof token !== "string") throw new BadRequest("asset is a 1Click asset id; token is the Hushd token's symbol");
+    // the other chain's address is public: screened before anything else is asked of 1Click
+    const screen = screenAddresses([address]);
+    if (!screen.allowed) throw new Forbidden(screen.message);
 
     let list: IntentsTokens;
     try {

@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { encode } from "@msgpack/msgpack";
-import { isBondStep, nep413Hash, TESTNET } from "@hushd/sdk";
+import { join } from "node:path";
+import { isBondStep, nep413Hash, SCREENED_MESSAGE, TESTNET } from "@hushd/sdk";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64 } from "@scure/base";
@@ -14,7 +15,7 @@ import { addressOfKey, approveAgentDigest, evmAddress, signDigest } from "../src
 import { eventsInBlock, eventsInTx } from "../src/indexer.js";
 import { orderAction, toRsv } from "../src/keeper.js";
 import { bondFor, hedgeMargin, priceAsk, spreadBps } from "../src/makers.js";
-import { checkDelegate } from "../src/relayer.js";
+import { checkDelegate, Relayer } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
 import { parseAsk, report } from "../src/market-agent.js";
@@ -207,6 +208,25 @@ test("a service records the events of its own transaction", async () => {
   assert.deepEqual(out.map((e) => [e.event, e.receiptId, e.txHash, e.blockHeight]), [["deal_matched", "r1", "tx9", 5]]);
 });
 
+// a digital currency address on OFAC's SDN list (published 2026-11-06)
+const LISTED = "TNiq9AXBp9EjUqhDhrwrfvAA8U3GUQZH81";
+
+test("the relayer refuses a cash out to a sanctioned account before it checks the proof", async () => {
+  const signer = { accountId: "relayer.hushd.testnet" } as unknown as ConstructorParameters<typeof Relayer>[1];
+  const relayer = new Relayer(TESTNET, signer, { dailyGasBudget: 10n ** 15n, cashOutFeeBps: 0, circuitsDir: join(import.meta.dirname, "../../app/public/circuits") });
+  const field = `0x${"01".repeat(32)}`;
+  const args = (recipient: string) => ({
+    root: field, nullifiers: [field, field], commitments: [field, field], public_amount: "1000000", token: "usdc.hushd.testnet",
+    ext: { recipient, relayer: null, fee: "0", refund_inner: null, memo: null },
+  });
+  // the proof check comes after the screen; stubbed, so a test that reaches it says so
+  (relayer as unknown as { verifyJoinsplit: () => Promise<void> }).verifyJoinsplit = async () => {
+    throw new Error("reached the proof check");
+  };
+  await assert.rejects(relayer.transact({ proof: {} as never, args: args(LISTED) }), (e: Error & { status?: number }) => e.status === 403 && e.message === SCREENED_MESSAGE);
+  await assert.rejects(relayer.transact({ proof: {} as never, args: args("alice.testnet") }), /reached the proof check/);
+});
+
 describe("NEAR Intents routes (1Click stubbed, no network)", () => {
   const ZERO = "0".repeat(64);
   const USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -345,6 +365,24 @@ describe("NEAR Intents routes (1Click stubbed, no network)", () => {
       assert.equal(r.status, 400, JSON.stringify(bad));
     }
     assert.equal(quotes().length, 0);
+  });
+
+  test("a sanctioned address on the other chain gets one neutral refusal, and 1Click is never asked", async () => {
+    const { quote, quotes } = setup();
+    for (const direction of ["deposit", "cashout"]) {
+      const r = await quote({ ...deposit, direction, address: LISTED });
+      assert.equal(r.status, 403);
+      assert.deepEqual(await r.json(), { error: SCREENED_MESSAGE });
+    }
+    assert.equal(quotes().length, 0);
+  });
+
+  test("POST /v1/screen answers for one public address, and only that", async () => {
+    const { api } = setup();
+    const screen = (body: unknown) => api.request("/v1/screen", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
+    assert.deepEqual(await (await screen({ address: "alice.testnet" })).json(), { allowed: true });
+    assert.deepEqual(await (await screen({ address: ` ${LISTED} ` })).json(), { allowed: false, message: SCREENED_MESSAGE });
+    for (const bad of [{}, { address: "" }, { address: 5 }, { address: "x".repeat(129) }]) assert.equal((await screen(bad)).status, 400);
   });
 
   test("1Click's refusals come back in plain words", async () => {

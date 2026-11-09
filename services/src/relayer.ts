@@ -9,14 +9,14 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { accountBalance, assetField, extHash, poolView, settleMessage, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
+import { accountBalance, assetField, extHash, poolView, screenAddresses, settleMessage, swapExtHash, view, type HushdNetwork } from "@hushd/sdk";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { decodeSignedDelegateAction } from "near-kit";
 import * as snarkjs from "snarkjs";
 import { account, network, settings } from "./config.js";
 import { Signer } from "./chain.js";
-import { app, BadRequest, listen, rateLimit } from "./http.js";
+import { app, BadRequest, Forbidden, listen, rateLimit } from "./http.js";
 
 const MAX_POST_BYTES = 2048;
 
@@ -110,6 +110,9 @@ export class Relayer {
       if (fee > 0n && ext.relayer !== this.signer.accountId) throw new BadRequest("A fee must name this relayer");
       const minFee = (publicAmount * BigInt(this.opts.cashOutFeeBps)) / 10_000n;
       if (fee < minFee) throw new BadRequest(`This relayer asks a fee of at least ${minFee}`);
+      // screened again here, whatever client built the cash out
+      const screen = screenAddresses([ext.recipient]);
+      if (!screen.allowed) throw new Forbidden(screen.message);
     }
     const inputs = [
       big(a.root), big(a.nullifiers[0]!), big(a.nullifiers[1]!), big(a.commitments[0]!), big(a.commitments[1]!),

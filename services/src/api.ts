@@ -10,9 +10,10 @@
  * - NEAR Intents: dry 1Click quotes for deposits from and cash-outs to other chains, and
  *   the mainnet trades between our agents (intents.ts).
  * - Market: Hyperliquid mainnet mids and candles for the trading screen (market.ts).
+ * - Screening: `POST /v1/screen` checks one public address against the sanctions list.
  */
 import { sha256 } from "@noble/hashes/sha2.js";
-import { boardView, poolView, view, type HushdNetwork } from "@hushd/sdk";
+import { boardView, poolView, screenAddresses, view, type HushdNetwork } from "@hushd/sdk";
 import { network, settings } from "./config.js";
 import { Db } from "./db.js";
 import { app, BadRequest, listen, rateLimit } from "./http.js";
@@ -101,6 +102,15 @@ export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), inte
       [contract ?? null, event ?? null, from, limit],
     );
     return c.json(r.rows);
+  });
+
+  // sanctions screening of one public address (a NEAR account, or an address on another
+  // chain); in the body, not the URL, so it stays out of access logs
+  a.post("/v1/screen", async (c) => {
+    const b = (await c.req.json().catch(() => null)) as { address?: unknown } | null;
+    const address = typeof b?.address === "string" ? b.address.trim() : "";
+    if (!address || address.length > 128) throw new BadRequest("The body is JSON: address, a NEAR account or an address on another chain");
+    return c.json(screenAddresses([address]));
   });
 
   intakeRoutes(a);

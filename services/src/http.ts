@@ -19,16 +19,22 @@ export function app(service: string, health: () => Promise<Record<string, unknow
     }
   });
   a.onError((e, c) => {
-    const client = (e as { status?: number }).status === 400;
+    const status = (e as { status?: number }).status;
+    const client = status === 400 || status === 403;
     // a refused request is the caller's business; anything else is ours, so log it
     if (!client) console.error(`${service} ${c.req.method} ${c.req.path}: ${e.message}`);
-    return c.json({ error: e.message }, client ? 400 : 500);
+    return c.json({ error: e.message }, client ? status : 500);
   });
   return a;
 }
 
 export class BadRequest extends Error {
   readonly status = 400;
+}
+
+/** A request refused for who it involves (a screened address): the message is all the caller learns. */
+export class Forbidden extends Error {
+  readonly status = 403;
 }
 
 export function listen(a: Hono, port: number, name: string) {
