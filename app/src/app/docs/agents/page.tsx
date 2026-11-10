@@ -42,7 +42,7 @@ const ENV: [string, string][] = [
   ["HUSHD_LIMIT_PER_DAY", "Caps per UTC day, per token, e.g. USDC=500,wNEAR=250"],
   ["HUSHD_POLICY_WALLET_KEY", "Its OutLayer policy wallet's key (wk_…): the NEAR account for hushd_faucet and hushd_shield, signed in a TEE"],
   ["HUSHD_LIMITS_EXPIRE", "A date after which the agent may not spend at all, e.g. 2026-12-01"],
-  ["HUSHD_ALLOW_TO", "The only hushd1… addresses and NEAR accounts it may send or cash out to, comma separated"],
+  ["HUSHD_ALLOW_TO", "The only hushd1… addresses and NEAR accounts it may send, cash out or pay over x402 to, comma separated"],
   ["HUSHD_NEAR_ACCOUNT", "Or a NEAR testnet account with its own key, for hushd_faucet and hushd_shield"],
   ["HUSHD_NEAR_PRIVATE_KEY", "That account's key (ed25519:…)"],
   ["HUSHD_NETWORK", "testnet; mainnet once Hushd's contracts are deployed there (or with HUSHD_RPC_URL, a local node running them)"],
@@ -143,8 +143,9 @@ claude mcp add hushd \\
         </tbody>
       </table>
       <p>
-        <code>hushd_trade</code> takes the package kind, what to sell and how much, what to buy, an optional{" "}
-        <code>min_receive</code> (sealed to the enclave) and a quote window of 10 to 300 seconds. It returns the deal,
+        <code>hushd_trade</code> takes the package kind, what to sell and how much, what to buy, a{" "}
+        <code>min_receive</code> above zero (the least it accepts, sealed to the enclave) and a quote window of 10 to
+        300 seconds. It returns the deal,
         the maker and what was given and received. <code>hushd_prove</code> takes a reader and a validity of 1 to 90
         days, and returns the proof with a link to check it.
       </p>
@@ -177,7 +178,12 @@ HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250,BTC=0.01"       # the default`}</code>
         </li>
         <li>
           <code>hushd_pay_x402</code> pays a 402 only up to the smaller of the per-payment cap and what is left of
-          today&apos;s; a higher price is refused, not paid.
+          today&apos;s; a higher price is refused, not paid. Like a send, it stops at the end date, and with a payee
+          list it pays only a 402 whose hushd1… address is on it.
+        </li>
+        <li>
+          <code>hushd_trade</code> needs <code>min_receive</code>, the least the agent accepts, above zero. Anyone can
+          register as a maker, so the floor is what keeps a fill fair.
         </li>
         <li>
           What was spent today is kept in a file under <code>HUSHD_HOME</code>, so restarting the server does not reset
@@ -191,6 +197,12 @@ HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250,BTC=0.01"       # the default`}</code>
         The model asks; the server decides. A prompt cannot raise a limit, since the limits are read from the
         server&apos;s environment when it starts.
       </Callout>
+      <p>
+        These limits are the only guard on the private balance, and they run in the MCP process beside the agent. The
+        relayer sends whatever was proved and knows nothing of them. The seed sits on the same machine, so anything that
+        can read it, an agent with shell or file access included, can spend the whole balance without asking the
+        server. Keep in the balance only what you would let the agent lose.
+      </p>
 
       <h2 id="policy-wallets">Policy wallets</h2>
       <p>

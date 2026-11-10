@@ -4,7 +4,8 @@
   <img src="assets/readme/hero-dark.png" alt="Hushd: private OTC on NEAR, run by agents" width="960">
 </picture>
 
-Hushd is a private OTC desk on NEAR, run by AI agents.
+Hushd is a private OTC desk on NEAR where agents do the trading.
+Automated maker agents quote the requests and settle the deals they win, and any AI agent can trade, pay over private x402 and prove through MCP, acting on NEAR through a policy wallet.
 A trader (a person or an agent) asks makers for a price without showing their hand, the match happens inside an enclave, and both legs settle privately in one call.
 Afterwards the trader can prove exactly one fact, such as "I paid this deal" or "I hold at least 10,000 USDC", to one named NEAR account until a date they choose.
 
@@ -13,10 +14,10 @@ Everything runs on NEAR testnet with test tokens.
 ## Try it
 
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
-- **The trading screen:** [hushd.net/app/trade](https://hushd.net/app/trade). Live Hyperliquid prices for each pair the desk trades, a ticket that seals the request, the makers and their bonds, a payoff chart for hedged packages, and your requests, deals, hedge legs and receipts below.
+- **The trading screen:** [hushd.net/app/trade](https://hushd.net/app/trade). Live Hyperliquid prices for each pair the desk trades, a ticket that seals the request, the makers and their bonds, a payoff chart of what you hold, and your requests, deals, hedge legs and receipts below.
 - **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
 - **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
-- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts, their code and the commit each was built from, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a trade checked by `intents.near` on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
+- **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts, their code and the commit each was built from, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a two-agent trade's signatures, keys and nonces checked by `intents.near`'s simulation on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
 
 ## What you can do
 
@@ -24,12 +25,12 @@ Everything runs on NEAR testnet with test tokens.
 - **Send, receive and cash out privately.** A relayer sends every proven action from its own account, so your NEAR account never appears next to your payments. Payment request links fill in the amount for the payer.
 - **Pay anyone as a link.** The payment waits in a one-time note, and whoever opens the link claims it into their own private balance with a passkey or a NEAR wallet, with no gas and no seed phrase (the Send page, or `hushd_pay_link` for agents). An unclaimed link can be taken back.
 - **Ask for a price without showing your hand.** Your request, including the least you accept, is sealed to the matcher enclave. Makers see the pair, the side and the size, never your limit.
-- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry add a Hyperliquid testnet perp order signed by NEAR Chain Signatures and backed by the maker's bond (at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC).
+- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry are experimental: you receive the same spot leg, and the maker commits, with its bond at stake, to place a Hyperliquid testnet hedge order signed by NEAR Chain Signatures from a per-deal address that trades for the maker's own account. If the order misses, the bond is paid to you privately. The hedge is the maker's position, not yours, and none has filled on testnet yet. A bond is at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC.
 - **Describe the trade in plain words.** A NEAR AI Cloud model inside a TEE drafts the request. Your words are encrypted to the model's attested key in the browser, and the answer's TEE signature is checked in the browser too. You confirm every number.
 - **Prove one fact to one reader.** An exact payment, a payment of at least an amount, funds held above a threshold, or your total desk volume. Each proof names its reader and expires, and the pool contract checks it again on chain.
 - **Let agents do all of it** through MCP, inside per-payment and per-day limits, including paying x402 resources privately.
 - **Give each agent a policy wallet.** The agent's NEAR key lives in OutLayer's TEE, which signs only calls to Hushd's contracts within the owner's NEAR, rate and hour caps. The owner can freeze it with one transaction, and a frozen agent stops spending privately too. The desk's own makers work this way.
-- **Trade on NEAR Intents.** Two agents settle a trade on `intents.near` with one transaction: each signs its side as a `token_diff`, and the verifier executes both or neither. 1Click quotes from 39 chains price the makers and preview deposits from, and cash-outs to, other chains.
+- **Trade on NEAR Intents.** Two agents can settle a trade on `intents.near` with one transaction: each signs its side as a `token_diff`, and the verifier executes both or neither. The trade is tested on a local node running `intents.near`'s code and is ready to run on mainnet; that run waits for the owner's go-ahead. 1Click quotes from 39 chains (NEAR included) price the makers and preview deposits from, and cash-outs to, other chains.
 
 ## How a deal works
 
@@ -39,9 +40,9 @@ Everything runs on NEAR testnet with test tokens.
 2. Each registered maker gets an ask sealed to its own key: pair, side and size only.
 3. Makers answer with quotes sealed to the enclave. Each quote is signed by the maker's quote key over the terms hash, bond and expiry; the desk checks that signature on chain.
 4. When the window closes, the enclave opens everything, picks the best quote inside the trader's limit and signs the match. The desk accepts a match only from OutLayer's callback or under the enclave key.
-5. Trader and maker swap the openings of the notes they make for each other in a sealed deal room, check them, and each proves a leg bound to the deal and all four outputs.
+5. Trader and maker swap the openings of the notes they make for each other in a sealed deal room (the trader under a key made for that deal alone; the API deletes the room once the deal closes, and after a day at most), check them, and each proves a leg bound to the deal and all four outputs.
 6. `desk.settle` calls `pool.settle_swap`: both legs or neither. The desk records a receipt: settled, recovered, failed or unresolved, with evidence.
-7. For hedged packages, the keeper has the MPC sign the Hyperliquid order from the path `hushd/hedge/<deal id>`. If the hedge misses its deadline, the maker's bond is paid to the trader as a private note.
+7. For hedged packages (experimental), the keeper has the MPC sign the maker's Hyperliquid order from the path `hushd/hedge/<deal id>`. The maker's Hyperliquid account approves that address as its agent, so the order trades for the maker, not the trader. The keeper reports the fill or the miss; if the hedge misses its deadline, the maker's bond is paid to the trader as a private note.
 
 ## Only on NEAR
 
@@ -53,11 +54,11 @@ Everything runs on NEAR testnet with test tokens.
 | NEAR AI Cloud verifiable private inference, attestation checked with `@nearai/inference-sdk` | Desk, "Describe it" |
 | Named accounts as proof readers: a proof is for `auditor.testnet`, not for a key | Prove page, "Who may read it" |
 | Passkeys that derive an implicit account, opened by the relayer with 0.2 testnet NEAR for its own gas | Sign in with a passkey |
-| Gas keys give the relayer parallel nonce lanes; it also relays NEP-366 meta transactions for allowlisted calls | Settings page, "Relayer" |
+| Gas keys give the relayer parallel nonce lanes; it also relays NEP-366 meta transactions for allowlisted calls | The Trade screen's status bar, "Relayer" (its lanes) |
 | NEP-141 `ft_transfer_call` deposits straight into the pool | Balance, "Add privately" |
 | OutLayer agent custody: each agent's NEAR account is a policy wallet whose key stays in a TEE; the owner stores the policy on chain and can freeze it | Agents page, "Policy wallets"; Makers page |
-| NEAR Intents direct trades: complementary `token_diff` intents signed by two agents, one `execute_intents`, simulated first with `simulate_intents` | Transparency, "On NEAR Intents (mainnet)" |
-| 1Click quotes across 39 chains, as the makers' second price and for deposits from and cash-outs to other chains | Balance, Add and Cash out, "another chain" |
+| NEAR Intents direct trades: complementary `token_diff` intents signed by two agents, one `execute_intents`, simulated first with `simulate_intents` (tested on a local node running `intents.near`'s code) | Transparency, "On NEAR Intents (mainnet)", which lists the mainnet trade's transactions once it runs |
+| 1Click quotes across 39 chains (NEAR included), as the makers' second price and for deposits from and cash-outs to other chains | Balance, Add and Cash out, "another chain" |
 | NEP-297 events read from FastNEAR's free transactions API by the indexer (or its neardata block stream) | A deal page's "On chain" list |
 
 ## Contracts
@@ -78,6 +79,7 @@ It names the commit and the pinned `sourcescan/cargo-near` Docker image it was b
 What stays private: who holds what, who paid whom, the amounts inside the pool, the parties and amounts of a desk deal, and the trader's limit.
 
 What is public: deposits into the pool and cash outs out of it, with their amounts; that a deal exists, its settlement class, its maker and its outcome; a hedged deal's bond (only in fixed steps of the desk minimum, so it does not give the size away) and its hedge order on Hyperliquid (which does).
+On Hyperliquid every hedge a maker places shows on that maker's account, whichever per-deal address signed it.
 Timing can link a deposit to a later action, so wait and use round amounts when that matters.
 
 Sanctions screening covers public addresses only: the NEAR account a deposit comes from, the account a cash out pays, and an address on another chain used through NEAR Intents. They are checked against a dated snapshot of the digital currency addresses on OFAC's SDN list (`packages/sdk/src/screening.ts`), in the app before you sign, at the API (`POST /v1/screen`) and again by the relayer before it sends a cash out. A listed address sees one neutral line. Notes, amounts and hushd1… addresses are never screened.
@@ -85,8 +87,11 @@ Sanctions screening covers public addresses only: the NEAR account a deposit com
 Who you trust, and for what:
 
 - **The relayer** (run by Hushd) sends what you proved. It dry-runs every proof and can refuse to send one, but it cannot change a recipient, an amount or a fee, because the proof binds them.
+- **The API** (run by Hushd) stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message.
+- **The matcher client** (run by Hushd) builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell.
+- **The keeper** (run by Hushd) submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report.
 - **The matcher enclave** sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code.
-- **The maker** sees the pair, side and size of your ask and, after a match, the deal terms.
+- **The maker** sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it, at no cost on a spot deal.
 - **NEAR AI Cloud** decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext.
 
 Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review and automated scans ([SECURITY.md](SECURITY.md)), not an external audit.
@@ -103,6 +108,7 @@ claude mcp add hushd \
 ```
 
 - 22 tools: balance and address, faucet and shield, send and cash out, claim links (pay, claim, list, take back), `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
+- The limits run in the local MCP process beside the seed and are the only guard on the private balance; the relayer does not enforce them. `hushd_pay_x402` obeys the payee list and expiry, and `hushd_trade` requires `min_receive`.
 - A policy wallet instead of a NEAR key: `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or the Agents page) stores the policy from the owner's account, then the agent gets `HUSHD_POLICY_WALLET_KEY`. The TEE enforces which contracts it may call and the NEAR it may attach; this server adds token limits, `HUSHD_LIMITS_EXPIRE` and `HUSHD_ALLOW_TO` (payees), and refuses to spend while the wallet is frozen.
 - Read-only, hosted: `claude mcp add --transport http hushd-read https://hushd.net/mcp`.
 - Private x402: a resource answers 402 with scheme `hushd`; the agent pays a private note to the resource's `hushd1...` address and sends the note's opening sealed to it; the server checks the pool created exactly that note. The reference makers sell indicative quotes this way.
@@ -153,7 +159,7 @@ The contract sandbox tests run the whole flow on a local nearcore: build the was
 | `near contract verify` | Rebuilds a deployed contract from its commit in its pinned image and compares the hash, the check NearBlocks runs |
 
 The contract review of 6 November 2026 found one High: anyone could settle a matched deal with empty legs of their own.
-It is fixed: `desk.settle` now needs both parties' signatures over the deal's four outputs.
+It is fixed: `desk.settle` needs both parties' signatures over the deal's four outputs.
 That finding, the three Medium and six Low, and what changed for each are in [SECURITY.md](SECURITY.md).
 
 ## Mainnet
@@ -170,7 +176,9 @@ Mainnet still needs a multi-party proving-key ceremony first (`circuits/scripts/
 
 ## Hackathon
 
-Hushd covers the Privacy, DeFi, AI Swarms and Agent Economy tracks.
+Hushd is entered in the Privacy, DeFi, AI Swarms and Agent Economy tracks.
+For the agent tracks, what runs is a market of independent agents: three automated makers, each with its own pricing formula (a fixed, a volatility or an inventory spread on Hyperliquid mids), bond, quote key and policy wallet, compete in every sealed auction and settle their own legs, and any agent can join as a trader through MCP and pay for quotes over private x402.
+No language model sets a price; the one model call in Hushd is the NEAR AI intake, which drafts a request from a person's words.
 
 ## License
 

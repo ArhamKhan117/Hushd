@@ -1,10 +1,14 @@
 # Hushd
 
-> Hushd (https://hushd.net) is a private OTC desk run by AI agents on NEAR testnet. A trader states a deal in plain words or a form; the request, with its limit, is sealed to a matcher enclave (an OutLayer project in a TEE) and only its sha256 goes on chain. Maker agents see the pair, side and size, and answer with quotes sealed to the enclave and signed by a quote key the desk checks. The enclave picks the best quote inside the limit, and both legs settle privately in one pool call (settle_swap): both happen or neither. Every deal ends with a receipt: settled, recovered, failed or unresolved. A trader can prove one fact (an exact payment, a payment of at least an amount, funds above a threshold, or total desk volume) to one named NEAR account, with an expiry.
+> Hushd (https://hushd.net) is a private OTC desk on NEAR testnet where agents do the trading: automated maker agents quote and settle, and any AI agent can trade, pay over private x402 and prove through MCP. A trader states a deal in plain words or a form; the request, with its limit, is sealed to a matcher enclave (an OutLayer project in a TEE) and only its sha256 goes on chain. Maker agents see the pair, side and size, and answer with quotes sealed to the enclave and signed by a quote key the desk checks. The enclave picks the best quote inside the limit, and both legs settle privately in one pool call (settle_swap): both happen or neither. Every deal ends with a receipt: settled, recovered, failed or unresolved. A trader can prove one fact (an exact payment, a payment of at least an amount, funds above a threshold, or total desk volume) to one named NEAR account, with an expiry.
+
+Agents: the three reference makers are automated agents that price by formula (a fixed, a volatility or an inventory spread on Hyperliquid mids, capped by a 1Click quote), sign quotes with a quote key, bond, settle their own legs and act on NEAR through OutLayer policy wallets. No language model sets a price; the one model call is the NEAR AI intake, which drafts a request from a person's words. The maker submits both legs after the trader hands over its proven one, so a maker has a last look: it can wait until the deal expires and settle only if the price still suits it, at no cost on a spot deal.
 
 Status: NEAR testnet only, test tokens with no value (USDC, wNEAR, BTC from a faucet), development proving keys (not a multi-party ceremony), not audited. No Hushd contract is on NEAR mainnet.
 
-Public on chain: deposits and cash outs with their amounts; that a desk deal happened, its maker, bond (only in fixed steps of the desk minimum, so it does not give a trade's size away), hedge order (which does) and outcome. Private: amounts and parties inside the pool, balances, the trader's limit and words, who the trader on a deal was.
+Public on chain: deposits and cash outs with their amounts; that a desk deal happened, its maker, bond (only in fixed steps of the desk minimum, so it does not give a trade's size away), hedge order (which does, and which shows on Hyperliquid on the maker's own account) and outcome. Private: amounts and parties inside the pool, balances, the trader's limit and words, who the trader on a deal was.
+
+Trust: the relayer (can refuse a proven action, never change it); the matcher enclave (sees requests and quotes inside OutLayer's TEE); Hushd's API (stores and passes on sealed requests, quotes and deal-room messages; sees IP addresses, timing and deal-room traffic); the matcher client (builds the enclave's batch from the API's database, so it could leave a quote out without the enclave knowing); the keeper (alone reports whether a hedge order filled, and the desk releases or slashes the maker's bond on that report); NEAR AI Cloud's TEE for the intake.
 
 Sanctions screening: public addresses only (the NEAR account a deposit comes from, the account a cash out pays, an address on another chain used through NEAR Intents), against a dated snapshot of the digital currency addresses on OFAC's SDN list, in the app before signing, at the API (POST /v1/screen with {"address"}) and in the relayer before a cash out. A listed address gets one neutral answer: "This address can't be used with Hushd."
 
@@ -16,7 +20,7 @@ Sanctions screening: public addresses only (the NEAR account a deposit comes fro
 - [Verify a proof](https://hushd.net/verify): checks a hushdproof1… string in the browser and through the pool contract's verify_disclosure view. Proof links put the proof after the #: https://hushd.net/verify#p=hushdproof1…
 - [Agents](https://hushd.net/agents): Hushd for AI agents.
 - [Developers](https://hushd.net/sdk): the SDK and the MCP server.
-- [Transparency](https://hushd.net/transparency): live service health and contract counts.
+- [Transparency](https://hushd.net/transparency): live service health and contract counts, and the mainnet NEAR Intents trade's transactions once it runs (tested on a local node running intents.near's code; none has run on mainnet yet).
 - [Security](https://hushd.net/security), [Privacy](https://hushd.net/privacy), [Terms](https://hushd.net/terms), [Cookies](https://hushd.net/cookies)
 
 ## Docs
@@ -24,7 +28,7 @@ Sanctions screening: public addresses only (the NEAR account a deposit comes fro
 - [Overview](https://hushd.net/docs): what Hushd is and what works today
 - [Quickstart](https://hushd.net/docs/quickstart): sign in, get test tokens, add privately, ask the desk
 - [How the desk works](https://hushd.net/docs/desk): sealed request, enclave match, settlement, receipt, NEAR AI intake
-- [Packages and settlement](https://hushd.net/docs/packages): spot, spot + hedge, cash and carry; Hyperliquid testnet hedge signed by NEAR Chain Signatures per deal (path hushd/hedge/<deal id>); bonds and slashing
+- [Packages and settlement](https://hushd.net/docs/packages): spot, and the experimental spot + hedge and cash and carry. On a hedged package the trader receives the spot leg, and the maker commits, with its bond, to place a Hyperliquid testnet hedge order signed by NEAR Chain Signatures from a per-deal address (path hushd/hedge/<deal id>) that trades for the maker's own account: the position is the maker's, not the trader's. A missed hedge pays the bond to the trader privately. No hedge has filled on testnet yet. Bonds, slashing and the keeper's report
 - [Proofs](https://hushd.net/docs/proofs): the four kinds, the named reader, expiry, checking
 - [Agents and MCP](https://hushd.net/docs/agents): tools, local and hosted setup, spending limits (HUSHD_LIMIT_PER_PAYMENT, HUSHD_LIMIT_PER_DAY)
 - [Private x402](https://hushd.net/docs/x402): scheme "hushd", the X-PAYMENT header, server-side checks
@@ -36,8 +40,8 @@ Sanctions screening: public addresses only (the NEAR account a deposit comes fro
 
 ## MCP
 
-- Hosted, read-only: https://hushd.net/mcp (Streamable HTTP, stateless). Tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
-- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. Adds wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_faucet, hushd_shield, hushd_send, hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
+- Hosted, read-only: https://hushd.net/mcp (Streamable HTTP, stateless). 5 read tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
+- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. 22 tools in all: the 5 read tools and 17 wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_policy, hushd_faucet, hushd_shield, hushd_send, hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
 
 ## Contracts (NEAR testnet)
 

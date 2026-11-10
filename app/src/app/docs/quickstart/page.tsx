@@ -71,7 +71,8 @@ export default function QuickstartPage() {
       </p>
       <ul>
         <li>
-          <strong>Package</strong>: spot, spot + hedge, or cash and carry. A hedged package needs a maker bond of at
+          <strong>Package</strong>: spot, or the experimental spot + hedge and cash and carry. On a hedged package you
+          receive the spot leg, and the maker bonds a hedge order it places for its own account; it needs a bond of at
           least 1,000 USDC, so it makes sense from about 10,000 USDC. See <Link href="/docs/packages">packages</Link>.
         </li>
         <li>

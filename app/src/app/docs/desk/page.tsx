@@ -49,6 +49,16 @@ export default function DeskDocsPage() {
             <td>Quote, sign their consent, settle their leg</td>
           </tr>
           <tr>
+            <td>Matcher client</td>
+            <td>A Hushd service</td>
+            <td>Builds the batch of sealed quotes from the API&apos;s database and carries it to the enclave</td>
+          </tr>
+          <tr>
+            <td>Keeper</td>
+            <td>A Hushd service</td>
+            <td>Expires deals, submits hedge orders and reports how each went</td>
+          </tr>
+          <tr>
             <td>Pool</td>
             <td>
               <code>pool.hushd.testnet</code>
@@ -154,13 +164,23 @@ export default function DeskDocsPage() {
         submission does not end the deal: the two sides can try again until it expires.
       </p>
 
+      <h3 id="last-look">Last look</h3>
+      <p>
+        You prove your leg first and hand it to the maker, and the maker submits both. Until the deal expires, the
+        maker holds a leg it can use or drop: it can wait and settle only if the price still suits it. Walking away
+        costs it nothing: a spot deal has no bond, and a hedged deal&apos;s bond is released when a deal expires
+        unsettled. Nothing of yours moves unless both legs settle together, but the quote is firm for you and an
+        option for the maker. The desk lists every deal that ended <strong>failed</strong>, with its maker.
+      </p>
+
       <h2 id="5-the-receipt">5. The receipt</h2>
       <p>
         Every deal ends with a receipt on the desk, graded by its evidence. A spot deal is <strong>settled</strong>{" "}
         once the pool applies it, with the pool&apos;s leaf index and root as evidence. A hedged deal stays{" "}
         <strong>unresolved</strong> until its hedge leg is done: <strong>settled</strong> with the Hyperliquid fill,
         or <strong>recovered</strong> when a missed hedge pays the bond to you. A deal nobody settles before its expiry
-        is marked <strong>failed</strong>, and its bond is released. See <Link href="/docs/packages">packages</Link>.
+        is marked <strong>failed</strong>, and its bond is released. On a hedged deal the keeper reports the hedge
+        leg, and the desk settles or recovers it on that report. See <Link href="/docs/packages">packages</Link>.
       </p>
 
       <h2 id="plain-language-intake">Plain-language intake</h2>
@@ -206,7 +226,7 @@ export default function DeskDocsPage() {
         <tbody>
           <tr>
             <td>API</td>
-            <td>Store and hand out sealed boxes, refuse a request</td>
+            <td>Store and hand out sealed boxes, refuse a request, see when requests arrive and from which IP address</td>
             <td>Open a request, a quote or a deal room message</td>
           </tr>
           <tr>
@@ -216,13 +236,18 @@ export default function DeskDocsPage() {
           </tr>
           <tr>
             <td>Matcher client</td>
-            <td>Carry the batch to the enclave, delay it</td>
+            <td>Carry the batch to the enclave, delay it, or leave a quote out of it (the enclave cannot tell)</td>
             <td>Read it, or forge a match</td>
           </tr>
           <tr>
             <td>Maker</td>
-            <td>Quote, decline, fail to settle (and lose the deal)</td>
+            <td>Quote, decline, hold your proven leg and settle only if the price still suits it (last look)</td>
             <td>Learn your limit or your account</td>
+          </tr>
+          <tr>
+            <td>Keeper</td>
+            <td>Report a hedge filled or missed, which releases or slashes the bond</td>
+            <td>Change a hedge order, or move a note</td>
           </tr>
           <tr>
             <td>Enclave</td>

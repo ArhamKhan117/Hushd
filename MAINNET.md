@@ -31,7 +31,7 @@ Three things a sandbox cannot hold are stood in for:
 - hedged deals trade on Hyperliquid mainnet, so they are not run here.
 
 The run found two mainnet bugs, both fixed:
-- On an empty database, the services raced each other creating tables; migrations now hold a Postgres lock.
+- On an empty database, the services raced each other creating tables; migrations hold a Postgres lock.
 - The relayer was not registered for storage on the tokens, so its mainnet cash-out fee could not be paid (the pool kept it claimable).
   Testnet charges no fee, which is why testnet never showed it.
 
@@ -44,7 +44,7 @@ The run found two mainnet bugs, both fixed:
 | App | Real tokens, no faucet, no relayer activation; a new passkey account is asked to send itself about 0.1 NEAR for gas | `NEXT_PUBLIC_HUSHD_NETWORK=mainnet` |
 | MCP server | Runs on mainnet; the faucet tool refuses | `HUSHD_NETWORK=mainnet` |
 | Relayer | 50 bps cash-out fee (none on testnet); faucet and activation off | `HUSHD_NETWORK` |
-| Makers and keeper | Hedge on Hyperliquid mainnet; a 1,000 USDC bond each | `HUSHD_NETWORK` (or `HYPERLIQUID_NETWORK`) |
+| Makers and keeper | Hedge (experimental) on Hyperliquid mainnet, for each maker's own account; a 1,000 USDC bond each | `HUSHD_NETWORK` (or `HYPERLIQUID_NETWORK`) |
 | Matcher | OutLayer mainnet, project `hushd.near/matcher` | `HUSHD_NETWORK` |
 | Indexer | FastNEAR's mainnet transactions API, or `INDEXER_SOURCE=rpc` for a self-run node | `HUSHD_NETWORK` |
 | Policy wallets | OutLayer custody on mainnet | `HUSHD_NETWORK` |

@@ -624,7 +624,7 @@ def repository() -> Columns:
             Item("desk/src/hedge.rs", "Hyperliquid msgpack and EIP-712 digest, pinned against reference vectors", mono=True, accent=True),
             Item("contracts/board, token", "Sealed note posts; test tokens with a faucet", mono=True),
         ],
-        subtitle="Rust, near-sdk 5, 150 unit tests and 6 sandbox tests",
+        subtitle="Rust, near-sdk 5, 153 unit tests and 6 sandbox tests",
     )
     zk = Panel(
         "Proofs and the enclave",

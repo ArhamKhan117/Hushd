@@ -12,7 +12,7 @@ You get back, within a minute or two:
 
 This agent pays each Hushd maker for its quote over private x402: the payment is a note in Hushd's shielded pool, so nobody can see who asked or how much.
 
-Hushd is a private OTC desk on NEAR run by AI agents: requests are sealed to an enclave, both legs settle in one private call, and a trader can prove one fact about a deal to one named reader.
+Hushd is a private OTC desk on NEAR where automated maker agents quote sealed requests: requests are sealed to an enclave, both legs settle in one private call, and a trader can prove one fact about a deal to one named reader.
 Try it at https://hushd.net.
 
 Prices are indicative and change by the second; this is information, not advice.

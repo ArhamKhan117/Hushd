@@ -10,13 +10,13 @@ A five-minute path through Hushd, then where to look in the code.
 4. Ask for quotes and watch the steps: committed on chain, sealed quotes arriving, matched in the enclave, settled in the pool. Open the deal page: the chain shows a deal and an outcome, not the amounts or you. Or trade from [Trade](https://hushd.net/app/trade): the same flow beside a live chart, with your deal settling in the panel below.
 5. Prove, then Exact payment for that deal, reader `judge.testnet`, then open the link. The checker verifies the proof in your browser and asks the pool contract to check it again.
 
-Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC), both for `judge.testnet` until 6 December 2026. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.
+Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC, from a wallet that only backs it), both for `judge.testnet`, until 6 and 10 December 2026. The pool checks each against its reader and expiry on chain. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.
 
-Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools through the agent's policy wallet: a deposit signed in OutLayer's TEE, a call outside its policy refused by the TEE, the owner freezing it (and the agent refusing to spend) then unfreezing it, a private x402 payment, a cash out, a spot trade, proofs and a hedged trade.
+Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools through the agent's policy wallet: a deposit signed in OutLayer's TEE, a call outside its policy refused by the TEE, the owner freezing it (and the agent refusing to spend) then unfreezing it, a private x402 payment, a cash out, a spot trade and proofs, then a request for a hedged trade, which no maker quotes until a maker's Hyperliquid testnet account holds margin.
 
 The NEAR Intents trade between two agents, end to end with no funds: `pnpm --filter @hushd/services intents:sandbox` deploys the exact code of `intents.near` (read from mainnet, hash checked) on a local node, and two agents deposit, trade with signed `token_diff`s, see a replay refused and withdraw. `intents:mainnet` prints the budgeted mainnet run and dry-runs it against `intents.near`.
 
-Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the README's live claims against the deployment, one PASS or FAIL each.
+Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the README's live claims against the deployment, one PASS or FAIL each (for NEAR Intents: a two-agent trade's signatures, keys and nonces checked by `intents.near`'s simulation on mainnet, with nothing sent).
 
 ## What to look at
 
@@ -28,7 +28,7 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 | NEAR-specific static checks on every contract | `contracts/tools/near-scan`, [security/near-scan.md](security/near-scan.md) |
 | A match must come from the enclave, and each quote carries its maker's consent | `contracts/desk/src/lib.rs` (`on_match`, `submit_match`, `accept_match`), `matcher/src/main.rs` |
 | Makers never see the limit | `packages/sdk/src/desk.ts` (`packageRequest`, `openRfq`) |
-| The hedge is signed by Chain Signatures per deal; a missed hedge pays the bond to the trader privately | `contracts/desk/src/hedge.rs`, `contracts/desk/src/lib.rs` (`sign_hedge_order`, `slash_overdue`), `services/src/keeper.ts` |
+| The maker's hedge order is signed by Chain Signatures per deal and trades for the maker's own Hyperliquid account; a missed hedge, as the keeper reports it, pays the bond to the trader privately | `contracts/desk/src/hedge.rs`, `contracts/desk/src/lib.rs` (`sign_hedge_order`, `record_hedge`, `slash_overdue`), `services/src/hyperliquid.ts` (`approveDealAgent`), `services/src/makers.ts`, `services/src/keeper.ts` |
 | Proofs for one reader with an expiry | `circuits/receipt/receipt.circom` (`context`), `packages/sdk/src/field.ts` (`proofContext`), `packages/sdk/src/proofs.ts` |
 | NEAR AI intake is end-to-end encrypted and verified | `packages/sdk/src/intake.ts`, `services/src/intake.ts` |
 | Private x402 | `packages/sdk/src/x402.ts` and its tests, `services/src/makers.ts` |
@@ -44,7 +44,12 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 
 - Testnet only, with test tokens and development proving keys.
 - The contracts had an internal review, not an external audit.
-- The hedge leg trades on Hyperliquid testnet.
+- Hedged packages are experimental. The hedge order trades on Hyperliquid testnet for the maker's own account (each deal's Chain Signatures address is approved as the maker's agent), so it does not hedge the trader, and Hyperliquid shows all of one maker's hedges on that maker's account. What the trader gets beyond the spot leg is the maker's bond if the order misses.
+- No hedge has filled: the reference makers' Hyperliquid testnet accounts hold no margin, so they do not quote hedged packages, and the one hedged deal so far (#3) ended with its bond paid to the trader.
+- The keeper alone reports a hedge's outcome, and the desk releases or slashes the bond on that report.
+- Makers have a last look: the trader proves its leg first and the maker submits both, so a maker can wait out the settlement window and settle only if the price still suits it, at no cost on a spot deal.
+- Hushd's own services are trusted for some things: the API sees IP addresses, timing and deal-room traffic, and the matcher client builds the enclave's batch from the API's database, so it could leave a quote out without the enclave knowing.
+- The makers are automated agents that price by formula (a fixed, a volatility or an inventory spread on Hyperliquid mids); the one language model in Hushd is the NEAR AI intake.
 - A policy wallet's TEE checks which contracts an agent calls and the NEAR it attaches, not the token amounts inside a call; those limits are the MCP server's.
 - NEAR Intents has no testnet: the direct trade is tested on a local node running `intents.near`'s code, and the mainnet run (about 3 USD, mostly returned) waits for the owner's go-ahead.
 - The NEAR Intents Agent API (mainnet only) is wired (`services/src/agent-api.ts`, `scripts/agent-api.ts`: an agent owned by the demo's dev wallet, its policy signed by that key, swaps through a grant) and checked against the live API's public endpoints; creating the agent waits for a partner key and the owner's go-ahead.
@@ -52,3 +57,4 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 - Deposits and cash outs are public, and timing can link them; the docs say how to reduce that.
 - A hedged deal's hedge order is public on Hyperliquid, so its size is not private; its bond shows only a size step.
 - Sanctions screening uses a dated snapshot of OFAC's list and covers public addresses only.
+- An agent's private balance is guarded by its local MCP server's limits, not by the relayer: whatever can read the seed can spend it.

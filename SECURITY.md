@@ -103,7 +103,7 @@ What held up, with the evidence in the review:
 
 ## Tests that guard the contracts
 
-- 150 unit tests with real Groth16 proofs: pool 48, desk 71, board 24, token 7.
+- 153 unit tests with real Groth16 proofs: pool 51, desk 71, board 24, token 7.
 - 6 sandbox tests on a local nearcore with the real wasm: shield, send, cash out, a refund note, a settled swap through the desk, a bonded hedge signed by the MPC double, and a refused slash payout retried.
 - The matcher's 7 tests, including byte vectors shared with the desk and the TypeScript protocol package.
 
@@ -112,4 +112,9 @@ What held up, with the evidence in the review:
 - The proving keys are development keys from one machine, not a multi-party ceremony; mainnet waits for one (`circuits/scripts/ceremony.mjs`, see [MAINNET.md](MAINNET.md)).
 - The matcher enclave sees requests and quotes in the clear; you trust OutLayer's attestation that it runs this repository's `matcher/` code.
 - The relayer can refuse to send a proof, but it cannot change a recipient, an amount or a fee.
+- Hushd's API stores and passes on sealed requests, quotes and deal-room messages; it cannot open them, but it sees IP addresses, timing and deal-room traffic.
+- The matcher client builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`), so it could leave a quote out and the enclave could not tell.
+- The keeper alone reports whether a hedge order filled, and the desk releases or slashes the maker's bond on that report.
+- A hedged deal's order trades for the maker's own Hyperliquid account (the per-deal Chain Signatures address is approved as the maker's agent), so it does not hedge the trader; hedged packages are experimental and none has filled on testnet.
+- The maker submits both legs after the trader hands over its proven one, so it has a last look until the deal expires, at no cost on a spot deal.
 - The full trust model is on [hushd.net/docs/threat-model](https://hushd.net/docs/threat-model).

@@ -7,7 +7,7 @@ import { Callout, FlowDiagram } from "@/components/docs/FlowDiagram";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Hushd docs: a private OTC desk run by AI agents on NEAR testnet. How a deal works, packages, proofs to one named reader, agents, makers, the SDK and the privacy model.",
+    "Hushd docs: a private OTC desk on NEAR testnet where agents quote, trade and settle. How a deal works, packages, proofs to one named reader, agents, makers, the SDK and the privacy model.",
   alternates: { canonical: "/docs" },
 };
 
@@ -15,7 +15,7 @@ export default function DocsOverviewPage() {
   return (
     <DocsLayout
       title="Hushd docs"
-      lede="A private OTC desk run by AI agents, on NEAR testnet. What it is, what works today, and where to start."
+      lede="A private OTC desk on NEAR testnet where agents quote, trade and settle. What it is, what works today, and where to start."
       glance={[
         { label: "Network", value: "NEAR testnet" },
         { label: "Tokens", value: "USDC, wNEAR, BTC (test)" },
@@ -26,9 +26,10 @@ export default function DocsOverviewPage() {
       <h2 id="what-hushd-is">What Hushd is</h2>
       <p>
         Hushd is an over-the-counter desk where the request, the quotes and the settlement stay private. You say what
-        you want to trade, in plain words or in a form. Maker agents quote. A matcher running inside a trusted
-        execution environment (TEE) picks the best quote inside your limit, and both sides settle from their private
-        balances in one call on NEAR.
+        you want to trade, in plain words or in a form. Maker agents, automated and pricing by formula, quote. A
+        matcher running inside a trusted execution environment (TEE) picks the best quote inside your limit, and both
+        sides settle from their private balances in one call on NEAR. Your own agent can do the trading too, through
+        MCP.
       </p>
       <p>
         Your money sits in a <strong>shielded pool</strong> as notes: Poseidon commitments in a Merkle tree of depth
@@ -67,8 +68,9 @@ export default function DocsOverviewPage() {
           <Link href="/docs/privacy-model#claim-links">claim links</Link>.
         </li>
         <li>
-          The desk: <Link href="/docs/packages">spot, spot + hedge, and cash and carry</Link>, matched in the enclave
-          and settled atomically in the pool.
+          The desk: <Link href="/docs/packages">spot</Link>, matched in the enclave and settled atomically in the
+          pool, and the experimental spot + hedge and cash and carry, where the maker bonds a hedge order it places on
+          Hyperliquid testnet for its own account.
         </li>
         <li>
           Plain-language intake on NEAR AI Cloud: your words are encrypted in the browser to an attested model, and its
@@ -87,8 +89,8 @@ export default function DocsOverviewPage() {
       <h2 id="what-it-is-not">What it is not</h2>
       <p>
         Hushd runs on testnet only. The tokens have no value, the proving keys are development keys from one
-        contribution (not a multi-party ceremony), and nothing has been audited. The hedge leg trades on Hyperliquid
-        testnet. Read <Link href="/docs/threat-model">the threat model</Link> before you rely on any part of it.
+        contribution (not a multi-party ceremony), and nothing has been audited. Hedged packages are experimental:
+        their hedge leg trades on Hyperliquid testnet for the maker&apos;s own account, and none has filled yet. Read <Link href="/docs/threat-model">the threat model</Link> before you rely on any part of it.
       </p>
       <Callout tone="caveat" title="Some things stay public">
         Deposits into the pool and cash outs from it are public, with their amounts. So is the fact that a desk deal

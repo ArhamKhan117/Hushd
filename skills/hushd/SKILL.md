@@ -1,6 +1,6 @@
 ---
 name: hushd
-description: Use Hushd, a private OTC desk on NEAR testnet run by agents. Covers holding a private balance, paying privately, paying x402 resources privately, trading on the desk (spot, spot with a Hyperliquid hedge, cash and carry), and proving a payment, funds or desk volume to one named NEAR account. Use when an agent needs to move or trade value on NEAR without making its payments public, or needs to prove a single fact about private money.
+description: Use Hushd, a private OTC desk on NEAR testnet where agents quote, trade and settle. Covers holding a private balance, paying privately, paying x402 resources privately, trading on the desk (spot, and the experimental spot with a hedge and cash and carry), and proving a payment, funds or desk volume to one named NEAR account. Use when an agent needs to move or trade value on NEAR without making its payments public, or needs to prove a single fact about private money.
 ---
 
 # Hushd
@@ -36,9 +36,12 @@ Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
    To pay someone not on Hushd yet, `hushd_pay_link` returns a claim link (`https://hushd.net/app/claim#...`); whoever opens it first claims the payment with a passkey or a NEAR wallet and no gas.
    `hushd_my_links` shows whether each link is waiting or claimed, and `hushd_take_back_link` takes back one nobody claimed.
    If the agent is paid with a link, `hushd_claim_link` claims it into its own balance.
-5. Trade: `hushd_trade` with `kind` spot, spot_hedge or carry, the sell token and amount, the buy token and optionally `min_receive`.
+5. Trade: `hushd_trade` with `kind` spot, spot_hedge or carry, the sell token and amount, the buy token and `min_receive`, the least you accept (required, above zero).
+   Work `min_receive` out from a fair price less the slippage you accept: anyone can register as a maker, so a low floor can be filled at a low price.
    The request and its limit are sealed to the matcher enclave; makers only see the pair, side and size.
-   Spot settles atomically in the pool; the hedge kinds add a Hyperliquid testnet order backed by the maker's bond.
+   Spot settles atomically in the pool.
+   The hedge kinds are experimental: the agent receives the same spot leg, and the maker commits, with its bond, to place a Hyperliquid testnet hedge order for its own account, so the position is the maker's, not the agent's.
+   If that order misses, the bond is paid to the agent privately. Makers quote a hedged kind only when they can place the hedge, so expect no match otherwise.
 6. Prove: `hushd_prove` with `what` payment, payment_at_least, funds or volume, a `reader` NEAR account and `days` of validity.
    Give the reader the `check_at` link; `hushd_verify_proof` checks one.
 
@@ -46,6 +49,7 @@ Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
 
 - Never print, log or send the seed (`~/.hushd/seed` or `HUSHD_SEED`). It spends everything.
 - Respect the limits. A refusal from a limit is final for that call; ask the operator to raise the limit rather than splitting a payment to get around it.
+  The limits run in the local MCP server, beside the seed; the relayer does not enforce them. An x402 payment obeys the payee list and the end date like a send.
 - Amounts are in token units ("25.5"), not base units.
 - Deposits (`hushd_shield`) and cash outs are public on NEAR. Payments, trades and balances inside the pool are not.
 - A claim link is the payment itself: anyone holding it can claim it. Send it only to the intended payee, over a private channel, and never log it.

@@ -42,7 +42,9 @@ export default function MakersDocsPage() {
       <h2 id="the-reference-makers">The reference makers</h2>
       <p>
         Hushd runs three makers in <code>services/src/makers.ts</code>, so the desk always has someone to trade with.
-        They differ only in how they set the spread:
+        They are automated agents: each reads its asks, prices them by formula, signs, bonds and settles on its own,
+        and acts on NEAR through its own policy wallet. No language model sets a price. They differ only in how they
+        set the spread:
       </p>
       <table>
         <thead>
@@ -81,9 +83,11 @@ export default function MakersDocsPage() {
       </p>
       <p>
         They quote only what they can fill from their own private balance, and each quote holds for five minutes. For
-        a hedged package they add the hedge: a short of the perp for the size they give, as an immediate-or-cancel
-        order with a limit of 99% of the mid, a ten-minute deadline, and a bond of a tenth of the trade&apos;s value,
-        rounded up to the desk&apos;s next bond step (<code>min_bond</code>, 1,000 USDC, times 1, 2, 5, 10, 20 and so on).
+        a hedged package (experimental) they add the hedge: a short of the perp for the size they give, placed for
+        their own Hyperliquid account, as an immediate-or-cancel order with a limit of 99% of the mid, a ten-minute
+        deadline, and a bond of a tenth of the trade&apos;s value, rounded up to the desk&apos;s next bond step
+        (<code>min_bond</code>, 1,000 USDC, times 1, 2, 5, 10, 20 and so on). They quote a hedged package only when
+        their Hyperliquid testnet account holds the margin for it; none does yet, so no hedge has filled on testnet.
       </p>
 
       <h2 id="quoting">Quoting</h2>
@@ -127,6 +131,11 @@ export default function MakersDocsPage() {
         call, <code>settleAsMaker</code>. How the two legs are bound
         together is in <Link href="/docs/desk#4-settlement">how the desk works</Link>.
       </p>
+      <p>
+        Since the maker submits, it has a last look: it holds the trader&apos;s proven leg until the deal expires and
+        could settle only if the price still suits it, at no cost on a spot deal. The reference makers settle each deal
+        they win as soon as both legs are ready. See <Link href="/docs/desk#last-look">last look</Link>.
+      </p>
 
       <h2 id="bonds">Bonds</h2>
       <ul>
@@ -156,8 +165,9 @@ export default function MakersDocsPage() {
           both secret.
         </li>
         <li>
-          For hedged packages, give it a Hyperliquid testnet account. Its key approves each hedged deal&apos;s own
-          address to trade on the maker&apos;s margin.
+          For hedged packages, give it a Hyperliquid testnet account with margin. Its key approves each hedged
+          deal&apos;s own address as an agent, so the hedge trades on the maker&apos;s margin and the position is the
+          maker&apos;s.
         </li>
         <li>
           Start the makers service with them. On start, each maker registers itself on the desk with{" "}
