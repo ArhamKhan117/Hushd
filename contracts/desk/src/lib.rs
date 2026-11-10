@@ -703,8 +703,8 @@ impl Desk {
         self.mpc_sign(deal_id, spec, false)
     }
 
-    /// The trader closes the hedge: a reduce-only IOC the other way, signed by the
-    /// MPC once the trader's per-deal key signs "hushd.close:<desk account>:<deal id>".
+    /// The trader asks for the hedge to close: a reduce-only IOC the other way on the maker's
+    /// account, signed by the MPC once the trader's per-deal key signs "hushd.close:<desk account>:<deal id>".
     pub fn close_hedge(&mut self, deal_id: U64, signature: Base64VecU8) -> Promise {
         let deal = self.deals.get_mut(&deal_id.0).unwrap_or_else(|| env::panic_str("No such deal"));
         require!(deal.status == DealStatus::Closed && deal.hedge.is_some(), "Only a finished hedge deal closes");

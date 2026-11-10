@@ -8,7 +8,7 @@
  * match below the request, and `settleAsTrader` settles both legs in the pool. The wallet
  * remembers the deal (and the bond note it may be owed) in its encrypted store.
  */
-import { awaitMatch, checkMatchedTerms, DeskApi, deskView, makeNote, openRfq, packageRequest, settleAsTrader, type AgreedTerms, type PackageDraft } from "@hushd/sdk";
+import { awaitMatch, checkMatchedTerms, DeskApi, deskView, makeNote, MarketApi, marketFloor, openRfq, packageRequest, settleAsTrader, tokenInfo, type AgreedTerms, type PackageDraft } from "@hushd/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Step, StepState } from "@/components/app/desk";
 import { NETWORK } from "@/lib/hushd/config";
@@ -77,6 +77,12 @@ export function useDeskRun() {
       set({});
       setShown(r.key);
       try {
+        // an empty minimum takes the best quote, but never one below 3% under the market price
+        if (draft.buy.minAmount === 0n) {
+          const { mids } = await new MarketApi(NETWORK.api).mids();
+          draft = { ...draft, buy: { ...draft.buy, minAmount: marketFloor(mids, tokenInfo(NETWORK, draft.sell.token), draft.sell.amount, tokenInfo(NETWORK, draft.buy.token)) } };
+          set({ draft });
+        }
         const { request, ask: makerAsk, refundBlinding } = packageRequest(identity, NETWORK, draft);
         const opened = await openRfq({ net: NETWORK, api, relayer: s.relayer, request, ask: makerAsk, windowMs });
         set({ phase: "quoting", rfqId: opened.rfqId, closesAtMs: opened.closesAtMs, quotes: 0 });

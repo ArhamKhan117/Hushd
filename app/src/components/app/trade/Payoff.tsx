@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * What the package is worth against the price of the asset it buys, from the terms on the
- * ticket (at today's mid) or the terms the enclave matched. The spot leg rises with the
- * price, the hedge leg (a perp short of the same size) falls by as much, and the package is
- * their sum. Funding, fees and gas are left out, and the chart says so.
+ * What the package is worth to you against the price of the asset it buys, from the terms on
+ * the ticket (at today's mid) or the terms the enclave matched. You hold the spot leg, which
+ * moves with the price. A hedged package's hedge order trades for the maker's own Hyperliquid
+ * account, so it is not drawn as yours; what it adds for you is the maker's bond, paid to you
+ * if the order misses, drawn as the spot leg plus the bond. Fees and gas are left out, and the
+ * chart says so.
  */
 import { tokenInfo, type AgreedTerms, type PackageKind, type TokenInfo } from "@hushd/sdk";
 import { useMemo, useRef, useState, type PointerEvent } from "react";
@@ -17,7 +19,7 @@ export interface PayoffModel {
   qty: number;
   /** USD paid per unit. */
   basis: number;
-  /** The short: its size in units and its entry price in USD. */
+  /** The maker's hedge order (for its own account): its size in units and its limit in USD. */
   hedge: { size: number; entry: number } | null;
   /** The maker's bond, paid to you if the hedge misses (USD). */
   bondUsd: number | null;
@@ -74,10 +76,10 @@ function endLabels(items: { key: string; y: number; text: string; cls: string }[
   return out.map((l) => ({ ...l, y: Math.max(top, over > 0 ? l.y - over : l.y) }));
 }
 
+/** What you hold: the spot leg, and on a hedged deal with a bond, the spot leg plus the bond if the hedge misses. */
 function lines(m: PayoffModel) {
   const spot = (p: number) => m.qty * (p - m.basis);
-  const hedge = (p: number) => (m.hedge ? -m.hedge.size * (p - m.hedge.entry) : 0);
-  return { spot, hedge, pkg: (p: number) => spot(p) + hedge(p), miss: (p: number) => spot(p) + (m.bondUsd ?? 0) };
+  return { spot, miss: (p: number) => spot(p) + (m.bondUsd ?? 0) };
 }
 
 export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | null; kind: PackageKind; buy: TokenInfo; minBondUsd: number | null }) {
@@ -90,8 +92,8 @@ export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | 
     const f = lines(model);
     const lo = model.mid * 0.9;
     const hi = model.mid * 1.1;
-    const samples = [lo, model.mid, hi, model.basis, ...(model.hedge ? [model.hedge.entry] : [])].filter((p) => p >= lo && p <= hi);
-    const ys = samples.flatMap((p) => [f.spot(p), f.pkg(p), ...(model.hedge ? [f.hedge(p)] : []), ...(model.bondUsd ? [f.miss(p)] : [])]);
+    const samples = [lo, model.mid, hi, model.basis].filter((p) => p >= lo && p <= hi);
+    const ys = samples.flatMap((p) => [f.spot(p), ...(model.hedge && model.bondUsd ? [f.miss(p)] : [])]);
     let yLo = Math.min(0, ...ys);
     let yHi = Math.max(0, ...ys);
     const pad = (yHi - yLo) * 0.1 || Math.max(1, model.qty * model.mid * 0.01);
@@ -113,6 +115,8 @@ export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | 
 
   const price = at ?? model?.mid ?? null;
   const hedged = kind !== "spot";
+  // the bond line shows only on a hedged deal whose bond is known
+  const missLine = Boolean(model?.hedge) && model?.bondUsd != null;
 
   return (
     <section className="tt-panel tt-payoff hd-frame" aria-label="Payoff">
@@ -144,22 +148,14 @@ export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | 
                 <line key={k} className="tt-gridline" x1={g.x(g.lo + (g.hi - g.lo) * k)} x2={g.x(g.lo + (g.hi - g.lo) * k)} y1={PAD.t} y2={H - PAD.b} />
               ))}
               <line className="tt-zero" x1={PAD.l} x2={W - PAD.r} y1={Math.round(g.y(0)) + 0.5} y2={Math.round(g.y(0)) + 0.5} />
-              {model.hedge && <path className="tt-hedge" d={g.path(g.f.hedge)} />}
-              {/* spot alone is the whole package: drawn as the package */}
-              <path className={model.hedge ? "tt-spot" : "tt-pkg"} d={g.path(g.f.spot)} />
-              {model.bondUsd !== null && model.hedge && <path className="tt-miss" d={g.path(g.f.miss)} />}
-              {model.hedge && <path className="tt-pkg" d={g.path(g.f.pkg)} />}
+              {missLine && <path className="tt-miss" d={g.path(g.f.miss)} />}
+              {/* the spot leg is what you hold: drawn as the package */}
+              <path className="tt-pkg" d={g.path(g.f.spot)} />
               {price !== null && <line className="tt-nowmark" x1={Math.round(g.x(price)) + 0.5} x2={Math.round(g.x(price)) + 0.5} y1={PAD.t} y2={H - PAD.b} />}
               {endLabels(
                 [
-                  { key: "spot", y: g.y(g.f.spot(g.hi)), text: signed(g.f.spot(g.hi)), cls: model.hedge ? "" : "tt-endpkg" },
-                  ...(model.hedge
-                    ? [
-                        { key: "hedge", y: g.y(g.f.hedge(g.hi)), text: signed(g.f.hedge(g.hi)), cls: "" },
-                        { key: "pkg", y: g.y(g.f.pkg(g.hi)), text: signed(g.f.pkg(g.hi)), cls: "tt-endpkg" },
-                      ]
-                    : []),
-                  ...(model.hedge && model.bondUsd !== null ? [{ key: "miss", y: g.y(g.f.miss(g.hi)), text: signed(g.f.miss(g.hi)), cls: "" }] : []),
+                  { key: "spot", y: g.y(g.f.spot(g.hi)), text: signed(g.f.spot(g.hi)), cls: "tt-endpkg" },
+                  ...(missLine ? [{ key: "miss", y: g.y(g.f.miss(g.hi)), text: signed(g.f.miss(g.hi)), cls: "" }] : []),
                 ],
                 PAD.t + 4,
                 H - PAD.b - 4,
@@ -169,7 +165,7 @@ export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | 
                 </text>
               ))}
               {price !== null && (
-                <circle cx={g.x(price)} cy={g.y(model.hedge ? g.f.pkg(price) : g.f.spot(price))} r={3} className="fill-[var(--foreground)]" />
+                <circle cx={g.x(price)} cy={g.y(g.f.spot(price))} r={3} className="fill-[var(--foreground)]" />
               )}
               <text x={PAD.l} y={H - 8}>
                 {fmtPrice(g.lo)}
@@ -182,67 +178,45 @@ export function Payoff({ model, kind, buy, minBondUsd }: { model: PayoffModel | 
               </text>
             </svg>
             {price !== null && (
-              <dl className={`grid gap-2 text-[12px] ${model.hedge ? "grid-cols-4" : "grid-cols-2"}`}>
+              <dl className={`grid gap-2 text-[12px] ${missLine ? "grid-cols-3" : "grid-cols-2"}`}>
                 <div className="min-w-0">
                   <dt className="text-mute">{model.asset.symbol} at</dt>
                   <dd className="tnum truncate text-foreground">{fmtPrice(price)}</dd>
                 </div>
-                {model.hedge && (
-                  <>
-                    <div className="min-w-0">
-                      <dt className="text-mute">Spot</dt>
-                      <dd className="tnum truncate text-foreground">{fmtUsd(g.f.spot(price))}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-mute">Short</dt>
-                      <dd className="tnum truncate text-foreground">{fmtUsd(g.f.hedge(price))}</dd>
-                    </div>
-                  </>
-                )}
                 <div className="min-w-0">
-                  <dt className="text-mute">Package</dt>
-                  <dd className="tnum truncate font-medium text-foreground">{fmtUsd(g.f.pkg(price))}</dd>
+                  <dt className="text-mute">{model.hedge ? "Your spot leg" : "Package"}</dt>
+                  <dd className="tnum truncate font-medium text-foreground">{fmtUsd(g.f.spot(price))}</dd>
                 </div>
+                {missLine && (
+                  <div className="min-w-0">
+                    <dt className="text-mute">Hedge missed</dt>
+                    <dd className="tnum truncate text-foreground">{fmtUsd(g.f.miss(price))}</dd>
+                  </div>
+                )}
               </dl>
             )}
             <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-soft">
-              {model.hedge && (
-                <li className="flex items-center gap-2">
-                  <span className="tt-key" aria-hidden /> Package
-                </li>
-              )}
               <li className="flex items-center gap-2">
-                {model.hedge ? (
-                  <>
-                    <span className="tt-key" data-k="spot" aria-hidden /> Spot leg
-                  </>
-                ) : (
-                  <>
-                    <span className="tt-key" aria-hidden /> Package, spot only
-                  </>
-                )}
+                <span className="tt-key" aria-hidden /> {model.hedge ? "Your spot leg" : "Package, spot only"}
               </li>
-              {model.hedge && (
+              {missLine && (
                 <li className="flex items-center gap-2">
-                  <span className="tt-key" data-k="hedge" aria-hidden /> {venue} short
-                </li>
-              )}
-              {model.hedge && model.bondUsd !== null && (
-                <li className="flex items-center gap-2">
-                  <span className="tt-key" data-k="miss" aria-hidden /> Hedge missed, bond paid to you
+                  <span className="tt-key" data-k="miss" aria-hidden /> Hedge missed: spot plus the bond
                 </li>
               )}
             </ul>
             <p className="text-[12px] leading-relaxed text-mute">
               {model.from === "terms"
-                ? `${fmtNum(model.qty)} ${model.asset.symbol} bought at ${model.basisAtMid ? "about " : ""}${fmtPrice(model.basis)} USD each${model.basisAtMid ? " (what you gave, at today's mid)" : ""}${model.hedge ? `, shorted at the order's limit of ${fmtPrice(model.hedge.entry)} or better` : ""}.`
+                ? `${fmtNum(model.qty)} ${model.asset.symbol} bought at ${model.basisAtMid ? "about " : ""}${fmtPrice(model.basis)} USD each${model.basisAtMid ? " (what you gave, at today's mid)" : ""}.`
                 : "At the mid, before the maker's spread."}{" "}
               {hedged
-                ? model.bondUsd !== null
-                  ? `If the short does not fill in time, the maker's ${fmtUsd(model.bondUsd)} bond is paid to you privately.`
-                  : `A hedged quote bonds${minBondUsd !== null ? ` at least ${fmtUsd(minBondUsd)}` : ""}, paid to you if the short misses.`
+                ? `Experimental: the maker's ${venue} hedge order${model.hedge && model.from === "terms" ? ` (${model.hedge.size < 0 ? "buy" : "sell"} ${fmtNum(Math.abs(model.hedge.size))} at ${fmtPrice(model.hedge.entry)} or better)` : ""} trades for its own account, so it is not part of your payoff. ${
+                    model.bondUsd !== null
+                      ? `If it does not fill in time, the maker's ${fmtUsd(model.bondUsd)} bond is paid to you privately.`
+                      : `A hedged quote bonds${minBondUsd !== null ? ` at least ${fmtUsd(minBondUsd)}` : ""}, paid to you if the order misses.`
+                  }`
                 : "Spot has no hedge leg: it moves one for one with the price."}{" "}
-              Funding, fees and gas left out.
+              Fees and gas left out.
             </p>
           </>
         )}

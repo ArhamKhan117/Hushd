@@ -153,8 +153,8 @@ pub fn spec_hash(spec: Option<&HedgeSpec>) -> [u8; 32] {
     spec.map(|s| env::sha256_array(near_sdk::borsh::to_vec(s).expect("borsh"))).unwrap_or([0u8; 32])
 }
 
-/// Chain Signatures derivation path of a deal's own Hyperliquid address: one fresh
-/// address per deal, so deals cannot be linked to each other on Hyperliquid.
+/// Chain Signatures derivation path of a deal's own Hyperliquid address: one per deal, approved
+/// as an agent of the maker's account, so its orders trade for the maker (and link to it).
 pub fn derivation_path(deal_id: u64) -> String {
     format!("hushd/hedge/{deal_id}")
 }

@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { AttestationLine, IntakeProof, Segmented, Steps, type Step } from "@/components/app/desk";
 import { AmountCard, ErrorLine, Field, TokenSelect, TxLine } from "@/components/app/forms";
 import { SignInPanel } from "@/components/app/SignInPanel";
+import { HedgedNote } from "@/components/app/trade/Ticket";
 import { runSteps, useDeskRun } from "@/components/app/trade/useDeskRun";
 import { BusyLabel } from "@/components/ui/Spinner";
 import { IS_TESTNET, NETWORK } from "@/lib/hushd/config";
@@ -15,8 +16,8 @@ import { useHushd } from "@/lib/hushd/session";
 
 const KINDS = [
   { value: "spot", label: "Spot", hint: "Swap one token for another, settled privately in one call" },
-  { value: "spot_hedge", label: "Spot + hedge", hint: "The swap plus a Hyperliquid short of what you buy, bonded by the maker" },
-  { value: "carry", label: "Cash and carry", hint: "Buy with a stablecoin and short the perp of the same size, bonded by the maker" },
+  { value: "spot_hedge", label: "Spot + hedge", hint: "Experimental: the swap, plus a hedge order the maker places for its own account, with its bond at stake" },
+  { value: "carry", label: "Cash and carry", hint: "Experimental: buy with a stablecoin, plus the same bonded hedge order, placed for the maker's own account" },
 ] as const satisfies readonly { value: PackageKind; label: string; hint: string }[];
 
 const WINDOWS = [
@@ -126,7 +127,7 @@ export default function DeskPage() {
               </p>
               <p className="text-[13px] text-mute">
                 {runHedged
-                  ? `${run.makerName} now opens the hedge on Hyperliquid${IS_TESTNET ? " testnet" : ""} from a per-deal address only the desk's Chain Signatures can sign for. If it misses the deadline, its bond is paid to you as a private note.`
+                  ? `You hold what you bought. ${run.makerName} now places its hedge order on Hyperliquid${IS_TESTNET ? " testnet" : ""} for its own account, signed by the desk's Chain Signatures from this deal's address. If the order misses its deadline, the maker's bond is paid to you as a private note.`
                   : "The chain shows that deal #" + run.dealId + " settled, not who traded or how much."}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -197,7 +198,7 @@ export default function DeskPage() {
                   <IntakeProof proof={drafted.proof} />
                 </div>
               )}
-              <Field label="Package">
+              <Field label="Package" hint={hedged ? <HedgedNote /> : undefined}>
                 <Segmented label="Package" value={kind} onChange={setKind} options={KINDS} />
               </Field>
               <AmountCard
@@ -225,7 +226,7 @@ export default function DeskPage() {
                 <Field label="You buy">
                   <TokenSelect value={buyToken} onChange={setBuyToken} label="Buy token" />
                 </Field>
-                <Field label={`Least you accept, in ${symbol(buyToken)}`} hint="Sealed: only the enclave reads it. Leave empty to take the best quote.">
+                <Field label={`Least you accept, in ${symbol(buyToken)}`} hint="Sealed: only the enclave reads it. Leave it empty to take the best quote, never less than 3% under the market price.">
                   <input className="hd-input tnum w-full" inputMode="decimal" placeholder="Best quote" value={minInput} onChange={(e) => setMinInput(e.target.value.replace(/[^\d.,]/g, ""))} />
                 </Field>
               </div>

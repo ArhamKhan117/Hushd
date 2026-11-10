@@ -20,8 +20,8 @@ import { runSteps, type Run } from "./useDeskRun";
 
 export const KINDS = [
   { value: "spot", label: "Spot", hint: "Swap one token for another, settled privately in one call" },
-  { value: "spot_hedge", label: "Spot + hedge", hint: "The swap plus a Hyperliquid short of what you buy, bonded by the maker" },
-  { value: "carry", label: "Cash and carry", hint: "Buy with a stablecoin and short the perp of the same size, bonded by the maker" },
+  { value: "spot_hedge", label: "Spot + hedge", hint: "Experimental: the swap, plus a hedge order the maker places for its own account, with its bond at stake" },
+  { value: "carry", label: "Cash and carry", hint: "Experimental: buy with a stablecoin, plus the same bonded hedge order, placed for the maker's own account" },
 ] as const satisfies readonly { value: PackageKind; label: string; hint: string }[];
 
 export const WINDOWS = [
@@ -37,6 +37,20 @@ export interface TicketState {
   amount: string;
   min: string;
   windowMs: WindowMs;
+}
+
+/** Under the package picker when a hedged package is picked: what it does and does not do for you. */
+export function HedgedNote() {
+  return (
+    <>
+      <span className="font-medium text-soft">Experimental.</span> You receive the spot leg. The maker commits, with its bond, to place a hedge
+      order on Hyperliquid{IS_TESTNET ? " testnet" : ""} for its own account, so the position is the maker&apos;s, not yours. If the order misses, the bond is paid to you
+      privately. Makers quote one only when they can place the hedge.{" "}
+      <Link href="/docs/packages#spot-and-hedge" className="text-foreground underline decoration-line-strong underline-offset-4">
+        How it works
+      </Link>
+    </>
+  );
 }
 
 /** Why the package cannot be asked for, in words, or null. */
@@ -128,7 +142,7 @@ export function Ticket({
                 </p>
                 <p className="text-[13px] leading-relaxed text-mute">
                   {hedged
-                    ? `${run.makerName} now opens the hedge on Hyperliquid${IS_TESTNET ? " testnet" : ""} from a per-deal address only the desk's Chain Signatures can sign for. If it misses the deadline, its bond is paid to you as a private note.`
+                    ? `You hold what you bought. ${run.makerName} now places its hedge order on Hyperliquid${IS_TESTNET ? " testnet" : ""} for its own account, signed by the desk's Chain Signatures from this deal's address. If the order misses its deadline, the maker's bond is paid to you as a private note.`
                     : `The chain shows that deal #${run.dealId} settled, not who traded or how much.`}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -166,7 +180,7 @@ export function Ticket({
               </button>
             </div>
 
-            <Field label="Package">
+            <Field label="Package" hint={state.kind === "spot" ? undefined : <HedgedNote />}>
               <Segmented label="Package" value={state.kind} onChange={(kind) => set({ kind })} options={KINDS} />
             </Field>
 
@@ -202,7 +216,7 @@ export function Ticket({
               )}
             </p>
 
-            <Field label={`Least you accept, in ${buy.symbol}`} hint="Sealed: only the enclave reads it. Leave it empty to take the best quote.">
+            <Field label={`Least you accept, in ${buy.symbol}`} hint="Sealed: only the enclave reads it. Leave it empty to take the best quote, never less than 3% under the market price.">
               <input
                 id="tt-min"
                 className="hd-input tnum w-full"

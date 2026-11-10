@@ -67,3 +67,16 @@ test("the hour's change, range and volatility come from the last hour of a one-m
   assert.equal(hourStats(series.slice(-30))!.change, null);
   assert.equal(hourStats([]), null);
 });
+
+test("an empty minimum becomes 3% under the market, never zero", async () => {
+  const { marketFloor } = await import("../src/market.ts");
+  const usdc = { symbol: "USDC", decimals: 6 };
+  const btc = { symbol: "BTC", decimals: 8, hedgeCoin: "BTC" };
+  const near = { symbol: "wNEAR", decimals: 24, hedgeCoin: "NEAR" };
+  // 1,000 USDC at BTC 50,000: 0.02 BTC, less 3%
+  assert.equal(marketFloor({ BTC: 50_000 }, usdc, 1_000_000_000n, btc), 1_940_000n);
+  // 10 wNEAR at NEAR 3.5: 35 USDC, less 3%
+  assert.equal(marketFloor({ NEAR: 3.5 }, near, 10n * 10n ** 24n, usdc), 33_950_000n);
+  assert.throws(() => marketFloor({}, usdc, 1_000_000n, btc), /No market price for BTC/);
+  assert.throws(() => marketFloor({ BTC: 50_000 }, usdc, 1n, btc), /too small/);
+});

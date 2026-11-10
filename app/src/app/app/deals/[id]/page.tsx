@@ -20,18 +20,56 @@ interface DealEvent {
   block_ms: string;
 }
 
-const EVENT_WORDS: Record<string, string> = {
-  deal_matched: "Matched by the enclave",
-  spot_settled: "Spot leg settled in the pool",
-  settle_failed: "A settlement attempt failed (nothing moved)",
-  hedge_signed: "Hedge order signed by Chain Signatures",
-  hedge_sign_failed: "Hedge signing failed",
-  bond_slashed: "Maker's bond paid to the trader",
-  receipt: "Receipt recorded",
+const BOND = NETWORK.bondToken ?? NETWORK.tokens[0]!.id;
+
+/** A bond amount in base units, as "1,000 USDC". */
+const bondText = (base: unknown) => (typeof base === "string" && /^\d+$/.test(base) ? `${fmt(BOND, BigInt(base))} ${symbol(BOND)}` : null);
+
+/** "hedge_sign_failed" as "Hedge sign failed", for an event this page has no words for. */
+const plain = (name: string) => {
+  const t = name.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
+const OUTCOME_WORDS: Record<string, string> = { settled: "settled", recovered: "recovered", failed: "failed", unresolved: "unresolved" };
+
+/** One indexed desk event, in words. */
+function eventWords(e: DealEvent): string {
+  const d = e.data ?? {};
+  switch (e.event) {
+    case "deal_matched":
+      return "Matched by the enclave";
+    case "spot_settled":
+      return "Spot leg settled in the pool";
+    case "settle_failed":
+      return "A settlement attempt failed (nothing moved)";
+    case "hedge_signed":
+      return d.close ? "Close order signed by Chain Signatures" : "Hedge order signed by Chain Signatures";
+    case "hedge_sign_failed":
+      return "Chain Signatures did not sign the hedge order (it can be asked for again)";
+    case "hedge_retry":
+      return typeof d.attempts === "number" && typeof d.max_attempts === "number" ? `Hedge order missed: order ${d.attempts} of ${d.max_attempts}, so it can be signed again` : "Hedge order missed, so it can be signed again";
+    case "bond_slashed": {
+      const amount = bondText(d.amount);
+      return amount ? `Maker's bond of ${amount} paid to the trader` : "Maker's bond paid to the trader";
+    }
+    case "slash_refused":
+      return "The pool refused the bond payout; the desk holds it for the trader";
+    case "slash_retried":
+      return "Bond payout sent to the pool again";
+    case "slash_redirected":
+      return "Bond payout sent to another note of the trader's";
+    case "receipt": {
+      const outcome = (d.receipt as { outcome?: string } | undefined)?.outcome;
+      return outcome && OUTCOME_WORDS[outcome] ? `Receipt recorded: ${OUTCOME_WORDS[outcome]}` : "Receipt recorded";
+    }
+    default:
+      return plain(e.event);
+  }
+}
+
 const EVIDENCE_WORDS: Record<string, string> = {
-  pool_settlement: "Pool settlement (leaf)",
+  pool_settlement: "Pool settlement (pool and leaf)",
   pool_root: "Pool root after settlement",
   hyperliquid_fill: "Hyperliquid fill",
   hyperliquid_reject: "Hyperliquid did not fill",
@@ -42,13 +80,31 @@ const EVIDENCE_WORDS: Record<string, string> = {
   expired: "Expired",
 };
 
+/** An evidence reference with its base units and millisecond times in words. */
+function evidenceText(kind: string, reference: string): string {
+  const amount = /^(\d+) (.+)$/.exec(reference);
+  if ((kind === "bond_paid_privately" || kind === "bond_payout_returned") && amount) return `${bondText(amount[1])} ${amount[2]}`;
+  const by = /^(no fill by|not settled by) (\d{12,})$/.exec(reference);
+  if (by) return `${by[1]} ${when(by[2]!)}`;
+  return reference;
+}
+
+/** The receipt's evidence with repeats folded into one line and a count. */
+function groupEvidence(evidence: { kind: string; reference: string }[]): { kind: string; reference: string; times: number }[] {
+  const out: { kind: string; reference: string; times: number }[] = [];
+  for (const e of evidence) {
+    const same = out.find((x) => x.kind === e.kind && x.reference === e.reference);
+    if (same) same.times += 1;
+    else out.push({ ...e, times: 1 });
+  }
+  return out;
+}
+
 /** How the match reached the desk (the deal's `attested_by`), in words. */
 const ATTESTED_WORDS: Record<string, string> = {
   enclave_signature: "signed with the matcher enclave's key",
   outlayer: "returned by OutLayer's on-chain callback",
 };
-
-const BOND = NETWORK.bondToken ?? NETWORK.tokens[0]!.id;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -192,18 +248,24 @@ export default function DealPage() {
                 </Row>
                 {BigInt(deal.bond) > 0n && <Row label="Maker's bond">{fmt(BOND, BigInt(deal.bond))} {symbol(BOND)}</Row>}
                 {deal.hedge && (
-                  <Row label="Hedge">
-                    {deal.hedge.is_buy ? "Buy" : "Sell"} {deal.hedge.size} {deal.hedge.coin} perp on Hyperliquid{deal.hedge.testnet ? " testnet" : ""}, limit {deal.hedge.limit_px}, by {when(deal.hedge.deadline_ms)}.
-                    <span className="block text-[12.5px] text-mute">Signed by NEAR Chain Signatures from the path hushd/hedge/{deal.id}; only the deal&apos;s owner key can close it.</span>
+                  <Row label="Maker's hedge">
+                    {deal.hedge.is_buy ? "Buy" : "Sell"} {deal.hedge.size} {deal.hedge.coin} perp on Hyperliquid{deal.hedge.testnet ? " testnet" : ""}, limit {deal.hedge.limit_px} USD, by {when(deal.hedge.deadline_ms)}.
+                    <span className="block text-[12.5px] text-mute">
+                      Experimental. Signed by NEAR Chain Signatures from the path hushd/hedge/{deal.id}, for the maker&apos;s own Hyperliquid account: the position is the maker&apos;s. Only the deal&apos;s owner key can ask to close it.
+                    </span>
                   </Row>
                 )}
                 {deal.receipt && (
                   <Row label="Receipt">
                     <span className="block capitalize">{deal.receipt.outcome}, {when(deal.receipt.recorded_at_ms)}</span>
                     <ul className="mt-1.5 grid gap-1">
-                      {deal.receipt.evidence.map((e, i) => (
+                      {groupEvidence(deal.receipt.evidence).map((e, i) => (
                         <li key={i} className="text-[12.5px] text-mute">
-                          <span className="text-soft">{EVIDENCE_WORDS[e.kind] ?? e.kind}:</span> <span className="break-all">{e.reference}</span>
+                          <span className="text-soft">
+                            {EVIDENCE_WORDS[e.kind] ?? plain(e.kind)}
+                            {e.times > 1 ? ` (${e.times} times)` : ""}:
+                          </span>{" "}
+                          <span className="[overflow-wrap:anywhere]">{evidenceText(e.kind, e.reference)}</span>
                         </li>
                       ))}
                     </ul>
@@ -218,7 +280,7 @@ export default function DealPage() {
                 <ol className="hd-card divide-y divide-line">
                   {events.map((e, i) => (
                     <li key={`${e.tx_hash}-${i}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
-                      <span className="text-[13.5px] text-foreground">{EVENT_WORDS[e.event] ?? e.event}</span>
+                      <span className="text-[13.5px] text-foreground">{eventWords(e)}</span>
                       <a href={txUrl(NETWORK, e.tx_hash)} target="_blank" rel="noreferrer" className="text-[12.5px] text-mute underline decoration-line-strong underline-offset-4 hover:text-foreground">
                         {when(e.block_ms)} · NearBlocks
                       </a>

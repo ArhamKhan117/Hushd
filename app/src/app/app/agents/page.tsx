@@ -41,21 +41,24 @@ const X402 = `curl -i "${NETWORK.api.replace(/\/$/, "")}/makers/steady/quote?sel
 # {"x402Version":1,"accepts":[{"scheme":"hushd","network":"${x402Network(NETWORK)}",
 #   "maxAmountRequired":"10000","asset":"${USDC}","payTo":"hushd1…", …}]}`;
 
+/** Every tool in packages/mcp/src/tools.ts: the wallet tools, then the read tools. */
 const TOOLS: [string, string][] = [
   ["hushd_address, hushd_balance", "The agent's receive address and private balance"],
-  IS_TESTNET ? ["hushd_faucet, hushd_shield", "Testnet tokens to its NEAR account, then into the pool"] : ["hushd_shield", "Tokens from its NEAR account into the pool"],
+  ["hushd_policy", "Its NEAR account: a policy wallet's owner, TEE rules and frozen state, or its own key"],
+  IS_TESTNET ? ["hushd_faucet, hushd_shield", "Testnet tokens to its NEAR account, then into the pool"] : ["hushd_faucet, hushd_shield", "Tokens from its NEAR account into the pool (the faucet is testnet only)"],
   ["hushd_send, hushd_cash_out", "Pay a hushd1… address, or out to a NEAR account"],
-  ["hushd_pay_link, hushd_claim_link", "Pay anyone as a claim link, or claim one (hushd_my_links, hushd_take_back_link)"],
+  ["hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link", "Pay anyone as a claim link, claim one, see where each stands, and take back one nobody claimed"],
   ["hushd_trade", "Ask the desk's makers, match in the enclave, settle privately"],
   ["hushd_pay_x402", "Pay a 402 resource from the private balance"],
   ["hushd_prove, hushd_my_payments", "A payment, funds or volume proof for one named reader"],
   ["hushd_limits, hushd_my_deals", "What it may spend and what it traded"],
   ["hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof", "Read tools, also on the hosted server"],
 ];
+const TOOL_COUNT = TOOLS.flatMap(([names]) => names.split(", ")).length;
 
 export default function AgentsPage() {
   return (
-    <AppShell title="Agents" subtitle="Give an agent a private balance and a seat at the desk. It pays, trades and proves through MCP, and never spends past the limits you set.">
+    <AppShell title="Agents" subtitle="Give an agent a private balance and a seat at the desk. It pays, trades and proves through MCP, acts on NEAR through a policy wallet, and never spends past the limits you set.">
       <div className="grid max-w-[760px] gap-8">
         <section className="grid gap-3">
           <p className="t-label">Run it with the agent&apos;s own seed</p>
@@ -73,7 +76,7 @@ export default function AgentsPage() {
         <PolicyWallets owner={OWNER} labels={LABELS} />
 
         <section className="grid gap-3">
-          <p className="t-label">Tools</p>
+          <p className="t-label">Tools ({TOOL_COUNT})</p>
           <ul className="hd-card divide-y divide-line">
             {TOOLS.map(([names, what]) => (
               <li key={names} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-4 sm:px-5">

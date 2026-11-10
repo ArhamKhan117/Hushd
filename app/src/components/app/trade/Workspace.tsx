@@ -249,7 +249,7 @@ export function Workspace({ runs, now, views }: { runs: Run[]; now: number; view
             )
           ) : tab === "hedges" ? (
             hedged.length === 0 ? (
-              <Empty>No hedge legs. A Spot + hedge or Cash and carry deal opens a short on {venue} for what you bought, bonded by the maker.</Empty>
+              <Empty>No hedge legs. On a Spot + hedge or Cash and carry deal (experimental), the maker places a bonded short on {venue} for its own account; if it misses, the bond is paid to you.</Empty>
             ) : (
               <table className="tt-table min-w-[820px]">
                 <thead>
@@ -284,7 +284,7 @@ export function Workspace({ runs, now, views }: { runs: Run[]; now: number; view
                               <span className="text-foreground">
                                 {h.is_buy ? "Long" : "Short"} {h.size} {h.coin}
                               </span>
-                              <span className="block text-[12px] text-mute">perp on Hyperliquid{h.testnet ? " testnet" : ""}</span>
+                              <span className="block text-[12px] text-mute">perp on Hyperliquid{h.testnet ? " testnet" : ""}, the maker&apos;s account</span>
                             </>
                           ) : (
                             "-"

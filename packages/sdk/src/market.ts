@@ -46,6 +46,23 @@ export interface MarketMids {
   mids: Record<string, number>;
 }
 
+/**
+ * The least to accept when a trader names no minimum: what `sellAmount` of `sell` is worth in
+ * `buy` at these mids, less `slippageBps` (USDC counts as one dollar). Anyone can register as a
+ * maker, so an empty minimum must never mean zero. Throws when a price is missing.
+ */
+export function marketFloor(mids: Record<string, number>, sell: { symbol: string; decimals: number; hedgeCoin?: string }, sellAmount: bigint, buy: { symbol: string; decimals: number; hedgeCoin?: string }, slippageBps = 300): bigint {
+  const usd = (t: { symbol: string; hedgeCoin?: string }) => (t.symbol === "USDC" ? 1 : t.hedgeCoin ? mids[t.hedgeCoin] : undefined);
+  const sellUsd = usd(sell);
+  const buyUsd = usd(buy);
+  if (!sellUsd || !buyUsd) throw new Error(`No market price for ${sellUsd ? buy.symbol : sell.symbol} to set the least you accept`);
+  // prices to a billionth of a dollar, in integers
+  const worth = (sellAmount * BigInt(Math.round(sellUsd * 1e9)) * 10n ** BigInt(buy.decimals)) / (BigInt(Math.round(buyUsd * 1e9)) * 10n ** BigInt(sell.decimals));
+  const floor = (worth * BigInt(10_000 - slippageBps)) / 10_000n;
+  if (floor <= 0n) throw new Error(`That amount of ${sell.symbol} is too small to price in ${buy.symbol}`);
+  return floor;
+}
+
 /** The API's market routes: `/v1/market/mids` and `/v1/market/candles`. */
 export class MarketApi {
   // browsers refuse `fetch` called as a method of another object ("Illegal invocation"), so wrap it
