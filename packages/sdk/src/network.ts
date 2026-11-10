@@ -30,6 +30,12 @@ export interface HushdNetwork {
    */
   browserRpc?: string[];
   /**
+   * Requests carry a salt the terms are hashed with (protocol `termsBytes`), so a deal's public
+   * terms hash cannot be searched for its amounts. On once the desk pins an enclave build that
+   * hashes salted terms.
+   */
+  termsSalt?: boolean;
+  /**
    * Tried, in order, only after every endpoint in `rpc` has failed. A server keeps dRPC here, so
    * a browser on the same address (a local run) keeps dRPC's quota for itself.
    */
@@ -55,6 +61,8 @@ export const TESTNET: HushdNetwork = {
   rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
   rpcFallback: ["https://near-testnet.drpc.org"],
   browserRpc: ["https://near-testnet.drpc.org"],
+  // on once the desk's pin to the enclave build 95cba282... applies (after 2026-11-11 00:35 UTC)
+  termsSalt: false,
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
   board: "board.hushd.testnet",
@@ -81,6 +89,7 @@ export const MAINNET: HushdNetwork = {
   rpcSend: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
   rpcFallback: ["https://near.drpc.org"],
   browserRpc: ["https://near.drpc.org", "https://near.api.pocket.network"],
+  termsSalt: true,
   pool: "pool.hushd.near",
   desk: "desk.hushd.near",
   board: "board.hushd.near",

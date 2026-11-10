@@ -103,6 +103,8 @@ export interface MakerAsk {
   buyToken: string;
   hedge?: { coin: string; testnet: boolean };
   closesAtMs: number;
+  /** The request's salt (0x hex): the maker signs its consent over the salted terms (`quoteConsent`). */
+  salt?: string;
 }
 
 export interface AgreedTerms {
@@ -218,6 +220,8 @@ export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft)
   const refundBlinding = randomField();
   const owner = ownerKeyFor(id, refundBlinding);
   const hedge = hedged ? { coin: coin!, testnet: net.id !== "mainnet" } : undefined;
+  // the salt hides the amounts in the public terms hash; the enclave and the makers both get it
+  const salt = net.termsSalt ? bytesHex(crypto.getRandomValues(new Uint8Array(32))) : undefined;
   const request = {
     v: 1,
     kind: d.kind,
@@ -227,8 +231,9 @@ export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft)
     expiresInMs: d.expiresInMs ?? 10 * 60_000,
     trader: { address: id.address, refundInner: bytesHex(be32(noteInner(id.pk, refundBlinding))), ownerKey: owner.publicKey },
     ...(d.text ? { text: d.text } : {}),
+    ...(salt ? { salt } : {}),
   };
-  const ask: Omit<MakerAsk, "rfqId" | "closesAtMs"> = { v: 1, kind: d.kind, sell: request.sell, buyToken: d.buy.token, ...(hedge ? { hedge } : {}) };
+  const ask: Omit<MakerAsk, "rfqId" | "closesAtMs"> = { v: 1, kind: d.kind, sell: request.sell, buyToken: d.buy.token, ...(hedge ? { hedge } : {}), ...(salt ? { salt } : {}) };
   return { request, ask, refundBlinding };
 }
 

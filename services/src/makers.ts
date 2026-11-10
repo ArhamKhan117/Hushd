@@ -195,7 +195,7 @@ export class Maker {
       if (q.bond > (await this.freeBond())) return null;
     }
     // consent v2: this desk, these terms, this class and exactly this hedge leg
-    q.signature = toB64(ed25519.sign(quoteConsent(this.net.desk!, q, ask.kind), this.quoteSecret));
+    q.signature = toB64(ed25519.sign(quoteConsent(this.net.desk!, q, ask.kind, ask.salt), this.quoteSecret));
     return q;
   }
 

@@ -43,6 +43,15 @@ test("terms bytes are stable (pinned for the enclave)", () => {
   assert.ok(noHedge.length < b.length);
 });
 
+test("a salt changes the terms hash and the consent, and needs exactly 32 bytes", () => {
+  const salt = `0x${"5a".repeat(32)}`;
+  const salted = termsBytes({ ...terms, salt });
+  assert.equal(new TextDecoder().decode(salted.slice(0, 14)), "hushd.terms.v2");
+  assert.deepEqual(salted.slice(14, 46), new Uint8Array(32).fill(0x5a));
+  assert.notEqual(hex(termsHash({ ...terms, salt })), hex(termsHash(terms)));
+  assert.throws(() => termsBytes({ ...terms, salt: "0x1234" }), /32 bytes/);
+});
+
 test("consent bytes are pinned (the same hashes as the desk and the matcher)", () => {
   // contracts/desk/src/tests.rs consent_bytes_are_pinned and matcher/src/main.rs consent_bytes_match_the_desk
   const hedge = { venue: "hyperliquid", coin: "BTC", asset: 3, isBuy: false, size: "1.45", limitPx: "60000", deadlineMs: 1_800_000_600_000, testnet: true } as const;
