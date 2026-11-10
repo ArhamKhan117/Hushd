@@ -156,6 +156,13 @@ test("RPC calls rotate across endpoints and put a resting one last", () => {
   assert.deepEqual(rpcOrder(["https://only.example"]), ["https://only.example"]);
 });
 
+test("a proof's context is the one the pool recomputes", async () => {
+  const { proofContext } = await import("../src/field.ts");
+  // the same vector is pinned in contracts/pool/src/tests.rs (proof_context)
+  const c = proofContext({ kind: "receipt", network: "testnet", pool: "pool.hushd.testnet", reader: "judge.testnet", expiresAtMs: 1_796_000_000_000 });
+  assert.equal(c.toString(16).padStart(64, "0"), "00d76a7dabc3a22e33a1c23f69ec04078b50fb5bb639ece5f9857081fea473ee");
+});
+
 test("a browser reads from endpoints that keep CORS headers, falls back to the rest, and sends where it always did", async () => {
   for (const net of [TESTNET, MAINNET]) {
     const b = forBrowser(net);

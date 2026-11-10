@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { custodyView, deskView, implicitAccount, INTENTS_MAINNET, intake, MAINNET, poolView, rpcOrder, signIntents, TESTNET, tradeDiffs, verifierView, view, withOverrides } from "@hushd/sdk";
+import { custodyView, decodeProof, deskView, implicitAccount, INTENTS_MAINNET, intake, MAINNET, poolView, rpcOrder, signIntents, TESTNET, tradeDiffs, verifierView, view, withOverrides } from "@hushd/sdk";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 const APP = (process.env.HUSHD_APP_URL ?? "https://hushd.net").replace(/\/$/, "");
@@ -224,14 +224,16 @@ const checks: Check[] = [
     },
   },
   {
-    claim: "The pool verifies Groth16 proofs on chain (alt_bn128)",
+    claim: "The pool verifies Groth16 proofs on chain (alt_bn128), with the reader and expiry they were made for",
     run: async () => {
-      // A receipt proof made with the development keys (contracts/pool/tests/fixtures.json).
-      const f = `${ROOT}contracts/pool/tests/fixtures.json`;
-      const fx = (JSON.parse(readFileSync(f, "utf8")) as { receipt: { proof: unknown; publicSignals: string[] } }).receipt;
-      const r = await view<{ proof_valid: boolean }>(net, net.pool!, "verify_disclosure", { kind: "receipt", proof: fx.proof, public_inputs: fx.publicSignals, legs: null });
+      // the payment proof made for judge.testnet (deployments/judge-proof-payment.txt)
+      const p = decodeProof(readFileSync(`${ROOT}deployments/judge-proof-payment.txt`, "utf8").trim());
+      const r = await poolView.verifyDisclosure(net, p.kind, p.proof, p.publicSignals, p.legs, { network: p.network, reader: p.reader, expiresAtMs: p.expiresAtMs });
       if (!r.proof_valid) fail("the pool refused a valid proof");
-      return "a valid receipt proof checks out in a view call";
+      if (!r.chain_valid) fail(`the pool found: ${r.problems.join("; ")}`);
+      const other = await poolView.verifyDisclosure(net, p.kind, p.proof, p.publicSignals, p.legs, { network: p.network, reader: "someone-else.testnet", expiresAtMs: p.expiresAtMs });
+      if (other.chain_valid) fail("the pool accepted the proof for a reader it was not made for");
+      return `${p.kind} proof for ${p.reader} holds on chain (deal #${r.deal_ids[0] ?? "?"}); the same proof for another reader does not`;
     },
   },
 ];

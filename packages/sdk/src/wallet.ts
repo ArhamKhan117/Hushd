@@ -318,7 +318,8 @@ export class PrivateWallet {
     if (notes.length < 2) throw new Error("nothing to merge");
     const merged = makeNote(this.id.pk, token, notes[0]!.amount + notes[1]!.amount);
     await this.treeHolding(notes);
-    const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs: notes, outputs: [merged, makeNote(this.id.pk, token, 0n)] });
+    // output 0 is what the pool reads as a payment: a merge pays no one, so it is a zero note
+    const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs: notes, outputs: [makeNote(this.id.pk, token, 0n), merged] });
     const r = await this.relayer().transact(transactRequest(j, 0n, null));
     await this.afterSpend(notes, [merged]);
     return r.txHash;
@@ -455,7 +456,8 @@ export class PrivateWallet {
     const info = await this.relayer().info();
     const ext: ExtData = { recipient, relayer: info.account, fee, refundInner: refund.inner };
     await this.treeHolding(inputs);
-    const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs, outputs: [change, makeNote(this.id.pk, token, 0n)], publicAmount: amount, ext });
+    // the cash out leaves the pool publicly; output 0, read as a payment, is a zero note so change never passes for one
+    const j = await proveJoinsplit(this.opts.artifacts, this.id, this.tree, { inputs, outputs: [makeNote(this.id.pk, token, 0n), change], publicAmount: amount, ext });
     // the refund note only exists if the payout fails; posting it to self keeps it recoverable either way
     await this.relayer().post(sealNote(this.id, refund, { memo: "refund if the cash out could not be paid" }), "note");
     await this.expect(change);

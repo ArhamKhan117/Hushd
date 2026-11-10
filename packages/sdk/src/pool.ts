@@ -57,8 +57,15 @@ export const poolView = {
   assets: (net: HushdNetwork) => view<AssetView[]>(net, pool(net), "assets"),
   stats: (net: HushdNetwork) => view<PoolStats>(net, pool(net), "stats"),
   config: (net: HushdNetwork) => view<Record<string, unknown>>(net, pool(net), "config"),
-  verifyDisclosure: (net: HushdNetwork, kind: "receipt" | "funds" | "volume", proof: Groth16Proof, publicInputs: string[], legs?: [string, string][]) =>
-    view<DisclosureCheck>(net, pool(net), "verify_disclosure", { kind, proof, public_inputs: publicInputs, legs: legs ?? null }),
+  /** `label` is what the proof says on its face; the pool checks its context binds exactly that, and that it has not expired. */
+  verifyDisclosure: (net: HushdNetwork, kind: "receipt" | "funds" | "volume", proof: Groth16Proof, publicInputs: string[], legs?: [string, string][], label?: { network: string; reader: string; expiresAtMs: number }) =>
+    view<DisclosureCheck>(net, pool(net), "verify_disclosure", {
+      kind,
+      proof,
+      public_inputs: publicInputs,
+      legs: legs ?? null,
+      label: label ? { network: label.network, reader: label.reader, expires_at_ms: String(label.expiresAtMs) } : null,
+    }),
 };
 
 /** Rebuild the whole tree from the pool's stored leaves, `pageSize` at a time. */

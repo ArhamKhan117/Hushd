@@ -201,7 +201,7 @@ export async function verifyProof(net: HushdNetwork, p: ReaderProof, vkey: unkno
 
   let chain: DisclosureCheck | undefined;
   if (opts.onChain !== false && net.pool) {
-    chain = await poolView.verifyDisclosure(net, p.kind, p.proof, p.publicSignals, p.legs);
+    chain = await poolView.verifyDisclosure(net, p.kind, p.proof, p.publicSignals, p.legs, { network: p.network, reader: p.reader, expiresAtMs: p.expiresAtMs });
     if (!chain.proof_valid) problems.push("The pool contract refuses the proof");
     problems.push(...chain.problems);
   }
