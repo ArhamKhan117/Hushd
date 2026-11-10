@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { HushdProvider } from "@/lib/hushd/session";
 
 export const metadata: Metadata = {
-  title: { default: "App", template: "%s · Hushd" },
+  // every page under /app names itself in its own layout; the desk is /app itself
+  title: { default: "Desk", template: "%s · Hushd" },
   description: "The Hushd desk: state a deal, get quotes matched in an enclave, settle privately on NEAR.",
   robots: { index: false, follow: true },
 };
