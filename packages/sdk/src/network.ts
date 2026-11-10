@@ -30,6 +30,12 @@ export interface HushdNetwork {
    */
   browserRpc?: string[];
   /**
+   * Ask a rate-limited endpoint of `rpc` once more, after a pause, before turning to
+   * `rpcFallback`. `forBrowser` sets it: there the fallback is FastNEAR, whose 429s a browser
+   * can only read as CORS errors. A server goes straight to its fallback.
+   */
+  retryRateLimited?: boolean;
+  /**
    * Requests carry a salt the terms are hashed with (protocol `termsBytes`), so a deal's public
    * terms hash cannot be searched for its amounts. On once the desk pins an enclave build that
    * hashes salted terms.
@@ -123,7 +129,7 @@ export function sendEndpoints(net: HushdNetwork): string[] {
 export function forBrowser(net: HushdNetwork): HushdNetwork {
   const first = net.browserRpc ?? [];
   if (!first.length) return net;
-  return { ...net, rpc: first, rpcFallback: [...net.rpc, ...(net.rpcFallback ?? [])].filter((u) => !first.includes(u)) };
+  return { ...net, rpc: first, rpcFallback: [...net.rpc, ...(net.rpcFallback ?? [])].filter((u) => !first.includes(u)), retryRateLimited: true };
 }
 
 /** Every endpoint a network may call: reads, fallbacks and sends. */

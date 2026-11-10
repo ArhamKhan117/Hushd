@@ -1,4 +1,40 @@
-import { expect, test } from "@playwright/test";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { expect, test, type Page } from "@playwright/test";
+import { encryptForModel } from "../../packages/sdk/src/intake";
+
+const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET, POST, OPTIONS" };
+const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
+
+/**
+ * NEAR AI intake as the browser meets it: the live model when the API's attestation checks
+ * out, and otherwise a stand-in model with its own key, so the browser's own checks still run.
+ * `signer` picks who signs the stand-in's answers: the attested key, or another one.
+ */
+async function intakeRoutes(page: Page) {
+  const model = ed25519.utils.randomSecretKey();
+  const other = ed25519.utils.randomSecretKey();
+  const modelPub = hex(ed25519.getPublicKey(model));
+  const state = { live: false, signer: "attested" as "attested" | "other" };
+  await page.route("**/v1/intake/attestation", async (route) => {
+    const real = await route.fetch().catch(() => null);
+    const att = real ? ((await real.json().catch(() => ({}))) as { enabled?: boolean; signing_public_key?: string }) : {};
+    state.live = Boolean(att.enabled && att.signing_public_key);
+    if (state.live && real) return route.fulfill({ response: real });
+    await route.fulfill({ json: { model: "stand-in/model", signing_public_key: modelPub, signing_address: modelPub, tcb_status: "UpToDate", gpu_evidence: "verified", verified_at_ms: Date.now(), enabled: true, verify_url: "https://cloud.near.ai/verify" }, headers: CORS });
+  });
+  await page.route("**/v1/intake/chat", async (route) => {
+    if (state.live) return route.continue();
+    const b = JSON.parse(route.request().postData() ?? "{}") as { body: string; clientPub: string };
+    const draft = { kind: "spot", sell: { symbol: "USDC", amount: "200" }, buy: { symbol: "BTC" }, min_receive: null, limit_price: null, hedge: false, window_minutes: 1, notes: "Sell 200 USDC for BTC." };
+    const response = JSON.stringify({ id: "stand-in-1", choices: [{ message: { content: encryptForModel(JSON.stringify(draft), b.clientPub) } }] });
+    const text = `stand-in/model:${hex(sha256(new TextEncoder().encode(b.body)))}:${hex(sha256(new TextEncoder().encode(response)))}`;
+    const key = state.signer === "attested" ? model : other;
+    const signature = { text, signature: hex(ed25519.sign(new TextEncoder().encode(text), key)), signing_address: hex(ed25519.getPublicKey(key)), signature_kind: "provider_tee" };
+    await route.fulfill({ json: { response, serverVerified: true, signature }, headers: CORS });
+  });
+  return state;
+}
 
 /**
  * The whole product on NEAR testnet, as a new user: a passkey account, test tokens,
@@ -43,10 +79,22 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.locator("li", { hasText: "USDC" }).getByText("500")).toBeVisible({ timeout: 120_000 });
 
   // 3. describe the trade to the NEAR AI intake, check its signed draft in the form, and settle
+  const intake = await intakeRoutes(page);
   await go("/app");
-  await page.locator("#intake").fill("Sell 200 USDC for BTC at the best price.");
+  const words = page.locator("#intake");
+  if (!intake.live) {
+    // the stand-in: an answer signed by any key but the attested one is shown as not verified
+    intake.signer = "other";
+    await words.fill("Sell 200 USDC for BTC at the best price.");
+    await page.getByRole("button", { name: "Draft my request" }).click();
+    await expect(page.getByText("Not verified: the answer is signed by a key other than the attested one. Check every number yourself.")).toBeVisible({ timeout: 90_000 });
+    intake.signer = "attested";
+    await page.getByRole("button", { name: "Describe it" }).click();
+  }
+  await words.fill("Sell 200 USDC for BTC at the best price.");
   await page.getByRole("button", { name: "Draft my request" }).click();
-  await expect(page.getByText("Answer signed inside the TEE and checked in this browser")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText("Answer signed inside the TEE by the attested key, checked in this browser")).toBeVisible({ timeout: 90_000 });
+  console.log(`[${test.info().project.name}] intake: ${intake.live ? "the live NEAR AI model" : "a stand-in model (NEAR AI's attestation is unavailable)"}`);
   await expect(page.locator("#amount")).toHaveValue("200");
   await page.getByRole("button", { name: "Ask for quotes" }).click();
   await expect(page.getByText(/committed on the desk/)).toBeVisible({ timeout: 60_000 });
@@ -54,6 +102,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
   const dealLink = page.getByRole("link", { name: /Open deal #\d+/ });
   const dealId = (await dealLink.textContent())!.match(/#(\d+)/)![1]!;
+  console.log(`[${test.info().project.name}] deal #${dealId} settled`);
 
   // 4. the deal page: the public record says settled; the private side shows our terms
   await dealLink.click();

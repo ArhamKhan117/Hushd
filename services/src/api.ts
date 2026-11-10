@@ -6,7 +6,10 @@
  *   to each maker); makers post quotes sealed to the enclave. The API checks the
  *   request is the one committed on chain but can open none of it.
  * - Deal rooms: the two sides of a matched deal swap sealed messages (their planned
- *   outputs, the opening of the note each makes for the other, their proven legs).
+ *   outputs, the opening of the note each makes for the other, their proven legs). Each
+ *   message is filed under its recipient's X25519 key: the maker's own, or the key the
+ *   trader made for that deal alone. A room is deleted once its deal settles or closes on
+ *   the desk, and no message is kept longer than a day (`sweepDealRooms`).
  * - NEAR Intents: dry 1Click quotes for deposits from and cash-outs to other chains, and
  *   the mainnet trades between our agents (intents.ts).
  * - Market: Hyperliquid mainnet mids and candles for the trading screen (market.ts).
@@ -37,6 +40,26 @@ export function limitFor<T>(path: string, limits: { market: T; makers: T; flow: 
   if (path === "/v1/rfq/open" || /^\/v1\/rfq\/\d+\/quotes$/.test(path)) return limits.makers;
   if (/^\/v1\/(rfq(\/|$)|deals\/\d+\/messages)/.test(path)) return limits.flow;
   return limits.rest;
+}
+
+/** A deal room is in use only while its deal is "matched" or "settling": the desk settles nothing else. */
+const ROOM_IN_USE = new Set(["matched", "settling"]);
+/** No deal room message is kept longer than this, whatever its deal's state. */
+export const ROOM_MAX_AGE_MS = 24 * 3_600_000;
+
+/**
+ * Delete what the deal rooms no longer need: every message of a deal that has settled or
+ * closed on the desk, and every message older than a day. `dealStatus` reads one deal's
+ * status from the desk (null when the deal is unknown, which leaves its room to the age rule).
+ */
+export async function sweepDealRooms(db: Db, nowMs: number, dealStatus: (dealId: number) => Promise<string | null>): Promise<{ deleted: number }> {
+  let deleted = (await db.q("delete from messages where at_ms < $1", [nowMs - ROOM_MAX_AGE_MS])).rowCount ?? 0;
+  const rooms = await db.q<{ deal_id: string }>("select distinct deal_id from messages order by deal_id limit 200");
+  for (const { deal_id } of rooms.rows) {
+    const status = await dealStatus(Number(deal_id)).catch(() => null);
+    if (status && !ROOM_IN_USE.has(status)) deleted += (await db.q("delete from messages where deal_id = $1", [deal_id])).rowCount ?? 0;
+  }
+  return { deleted };
 }
 
 export function buildApi(net: HushdNetwork, db: Db, now = () => Date.now(), intents: IntentsDeps = {}, market: MarketDeps = {}) {
@@ -222,4 +245,21 @@ export async function startApi() {
   const db = new Db(settings.databaseUrl());
   await db.migrate();
   listen(buildApi(net, db), settings.port("api", 8788), "api");
+  // deal rooms go once their deal is done: a sweep a minute, never two at once
+  const desk = net.desk;
+  if (!desk) return;
+  let sweeping = false;
+  const sweep = async () => {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      await sweepDealRooms(db, Date.now(), async (id) => (await view<{ status: string } | null>(net, desk, "deal", { deal_id: String(id) }))?.status ?? null);
+    } catch (e) {
+      console.error(`api: the deal room sweep failed: ${(e as Error).message}`);
+    } finally {
+      sweeping = false;
+    }
+  };
+  void sweep();
+  setInterval(() => void sweep(), 60_000).unref();
 }

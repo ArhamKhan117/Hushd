@@ -62,10 +62,43 @@ export function keepRpcErrorBodies(endpoints: readonly string[] | HushdNetwork):
   };
 }
 
+/** How long to wait before asking a rate-limited endpoint again: its Retry-After (0.2 to 3 s), or about a second. */
+export function rateLimitPauseMs(retryAfter: string | null, jitter = Math.random()): number {
+  const s = retryAfter !== null && /^\d+(\.\d+)?$/.test(retryAfter.trim()) ? Number(retryAfter) : NaN;
+  return Number.isFinite(s) ? Math.min(3_000, Math.max(200, s * 1_000)) : 1_000 + Math.round(jitter * 500);
+}
+
+/**
+ * Run at most `max` of the calls handed to it at once; the rest wait their turn, in order.
+ * For a page that would otherwise start many reads together and trip a free RPC's rate limit.
+ */
+export function readLimit(max: number): <T>(read: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  return async (read) => {
+    // a slot freed by a finished read is handed straight to the next in line
+    if (active < max) active++;
+    else await new Promise<void>((go) => waiting.push(go));
+    try {
+      return await read();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else active--;
+    }
+  };
+}
+
 async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): Promise<T> {
   let last: unknown;
-  for (const url of [...rpcOrder(net.rpc), ...(net.rpcFallback ?? [])]) {
+  const first = rpcOrder(net.rpc);
+  const fallback = net.rpcFallback ?? [];
+  for (const [i, url] of [...first, ...fallback].entries()) {
+    // in a browser the fallback is FastNEAR, whose 429s carry no CORS headers and read as "Failed to fetch":
+    // a rate limit on the last first endpoint earns it one more try, after a pause, before the fallback
+    const beforeFallback = Boolean(net.retryRateLimited) && i === first.length - 1 && fallback.length > 0;
     for (let attempt = 0; attempt < 2; attempt++) {
+      let pauseMs = 300 * (attempt + 1);
       try {
         const res = await fetch(url, {
           method: "POST",
@@ -73,10 +106,14 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
           body: JSON.stringify({ jsonrpc: "2.0", id: "hushd", method, params }),
           signal: AbortSignal.timeout(15_000),
         });
+        if (res.status === 429) pauseMs = rateLimitPauseMs(res.headers.get("retry-after"));
         if (res.status === 429 || res.status >= 500) throw new RpcError(`${url} answered ${res.status}`);
         const body = (await res.json()) as { result?: T; error?: { code?: number; cause?: { name?: string; info?: { requested_account_id?: string } }; data?: unknown; message?: string } };
         // some providers rate-limit inside a 200 answer: that is an outage, try the next endpoint
-        if (body.error?.code === -429) throw new RpcError(`${url} answered 429`);
+        if (body.error?.code === -429) {
+          pauseMs = rateLimitPauseMs(null);
+          throw new RpcError(`${url} answered 429`);
+        }
         if (body.error) {
           const c = body.error.cause;
           const words = c?.name === "UNKNOWN_ACCOUNT" ? `${c.info?.requested_account_id ?? "That account"} does not exist on NEAR ${net.id} (UNKNOWN_ACCOUNT)` : c?.name ?? body.error.message ?? "RPC error";
@@ -88,9 +125,10 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
         // contract errors are answers, not outages: no point asking another endpoint
         if (e instanceof RpcError && e.cause && !String(e.message).includes("answered")) throw e;
         restEndpoint(url);
-        // a rate limit will not lift in a moment: ask the next endpoint rather than this one again
-        if (e instanceof RpcError && /answered 429/.test(e.message)) break;
-        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+        // a rate limit will not lift at once: ask the next first endpoint rather than this one again,
+        // and only the last of them, once, after a pause, before turning to a fallback
+        if (e instanceof RpcError && /answered 429/.test(e.message) && !(beforeFallback && attempt === 0)) break;
+        await new Promise((r) => setTimeout(r, pauseMs));
       }
     }
   }

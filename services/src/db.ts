@@ -1,8 +1,8 @@
 /**
  * Postgres for the services: indexed chain events, the indexer's cursor, sealed RFQs
- * and quotes waiting for the enclave, match results and the per-deal mailbox.
- * Everything sealed is stored as the ciphertext it arrived as; the services never
- * hold a key that opens it.
+ * and quotes waiting for the enclave, match results and the per-deal mailbox (kept only
+ * until its deal settles or closes, and a day at most). Everything sealed is stored as
+ * the ciphertext it arrived as; the services never hold a key that opens it.
  */
 import pg from "pg";
 

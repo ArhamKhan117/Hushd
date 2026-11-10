@@ -76,13 +76,32 @@ export function AttestationLine({ att }: { att: IntakeAttestation | null }) {
   );
 }
 
-/** What the browser checked about one intake answer. */
+type Check = keyof IntakeResult["proof"]["checks"];
+
+/** Each check the browser makes: what it shows when it holds, and when it does not. */
+const CHECKS: [Check, string, string][] = [
+  ["signerIsAttested", "Signed by the attested key your words were encrypted to", "the answer is signed by a key other than the attested one"],
+  ["signatureValid", "The signature checks out against that key", "the signature does not check out against the attested key"],
+  ["hashesMatch", "It signs this exact request and response", "the signature is over another request or response"],
+  ["apiVerified", "The API checked it against the attestation too", "the API did not confirm it against the attestation"],
+];
+
+/** What the browser checked about one intake answer: verified only when every check holds. */
 export function IntakeProof({ proof }: { proof: IntakeResult["proof"] }) {
+  const failed = CHECKS.find(([k]) => !proof.checks[k]);
   return (
-    <details className="hd-tile px-4 py-3 text-[12.5px] text-mute">
-      <summary className="cursor-pointer select-none text-soft">
-        {proof.verified ? "Answer signed inside the TEE and checked in this browser" : "The answer's signature did not check out"}
+    <details className="hd-tile px-4 py-3 text-[12.5px] text-mute" open={!proof.verified}>
+      <summary className={`cursor-pointer select-none ${proof.verified ? "text-soft" : "text-danger"}`}>
+        {proof.verified ? "Answer signed inside the TEE by the attested key, checked in this browser" : `Not verified: ${failed?.[2] ?? "a check failed"}. Check every number yourself.`}
       </summary>
+      <ul className="mt-3 grid gap-1.5" aria-label="Checks on this answer">
+        {CHECKS.map(([k, label]) => (
+          <li key={k} className="flex items-start gap-2">
+            <span className={`shrink-0 ${proof.checks[k] ? "text-soft" : "text-danger"}`}>{proof.checks[k] ? "Yes" : "No"}</span>
+            <span>{label}</span>
+          </li>
+        ))}
+      </ul>
       <dl className="mt-3 grid gap-1.5 break-all">
         <div>
           <dt className="inline text-soft">Model: </dt>
@@ -101,8 +120,14 @@ export function IntakeProof({ proof }: { proof: IntakeResult["proof"] }) {
           <dd className="inline">{proof.responseHash}</dd>
         </div>
         <div>
+          <dt className="inline text-soft">Attested key: </dt>
+          <dd className="inline">{proof.attestedKey}</dd>
+        </div>
+        <div>
           <dt className="inline text-soft">Signed by: </dt>
-          <dd className="inline">{proof.signingKey} ({proof.signatureKind})</dd>
+          <dd className="inline">
+            {proof.signingKey || "nobody named"} ({proof.signatureKind})
+          </dd>
         </div>
       </dl>
     </details>

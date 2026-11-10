@@ -9,7 +9,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { base64 } from "@scure/base";
 import { decodeSignedDelegateAction, encodeSignedDelegateAction } from "near-kit";
 import { AGENT_API_USDC, AGENT_API_WNEAR, hushdAgentPolicy, ownerKey, signOwnerIntent } from "../src/agent-api.js";
-import { buildApi, limitFor } from "../src/api.js";
+import { buildApi, limitFor, ROOM_MAX_AGE_MS, sweepDealRooms } from "../src/api.js";
 import { Db } from "../src/db.js";
 import { addressOfKey, approveAgentDigest, evmAddress, signDigest } from "../src/hyperliquid.js";
 import { eventsInBlock, eventsInTx } from "../src/indexer.js";
@@ -190,6 +190,30 @@ describe("deal rooms (Postgres)", () => {
     if (!pg) return t.skip("no Postgres at TEST_DATABASE_URL");
     const bad = await api.request(`/v1/deals/4/messages`, { method: "POST", body: JSON.stringify({ to: "nope", box: "QUJD" }), headers: { "content-type": "application/json" } });
     assert.equal(bad.status, 400);
+  });
+
+  test("a room goes once its deal settles or closes, and no message outlives a day", async (t) => {
+    if (!pg) return t.skip("no Postgres at TEST_DATABASE_URL");
+    await db.q("delete from messages");
+    const now = 10 * ROOM_MAX_AGE_MS;
+    const rows: [number, number][] = [[5, now - 1_000], [5, now - 500], [6, now - 1_000], [7, now - ROOM_MAX_AGE_MS - 1], [8, now - 1_000], [9, now - 1_000], [10, now - 1_000]];
+    for (const [deal, at] of rows) await db.q("insert into messages (deal_id, recipient, box, at_ms) values ($1,$2,$3,$4)", [deal, to, "QUJD", at]);
+    // 5 still matched, 6 closed, 7 matched but a day old, 8 unknown to the desk, 9 settled with its hedge open, 10 unreadable
+    const status: Record<number, string | null> = { 5: "matched", 6: "closed", 7: "matched", 8: null, 9: "hedge_pending" };
+    const r = await sweepDealRooms(db, now, async (id) => {
+      if (id === 10) throw new Error("RPC down");
+      return status[id] ?? null;
+    });
+    const left = async () => (await db.q<{ deal_id: string }>("select deal_id from messages order by id")).rows.map((x) => Number(x.deal_id));
+    assert.deepEqual(await left(), [5, 5, 8, 10]);
+    assert.equal(r.deleted, 3);
+    // once 5 settles, its room goes on the next sweep
+    status[5] = "closed";
+    assert.equal((await sweepDealRooms(db, now, async (id) => status[id] ?? null)).deleted, 2);
+    assert.deepEqual(await left(), [8, 10]);
+    // and the age rule takes the rest a day later
+    await sweepDealRooms(db, now + ROOM_MAX_AGE_MS, async () => null);
+    assert.deepEqual(await left(), []);
   });
 });
 

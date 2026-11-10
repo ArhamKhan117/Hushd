@@ -6,6 +6,8 @@
  * that maker, wait for the enclave's match, then settle.
  *
  * Settlement (the same for both sides, through the API's sealed deal room):
+ *   0. the trader's side of the room is a key made for this deal alone (`roomKeyFor`), named
+ *      inside its sealed plan, so the API never files a message under its hushd1 address
  *   1. each side plans its leg: a note for the other side and its own change
  *   2. each sends the other its two output commitments and the opening of the note
  *      it made for them, and checks the note it gets opens to the agreed amount, token
@@ -13,7 +15,7 @@
  *   3. each proves its leg bound to the deal and all four outputs
  *   4. the maker (always online) submits both legs to `desk.settle` in one call
  */
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
 import { openJson, sealJson } from "./box.js";
@@ -147,18 +149,40 @@ export class DeskApi {
   send(dealId: number, to: Uint8Array, value: unknown) {
     return this.req<{ id: number }>(`/v1/deals/${dealId}/messages`, { to: bytesHex(to), box: toB64(sealJson(to, value)) });
   }
-  async inbox<T>(dealId: number, me: Identity, after = 0): Promise<{ id: number; msg: T }[]> {
-    const list = await this.req<{ id: number; box: string }[]>(`/v1/deals/${dealId}/messages?to=${bytesHex(me.encPublic)}&after=${after}`);
+  /** The messages sealed to `key` in one deal's room: a maker's own key, or a trader's room key. */
+  async inbox<T>(dealId: number, key: RoomKey, after = 0): Promise<{ id: number; msg: T }[]> {
+    const list = await this.req<{ id: number; box: string }[]>(`/v1/deals/${dealId}/messages?to=${bytesHex(key.encPublic)}&after=${after}`);
     return list.flatMap((m) => {
-      const msg = openJson<T>(me.encSecret, fromB64(m.box));
+      const msg = openJson<T>(key.encSecret, fromB64(m.box));
       return msg ? [{ id: m.id, msg }] : [];
     });
   }
 }
 
+/** The X25519 key pair one side of a deal room reads with (an `Identity` is one too). */
+export interface RoomKey {
+  encSecret: Uint8Array;
+  encPublic: Uint8Array;
+}
+
+/**
+ * The trader's key for one deal's room: derived from the spending key and the refund
+ * blinding, as `ownerKeyFor` is, so it names this deal and nothing else. The maker seals
+ * its replies to it, and the API files them under it: nothing in the room links the deal
+ * to the key inside the trader's hushd1 address. The same seed and blinding re-derive it.
+ */
+export function roomKeyFor(id: Identity, refundBlinding: bigint): RoomKey {
+  const tag = new TextEncoder().encode("hushd.room.v1");
+  const encSecret = sha256(new Uint8Array([...tag, ...be32(id.sk), ...be32(refundBlinding)]));
+  return { encSecret, encPublic: x25519.getPublicKey(encSecret) };
+}
+
 type RoomMsg =
-  | { t: "plan"; outputs: [string, string]; noteForYou: NoteMessage }
+  /** `replyTo` (the trader's plan only): the room key the maker seals its answers to, 0x hex. */
+  | { t: "plan"; outputs: [string, string]; noteForYou: NoteMessage; replyTo?: string }
   | { t: "leg"; leg: ReturnType<typeof swapLeg>; approval: string };
+
+const ROOM_KEY_HEX = /^0x[0-9a-f]{64}$/;
 
 export type PackageKind = MakerAsk["kind"];
 
@@ -328,14 +352,38 @@ export function checkNoteForMe(me: Identity, m: NoteMessage, expected: { token: 
   return note;
 }
 
-async function waitFor<T extends RoomMsg>(api: DeskApi, dealId: number, me: Identity, t: T["t"], timeoutMs: number): Promise<T> {
+const pause = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const lastWords = (e: unknown) => (e ? ` (last error: ${(e as Error).message ?? String(e)})` : "");
+
+/** Post to the deal room, asking again after a failure (a rate limit, a dropped connection): a repeated message is harmless. */
+async function sendPatiently(api: DeskApi, dealId: number, to: Uint8Array, value: RoomMsg, tries = 4): Promise<void> {
+  for (let i = 1; ; i++) {
+    try {
+      await api.send(dealId, to, value);
+      return;
+    } catch (e) {
+      if (i >= tries) throw e;
+      await pause(1_000 * i);
+    }
+  }
+}
+
+async function waitFor<T extends RoomMsg>(api: DeskApi, dealId: number, me: RoomKey, t: T["t"], timeoutMs: number): Promise<T> {
   const start = Date.now();
+  let failed: unknown = null;
   for (;;) {
-    const msgs = await api.inbox<RoomMsg>(dealId, me);
+    // a read that fails is asked again until the time is up: one rate limit must not end the deal
+    let msgs: { id: number; msg: RoomMsg }[] = [];
+    try {
+      msgs = await api.inbox<RoomMsg>(dealId, me);
+      failed = null;
+    } catch (e) {
+      failed = e;
+    }
     const hit = msgs.find((m) => m.msg.t === t);
     if (hit) return hit.msg as T;
-    if (Date.now() - start > timeoutMs) throw new Error(`The other side did not send its ${t} in time`);
-    await new Promise((res) => setTimeout(res, 1_000));
+    if (Date.now() - start > timeoutMs) throw new Error(`The other side did not send its ${t} in time${lastWords(failed)}`);
+    await pause(1_000);
   }
 }
 
@@ -364,26 +412,36 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
 
 async function traderLeg(p: Parameters<typeof settleAsTrader>[0], plan: LegPlan, maker: ReturnType<typeof decodeAddress>): Promise<{ received: Note; plan: LegPlan }> {
   const me = p.wallet.id;
+  // this deal's own room key: the maker answers to it, never to the key in this wallet's address
+  const room = roomKeyFor(me, p.refundBlinding);
   const aOut = plan.outputs.map((o) => o.commitment.toString()) as [string, string];
-  await p.api.send(p.dealId, maker.encPublic, { t: "plan", outputs: aOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) } satisfies RoomMsg);
+  await sendPatiently(p.api, p.dealId, maker.encPublic, { t: "plan", outputs: aOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }), replyTo: bytesHex(room.encPublic) });
   p.onStep?.("waiting_plan");
-  const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, me, "plan", 120_000);
+  const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, room, "plan", 120_000);
   const received = checkNoteForMe(me, theirs.noteForYou, p.terms.makerGives, theirs.outputs[0]);
   // the note for me checked out: approve exactly these four outputs with the deal's owner key
   const message = new TextEncoder().encode(settleMessage(p.net, p.dealId, [...aOut, ...theirs.outputs]));
   const approval = toB64(ed25519.sign(message, ownerKeyFor(me, p.refundBlinding).secret));
   p.onStep?.("proving");
   const legA: JoinsplitArgs = await p.wallet.proveLeg(plan, aOut.map(BigInt) as [bigint, bigint], theirs.outputs.map(BigInt) as [bigint, bigint]);
-  await p.api.send(p.dealId, maker.encPublic, { t: "leg", leg: swapLeg(legA), approval } satisfies RoomMsg);
+  await sendPatiently(p.api, p.dealId, maker.encPublic, { t: "leg", leg: swapLeg(legA), approval });
   p.onStep?.("waiting_settlement");
   const start = Date.now();
+  let failed: unknown = null;
   for (;;) {
-    const d = await deskView.deal(p.net, p.dealId);
+    // a read that fails (a rate-limited RPC) is asked again: the deal settles whether or not this read lands
+    let d: DealView | null | undefined;
+    try {
+      d = await deskView.deal(p.net, p.dealId);
+      failed = null;
+    } catch (e) {
+      failed = e;
+    }
     // "settling" is the pool call in flight; a refused one goes back to "matched"
     if (d?.status === "closed" && d.receipt?.outcome === "failed") throw new Error("The deal expired before it settled");
     if (d && d.status !== "matched" && d.status !== "settling") break;
-    if (Date.now() - start > 180_000) throw new Error("The deal did not settle in time");
-    await new Promise((res) => setTimeout(res, 2_000));
+    if (Date.now() - start > 180_000) throw new Error(`The deal did not settle in time${lastWords(failed)}`);
+    await pause(2_000);
   }
   await p.wallet.settled(plan, received);
   p.onStep?.("settled");
@@ -399,9 +457,12 @@ export async function settleAsMaker(p: { net: HushdNetwork; api: DeskApi; relaye
   const trader = decodeAddress(p.traderAddress);
   const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, me, "plan", 120_000);
   const received = checkNoteForMe(me, theirs.noteForYou, p.terms.traderGives, theirs.outputs[0]);
+  if (theirs.replyTo !== undefined && !ROOM_KEY_HEX.test(theirs.replyTo)) throw new Error(`Deal ${p.dealId}: the trader's room key is not an X25519 key`);
+  // a trader that names no room key reads the room with the key in its address
+  const replyTo = theirs.replyTo !== undefined ? hexToBytes(theirs.replyTo) : trader.encPublic;
   const plan = await p.wallet.planLeg(BigInt(p.dealId), { token: p.terms.makerGives.token, amount: BigInt(p.terms.makerGives.amount) }, trader);
   try {
-    return await makerLeg(p, plan, theirs, received, trader);
+    return await makerLeg(p, plan, theirs, received, replyTo);
   } catch (e) {
     p.wallet.release(plan);
     throw e;
@@ -413,18 +474,30 @@ async function makerLeg(
   plan: LegPlan,
   theirs: Extract<RoomMsg, { t: "plan" }>,
   received: Note,
-  trader: ReturnType<typeof decodeAddress>,
+  replyTo: Uint8Array,
 ): Promise<{ txHash: string; received: Note }> {
   const me = p.wallet.id;
   const bOut = plan.outputs.map((o) => o.commitment.toString()) as [string, string];
-  await p.api.send(p.dealId, trader.encPublic, { t: "plan", outputs: bOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) } satisfies RoomMsg);
+  await sendPatiently(p.api, p.dealId, replyTo, { t: "plan", outputs: bOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }) });
   const legB = await p.wallet.proveLeg(plan, theirs.outputs.map(BigInt) as [bigint, bigint], bOut.map(BigInt) as [bigint, bigint]);
   const legA = await waitFor<Extract<RoomMsg, { t: "leg" }>>(p.api, p.dealId, me, "leg", 180_000);
   // the trader's leg must carry the outputs whose note this maker checked
   if (legA.leg.commitments.some((c, i) => c !== theirs.outputs[i])) throw new Error(`Deal ${p.dealId}: the trader's leg names other outputs than its plan`);
   const message = new TextEncoder().encode(settleMessage(p.net, p.dealId, [...theirs.outputs, ...bOut]));
   const approvals = { trader: legA.approval, maker: toB64(ed25519.sign(message, p.quoteSecret)) };
-  const r = await p.relayer.settle(p.dealId, [legA.leg, swapLeg(legB)], approvals);
+  // the relayer answers 5xx when its own chain reads fail (a rate limit): ask again, while the deal still
+  // waits; a refusal (4xx) is final, and a deal already settled is refused, so asking twice settles once
+  let r: Awaited<ReturnType<RelayerClient["settle"]>>;
+  for (let i = 1; ; i++) {
+    try {
+      r = await p.relayer.settle(p.dealId, [legA.leg, swapLeg(legB)], approvals);
+      break;
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      if (i >= 3 || (status !== undefined && status < 500 && status !== 429)) throw e;
+      await pause(2_000 * i);
+    }
+  }
   await p.wallet.settled(plan, received, r.txHash);
   return { txHash: r.txHash, received };
 }
