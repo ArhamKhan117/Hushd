@@ -54,6 +54,23 @@ pub struct Request {
     pub hedge: Option<HedgeWish>,
     pub expires_in_ms: u64,
     pub trader: Trader,
+    /// 32 random bytes (0x hex) the trader also seals into the makers' ask: hashed into the
+    /// terms, so the public terms hash cannot be searched for the amounts.
+    #[serde(default)]
+    pub salt: Option<String>,
+}
+
+impl Request {
+    /// The salt as bytes; a request without one hashes its terms the plain way.
+    pub fn salt_bytes(&self) -> Result<Option<[u8; 32]>, String> {
+        match &self.salt {
+            None => Ok(None),
+            Some(s) => {
+                let b = hex::decode(s.trim_start_matches("0x")).map_err(|_| "salt is 0x hex".to_string())?;
+                Ok(Some(b.try_into().map_err(|_| "salt is 32 bytes".to_string())?))
+            }
+        }
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
@@ -106,6 +123,7 @@ pub struct Agreed {
     pub hedge: Option<Hedge>,
     pub bond: u128,
     pub expires_at_ms: u64,
+    pub salt: Option<[u8; 32]>,
 }
 
 pub const CLASS_NAMES: [&str; 3] = ["atomic_pool", "bonded_hedge", "atomic_intents"];
@@ -122,11 +140,12 @@ impl Agreed {
                 "size": h.size, "limitPx": h.limit_px, "deadlineMs": h.deadline_ms, "testnet": h.testnet })),
             "bond": self.bond.to_string(),
             "expiresAtMs": self.expires_at_ms,
+            "salt": self.salt.map(|s| format!("0x{}", hex::encode(s))),
         })
     }
 }
 
-pub fn agreed(req: &Request, q: &Quote) -> Agreed {
+pub fn agreed(req: &Request, q: &Quote, salt: Option<[u8; 32]>) -> Agreed {
     Agreed {
         rfq_id: q.rfq_id,
         maker: q.maker.clone(),
@@ -136,6 +155,7 @@ pub fn agreed(req: &Request, q: &Quote) -> Agreed {
         hedge: q.hedge.clone(),
         bond: q.bond,
         expires_at_ms: q.expires_at_ms,
+        salt,
     }
 }
 
@@ -147,8 +167,13 @@ impl W {
     }
 }
 
+/// The terms' canonical bytes: "hushd.terms.v1", or "hushd.terms.v2" ‖ salt (32) when the
+/// request carried a salt, then the same fields in the same order.
 pub fn terms_bytes(t: &Agreed) -> Vec<u8> {
-    let mut w = W(b"hushd.terms.v1".to_vec());
+    let mut w = match &t.salt {
+        Some(s) => W([b"hushd.terms.v2".as_slice(), s.as_slice()].concat()),
+        None => W(b"hushd.terms.v1".to_vec()),
+    };
     w.0.extend_from_slice(&t.rfq_id.to_le_bytes());
     w.str(&t.maker);
     w.0.push(t.class);

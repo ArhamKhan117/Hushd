@@ -67,6 +67,7 @@ fn do_match(input: &Value) -> Result<Value, String> {
         return Err("The sealed request is not the one committed on chain".into());
     }
     let req: Request = serde_json::from_slice(&box_::open(&enc, &rfq_box).ok_or("cannot open the request")?).map_err(|e| format!("request: {e}"))?;
+    let salt = req.salt_bytes()?;
 
     let now = now_ms();
     let mut valid: Vec<Quote> = Vec::new();
@@ -75,7 +76,7 @@ fn do_match(input: &Value) -> Result<Value, String> {
         let Some(sealed) = q.as_str().and_then(|s| B64.decode(s).ok()) else { refused += 1; continue };
         let Some(plain) = box_::open(&enc, &sealed) else { refused += 1; continue };
         let Ok(quote) = serde_json::from_slice::<Quote>(&plain) else { refused += 1; continue };
-        if quote.rfq_id != rfq_id || !maker_signed(&quote, &req, desk) {
+        if quote.rfq_id != rfq_id || !maker_signed(&quote, &req, salt, desk) {
             refused += 1;
             continue;
         }
@@ -85,7 +86,7 @@ fn do_match(input: &Value) -> Result<Value, String> {
     let Some(best) = terms::best(&req, &valid, now) else {
         return Ok(json!({ "matched": false, "reason": "no quote inside the limit", "quotes": valid.len(), "refused": refused }));
     };
-    let agreed = terms::agreed(&req, best);
+    let agreed = terms::agreed(&req, best, salt);
     let terms_hash = terms::terms_hash(&agreed);
     let m = MatchResult::new(rfq_id, best, &req, &terms_hash);
     let signature = sign.sign(&m.signing_bytes(desk));
@@ -107,10 +108,10 @@ fn do_match(input: &Value) -> Result<Value, String> {
 
 /// The maker's quote key signed its consent to exactly these terms on this desk (the desk
 /// checks the same signature against the key the maker registered on chain).
-fn maker_signed(q: &Quote, req: &Request, desk: &str) -> bool {
+fn maker_signed(q: &Quote, req: &Request, salt: Option<[u8; 32]>, desk: &str) -> bool {
     let (Some(key), Some(sig)) = (q.quote_key_bytes(), q.signature_bytes()) else { return false };
     let Ok(vk) = VerifyingKey::from_bytes(&key) else { return false };
-    let msg = terms::agreed(req, q).consent(desk);
+    let msg = terms::agreed(req, q, salt).consent(desk);
     vk.verify(&msg, &ed25519_dalek::Signature::from_bytes(&sig)).is_ok()
 }
 
@@ -200,6 +201,25 @@ mod tests {
         assert_eq!(out["refused"], json!(3));
         input.as_object_mut().unwrap().remove("desk");
         assert_eq!(do_match(&input).unwrap_err(), "desk");
+    }
+
+    /// A salted request (gen-matcher-interop.ts): the makers signed over salted terms, the
+    /// enclave hashes them with the salt to TypeScript's value, and a quote signed over the
+    /// plain terms does not count.
+    #[test]
+    fn a_salted_request_hashes_its_terms_with_the_salt() {
+        let fx: Value = serde_json::from_str(INTEROP).unwrap();
+        unsafe {
+            std::env::set_var("PROTECTED_MATCHER_KEY", fx["enclaveSeedHex"].as_str().unwrap());
+            std::env::set_var("NEAR_BLOCK_TIMESTAMP", fx["nowNs"].as_str().unwrap());
+        }
+        let s = &fx["salted"];
+        let out = do_match(&s["input"]).unwrap();
+        assert_eq!(out["matched"], json!(true), "{out}");
+        assert_eq!(out["match"]["maker"], s["expect"]["maker"]);
+        assert_eq!(out["match"]["terms_hash"], s["expect"]["termsHash"]);
+        assert_ne!(out["match"]["terms_hash"], s["expect"]["plainTermsHash"]);
+        assert_eq!(out["refused"], s["expect"]["refused"]);
     }
 
     #[test]

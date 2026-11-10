@@ -39,18 +39,28 @@ const req: PackageRequest = {
 const rfqBox = seal(enclaveEnc, enc.encode(toJson(req)));
 const commitment = hex(sha256(rfqBox));
 
-function quote(maker: string, makerAddress: string, sk: Uint8Array, give: bigint): PackageQuote {
+function quote(maker: string, makerAddress: string, sk: Uint8Array, give: bigint, salt?: string): PackageQuote {
   const q: PackageQuote = {
     v: 1, rfqId: 5, maker, give: { token: "btc.hushd.testnet", amount: give }, take: { token: "usdc.hushd.testnet", amount: 1_000_000_000n },
     bond: 0n, expiresAtMs: now + 300_000, makerAddress, quoteKey: quoteKey(sk), signature: "",
   };
-  q.signature = toB64(ed25519.sign(quoteConsent(desk, q, "spot"), sk));
+  q.signature = toB64(ed25519.sign(quoteConsent(desk, q, "spot", salt), sk));
   return q;
 }
 const qa = quote("maker-a.hushd.testnet", makerA.address, quoteSecret(11), 1_550_000n);
 const qb = quote("maker-b.hushd.testnet", makerB.address, quoteSecret(12), 1_620_000n);
 const forged = { ...quote("maker-a.hushd.testnet", makerA.address, quoteSecret(11), 9_999_999n), signature: qa.signature };
 const batch = { rfq: toB64(rfqBox), quotes: [qa, qb, forged].map((q) => toB64(seal(enclaveEnc, enc.encode(toJson(q))))) };
+
+// the same request with a salt: the makers sign their consent over salted terms, and the
+// enclave must hash the terms with the salt to the same value
+const salt = `0x${"5a".repeat(32)}`;
+const saltedBox = seal(enclaveEnc, enc.encode(toJson({ ...req, salt })));
+const sqa = quote("maker-a.hushd.testnet", makerA.address, quoteSecret(11), 1_550_000n, salt);
+const sqb = quote("maker-b.hushd.testnet", makerB.address, quoteSecret(12), 1_620_000n, salt);
+// a quote signed over the plain terms does not count for a salted request
+const unsalted = quote("maker-a.hushd.testnet", makerA.address, quoteSecret(11), 1_700_000n);
+const saltedBatch = { rfq: toB64(saltedBox), quotes: [sqa, sqb, unsalted].map((q) => toB64(seal(enclaveEnc, enc.encode(toJson(q))))) };
 
 writeFileSync(
   new URL("../../matcher/tests/interop.json", import.meta.url),
@@ -59,6 +69,10 @@ writeFileSync(
     nowNs: String(BigInt(now) * 1_000_000n),
     input: { cmd: "match", desk, rfq_id: "5", rfq_commitment: commitment, batch: Buffer.from(JSON.stringify(batch)).toString("base64") },
     expect: { maker: qb.maker, termsHash: hex(termsHash(termsOf(qb, "spot"))), refused: 1, traderEncKey: hex(trader.encPublic) },
+    salted: {
+      input: { cmd: "match", desk, rfq_id: "5", rfq_commitment: hex(sha256(saltedBox)), batch: Buffer.from(JSON.stringify(saltedBatch)).toString("base64") },
+      expect: { maker: sqb.maker, termsHash: hex(termsHash(termsOf(sqb, "spot", salt))), plainTermsHash: hex(termsHash(termsOf(sqb, "spot"))), refused: 1, salt },
+    },
   }, null, 1),
 );
 console.log("wrote matcher/tests/interop.json");

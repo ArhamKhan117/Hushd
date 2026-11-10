@@ -57,6 +57,11 @@ export interface PackageRequest {
   };
   /** Words the trader typed, if any; never leaves the enclave. */
   text?: string;
+  /**
+   * 32 random bytes (0x hex), also sealed into the makers' ask: hashed into the terms, so the
+   * public terms hash cannot be searched for the amounts. Without it the terms hash the plain way.
+   */
+  salt?: string;
 }
 
 /** A maker's firm answer, sealed to the enclave. */
@@ -89,13 +94,15 @@ export interface Terms {
   hedge?: HedgeLeg;
   bond: bigint;
   expiresAtMs: number;
+  /** The request's salt (0x hex, 32 bytes), when it carried one. */
+  salt?: string;
 }
 
 export function classFor(kind: PackageKind): SettlementClass {
   return kind === "spot" ? "atomic_pool" : "bonded_hedge";
 }
 
-export function termsOf(q: PackageQuote, kind: PackageKind): Terms {
+export function termsOf(q: PackageQuote, kind: PackageKind, salt?: string): Terms {
   return {
     rfqId: q.rfqId,
     maker: q.maker,
@@ -105,6 +112,7 @@ export function termsOf(q: PackageQuote, kind: PackageKind): Terms {
     ...(q.hedge ? { hedge: q.hedge } : {}),
     bond: q.bond,
     expiresAtMs: q.expiresAtMs,
+    ...(salt ? { salt } : {}),
   };
 }
 
@@ -151,8 +159,17 @@ export class Writer {
   }
 }
 
+/** 32 bytes from 0x hex. */
+function salt32(s: string): Uint8Array {
+  const h = s.replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(h)) throw new RangeError("salt is 32 bytes of 0x hex");
+  return Uint8Array.from(h.match(/../g)!, (x) => parseInt(x, 16));
+}
+
+/** The terms' canonical bytes: "hushd.terms.v1", or "hushd.terms.v2" ‖ salt (32) for a salted request, then the fields. */
 export function termsBytes(t: Terms): Uint8Array {
-  const w = new Writer().bytes(enc.encode("hushd.terms.v1")).u64(t.rfqId).str(t.maker).u8(CLASS_TAG[t.class]);
+  const head = t.salt ? new Writer().bytes(enc.encode("hushd.terms.v2")).bytes(salt32(t.salt)) : new Writer().bytes(enc.encode("hushd.terms.v1"));
+  const w = head.u64(t.rfqId).str(t.maker).u8(CLASS_TAG[t.class]);
   w.str(t.traderGives.token).u128(t.traderGives.amount).str(t.makerGives.token).u128(t.makerGives.amount);
   if (t.hedge) {
     const h = t.hedge;
@@ -211,9 +228,9 @@ export function consentBytes(c: Consent): Uint8Array {
     .done();
 }
 
-/** The consent a maker signs for its quote on `desk`, for a request of this kind. */
-export function quoteConsent(desk: string, q: PackageQuote, kind: PackageKind): Uint8Array {
-  const t = termsOf(q, kind);
+/** The consent a maker signs for its quote on `desk`, for a request of this kind (and the request's salt, if it had one). */
+export function quoteConsent(desk: string, q: PackageQuote, kind: PackageKind, salt?: string): Uint8Array {
+  const t = termsOf(q, kind, salt);
   return consentBytes({ desk, rfqId: q.rfqId, termsHash: termsHash(t), bond: q.bond, expiresAtMs: q.expiresAtMs, class: t.class, hedge: q.hedge, maker: q.maker });
 }
 
