@@ -177,3 +177,33 @@ test("a trade needs a floor above zero, before anything is asked", async () => {
   assert.match(text(zero), /Set min_receive above zero/);
   await c.close();
 });
+
+test("the makers tool shows each maker's record from the desk's deals, and whether a request asks it", async () => {
+  const real = globalThis.fetch;
+  const now = Date.now();
+  const enc = `0x${"11".repeat(32)}`;
+  const m = (bond: string) => ({ name: "M", enc_key: enc, quote_url: "", style: "fixed", quote_key: "ed25519:x", bond, locked: "0", deals: 6, slashed: "0", active: true });
+  const d = (id: number, maker: string, outcome: "settled" | "failed") => ({
+    id: String(id), rfq_id: String(id), maker, terms_hash: "0x", class: "atomic_pool", matched_at_ms: String(now - 60_000 * (id + 1)), expires_at_ms: String(now - 1),
+    bond: "0", hedge: null, status: "closed", settle_attempts: 0, hedge_orders: 0, hedge_attempts: 0, bond_released: true, slash_held: "0", attested_by: "enclave_signature",
+    receipt: { outcome, evidence: [], recorded_at_ms: String(now) },
+  });
+  const views: Record<string, unknown> = {
+    makers: [["steady", m("2")], ["lapser", m("1")]],
+    deals: [d(5, "lapser", "failed"), d(4, "lapser", "failed"), d(3, "steady", "settled"), d(2, "lapser", "settled"), d(1, "lapser", "failed"), d(0, "lapser", "settled")],
+  };
+  globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const { params } = JSON.parse(String(init?.body)) as { params: { method_name: string } };
+    return Response.json({ jsonrpc: "2.0", id: "hushd", result: { result: [...Buffer.from(JSON.stringify(views[params.method_name] ?? null))], logs: [] } });
+  }) as typeof fetch;
+  try {
+    const c = await connect(false);
+    const r = await c.callTool({ name: "hushd_makers", arguments: {} });
+    const list = JSON.parse((r.content as { text: string }[])[0]!.text) as { account: string; asked: boolean; record: { ended: number; settled: number; lapsed: number; lapse_rate: number | null } }[];
+    assert.deepEqual(list.map((x) => [x.account, x.asked]), [["steady", true], ["lapser", false]]);
+    assert.deepEqual(list[1]!.record, { ended: 5, settled: 2, lapsed: 3, missed_hedges: 0, open: 0, lapse_rate: 0.6 });
+    await c.close();
+  } finally {
+    globalThis.fetch = real;
+  }
+});

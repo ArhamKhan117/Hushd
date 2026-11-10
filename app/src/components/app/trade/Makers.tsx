@@ -2,15 +2,17 @@
 
 /**
  * In place of an order book (a sealed auction has none): the makers taking requests and
- * what the chain shows of the desk. Bonds, deal counts and slashes come from `desk.makers`;
- * the latest deals from `desk.deals`, which hold no amounts and no trader.
+ * what the chain shows of the desk. Bonds and slashes come from `desk.makers`; the latest
+ * deals from `desk.deals`, which hold no amounts and no trader, and each maker's record
+ * (settled and lapsed of its recent deals) is counted from them (`readMakerRecords`).
  */
-import { accountUrl } from "@hushd/sdk";
+import { accountUrl, LAPSE_MAX_RATE, LAPSE_MIN_DEALS, lapsesTooOften, RECORD_WINDOW } from "@hushd/sdk";
 import Link from "next/link";
 import { Reveal } from "@/components/ui/Reveal";
 import { NETWORK } from "@/lib/hushd/config";
 import { CLASS_WORDS, dealState, StateDot } from "@/lib/hushd/deal";
 import { fmt, symbol } from "@/lib/hushd/format";
+import { lapsePercent } from "@/lib/hushd/record";
 import { ago } from "./pairs";
 import type { DeskPublic, Polled } from "./useMarket";
 
@@ -60,9 +62,9 @@ export function Makers({ desk, now }: { desk: Polled<DeskPublic>; now: number })
                     Bond
                   </th>
                   <th scope="col" className="text-right">
-                    Deals
+                    Record
                   </th>
-                  <th scope="col" className="text-right">
+                  <th scope="col" className="tt-col-slashed text-right">
                     Slashed
                   </th>
                 </tr>
@@ -70,29 +72,53 @@ export function Makers({ desk, now }: { desk: Polled<DeskPublic>; now: number })
               <tbody>
                 {active.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="text-mute">
+                    <td colSpan={4} className="whitespace-normal text-mute">
                       No maker is taking requests right now.
                     </td>
                   </tr>
                 )}
-                {active.map(([acc, m]) => (
-                  <tr key={acc}>
-                    <td>
-                      <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="block text-foreground hover:underline hover:decoration-line-strong hover:underline-offset-4">
-                        {m.name}
-                      </a>
-                      <span className="block text-[12px] text-mute">{STYLE_WORDS[m.style] ?? m.style}</span>
-                    </td>
-                    <td className="text-right">
-                      <span className="text-foreground">{fmt(BOND, BigInt(m.bond), 0)}</span>
-                      <span className="block text-[12px] text-mute">{BigInt(m.locked) > 0n ? `${fmt(BOND, BigInt(m.locked), 0)} locked` : symbol(BOND)}</span>
-                    </td>
-                    <td className="text-right text-foreground">{m.deals}</td>
-                    <td className="text-right">{BigInt(m.slashed) > 0n ? fmt(BOND, BigInt(m.slashed), 0) : "0"}</td>
-                  </tr>
-                ))}
+                {active.map(([acc, m]) => {
+                  const r = d.records.get(acc);
+                  const skipped = lapsesTooOften(r);
+                  return (
+                    <tr key={acc} data-maker={acc}>
+                      <td>
+                        <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="block text-foreground hover:underline hover:decoration-line-strong hover:underline-offset-4">
+                          {m.name}
+                        </a>
+                        <span className="flex items-center gap-1.5 whitespace-normal text-[12px] text-mute">
+                          {skipped && <StateDot tone="bad" />}
+                          {skipped ? "Skipped: lapses too often" : (STYLE_WORDS[m.style] ?? m.style)}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <span className="text-foreground">{fmt(BOND, BigInt(m.bond), 0)}</span>
+                        <span className="block text-[12px] text-mute">{BigInt(m.locked) > 0n ? `${fmt(BOND, BigInt(m.locked), 0)} locked` : symbol(BOND)}</span>
+                      </td>
+                      <td className="text-right">
+                        {r && r.ended > 0 ? (
+                          <>
+                            <span className="text-foreground">{r.settled} settled</span>
+                            <span className="block text-[12px] text-mute">
+                              {r.lapsed} lapsed, {lapsePercent(r)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-mute">None this week</span>
+                        )}
+                      </td>
+                      <td className="tt-col-slashed text-right">{BigInt(m.slashed) > 0n ? fmt(BOND, BigInt(m.slashed), 0) : "0"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+            <p className="border-t border-line px-4 py-2.5 text-[12px] leading-relaxed text-mute">
+              Record: its last {RECORD_WINDOW} deals that ended in the past week. A request skips a maker that let more than {LAPSE_MAX_RATE * 100}% lapse, once {LAPSE_MIN_DEALS} have ended.{" "}
+              <Link href="/docs/desk#last-look" className="text-soft underline decoration-line-strong underline-offset-4 hover:text-foreground">
+                Why
+              </Link>
+            </p>
           </div>
           <div className="tt-makers-side" data-reveal-item>
             <dl className="grid grid-cols-3 gap-px border-b border-line bg-line text-[12px]">

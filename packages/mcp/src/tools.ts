@@ -14,9 +14,13 @@ import {
   deskView,
   encodeProof,
   isOwnLink,
+  LAPSE_MAX_RATE,
+  LAPSE_MIN_DEALS,
   linkToken,
   linkUrl,
   makeNote,
+  makersToAsk,
+  MAX_ASKED_MAKERS,
   openRfq,
   packageRequest,
   parseLink,
@@ -25,6 +29,8 @@ import {
   proveFunds,
   proveReceipt,
   proveVolume,
+  readMakerRecords,
+  RECORD_WINDOW,
   sentLinks,
   settleAsTrader,
   takeBackLink,
@@ -70,8 +76,24 @@ export function registerReadTools(server: McpServer, net: HushdNetwork, vkey: (k
   );
   server.registerTool(
     "hushd_makers",
-    { title: "Makers", description: "Market makers taking requests now: name, pricing style, bond, deals and slashed amount. Paused accounts only with include_inactive.", inputSchema: { include_inactive: z.boolean().default(false) }, annotations: { readOnlyHint: true } },
-    ({ include_inactive }) => run(async () => (await deskView.makers(net)).filter(([, m]) => include_inactive || m.active).map(([account, m]) => ({ account, ...m }))),
+    {
+      title: "Makers",
+      description: `Market makers taking requests now: name, pricing style, bond, deals and slashed amount, and each one's record from the desk's receipts: of its last ${RECORD_WINDOW} ended deals (none older than a week), how many settled and how many it let lapse. A request skips a maker that let more than ${LAPSE_MAX_RATE * 100}% lapse once ${LAPSE_MIN_DEALS} have ended (asked: false). Paused accounts only with include_inactive.`,
+      inputSchema: { include_inactive: z.boolean().default(false) },
+      annotations: { readOnlyHint: true },
+    },
+    ({ include_inactive }) =>
+      run(async () => {
+        const [makers, { records }] = await Promise.all([deskView.makers(net), readMakerRecords(net)]);
+        const asked = new Set(makersToAsk(makers, records, MAX_ASKED_MAKERS).ask.map(([account]) => account));
+        return makers
+          .filter(([, m]) => include_inactive || m.active)
+          .map(([account, m]) => {
+            const r = records.get(account);
+            const record = { ended: r?.ended ?? 0, settled: r?.settled ?? 0, lapsed: r?.lapsed ?? 0, missed_hedges: r?.missedHedges ?? 0, open: r?.open ?? 0, lapse_rate: r?.lapseRate ?? null };
+            return { account, ...m, record, asked: asked.has(account) };
+          });
+      }),
   );
   server.registerTool(
     "hushd_desk_deals",
@@ -111,11 +133,11 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
 
   server.registerTool(
     "hushd_balance",
-    { title: "Private balance", description: "Sync with the pool and the board, then list this agent's private balance per token.", annotations: { readOnlyHint: true } },
+    { title: "Private balance", description: "Sync with the pool and the board, then list this agent's private balance per token. A deal's tokens not yet in the balance (deal_notes_moving) are moved into it during the sync, a private send to itself.", annotations: { readOnlyHint: false } },
     () =>
       run(async () => {
         await wallet.sync();
-        return { balances: net.tokens.map((t) => ({ token: t.symbol, amount: formatUnits(wallet.balances().get(t.id) ?? 0n, t.decimals) })), pending_notes: wallet.pending().length };
+        return { balances: net.tokens.map((t) => ({ token: t.symbol, amount: formatUnits(wallet.balances().get(t.id) ?? 0n, t.decimals) })), pending_notes: wallet.pending().length, deal_notes_moving: wallet.dealNotes().filter((n) => !n.ended).length };
       }),
   );
 
@@ -310,14 +332,15 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         a.limits.check(sell.token, sell.amount);
         await wallet.sync();
         const draft = { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: floor } };
-        const { request, ask, refundBlinding } = packageRequest(a.id, net, draft);
+        // the request names a one-time address for this deal alone: the maker it goes to cannot link it to this agent's other deals
+        const { request, ask, refundBlinding, dealIdentity } = packageRequest(a.id, net, draft);
         const opened = await openRfq({ net, api: a.api, relayer: a.relayer, request, ask, windowMs: window_seconds * 1000 });
-        const match = await awaitMatch(a.api, a.id, opened.rfqId, window_seconds * 1000 + 120_000);
+        const match = await awaitMatch(a.api, dealIdentity, opened.rfqId, window_seconds * 1000 + 120_000);
         checkMatchedTerms(match.terms, draft);
         if (BigInt(match.terms.bond) > 0n && net.bondToken) await wallet.expect(makeNote(a.id.pk, net.bondToken, BigInt(match.terms.bond), refundBlinding), { memo: "Bond paid to you", dealId: String(match.dealId) });
         const record = { dealId: match.dealId, rfqId: opened.rfqId, role: "trader" as const, kind, maker: match.terms.maker, class: match.terms.class, gave: match.terms.traderGives, got: match.terms.makerGives, bond: match.terms.bond, refundBlinding: refundBlinding.toString(), atMs: Date.now() };
         await wallet.rememberDeal(record);
-        await settleAsTrader({ net, api: a.api, wallet, dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address, refundBlinding });
+        const { moved } = await settleAsTrader({ net, api: a.api, wallet, dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address, refundBlinding });
         await wallet.rememberDeal({ ...record, settledAtMs: Date.now() });
         a.limits.record(sell.token, sell.amount);
         return {
@@ -327,6 +350,9 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
           got: human(net, match.terms.makerGives.token, BigInt(match.terms.makerGives.amount)),
           settlement: match.terms.class,
           hedge: match.terms.hedge ?? null,
+          // the maker paid this deal's one-time address; a private send moves it into the balance (a later sync retries it)
+          in_balance: moved.state === "moved",
+          ...(moved.state === "moved" && moved.txHash ? { move_tx: moved.txHash } : {}),
         };
       }),
   );

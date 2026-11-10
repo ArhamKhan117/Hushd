@@ -1,11 +1,12 @@
 "use client";
 
-import { accountUrl, custodyView, deskView, readLimit, type MakerView } from "@hushd/sdk";
+import { accountUrl, custodyView, deskView, readLimit, readMakerRecords, type MakerRecord, type MakerView } from "@hushd/sdk";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { NETWORK } from "@/lib/hushd/config";
 import { StateDot } from "@/lib/hushd/deal";
 import { fmt, symbol } from "@/lib/hushd/format";
+import { lapsePercent, RECORD_RULE, recordStanding } from "@/lib/hushd/record";
 
 const BOND = NETWORK.bondToken ?? NETWORK.tokens[0]!.id;
 /** Anyone can register as a maker: read their policy wallets two at a time, not all at once. */
@@ -25,6 +26,9 @@ export default function MakersPage() {
   const [error, setError] = useState<string | null>(null);
   // the owner of each maker's policy wallet, read on chain (an implicit account is its wallet key)
   const [wallets, setWallets] = useState<Record<string, { owner: string; frozen: boolean }>>({});
+  // each maker's record, counted from the desk's own deals: what a request checks before it asks
+  const [records, setRecords] = useState<Map<string, MakerRecord> | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([deskView.makers(NETWORK), deskView.enclave(NETWORK)])
@@ -37,6 +41,10 @@ export default function MakersPage() {
       })
       .then((found) => setWallets(Object.fromEntries(found.flatMap(({ acc, policy }) => (policy ? [[acc, policy]] : [])))))
       .catch((e: Error) => setError(e.message));
+    read(() => readMakerRecords(NETWORK)).then(
+      (r) => setRecords(r.records),
+      (e: Error) => setRecordError(e.message),
+    );
   }, []);
 
   // a paused desk account with no bond belongs to a maker that quotes from a policy wallet: list those apart
@@ -87,6 +95,7 @@ export default function MakersPage() {
                     <dd className="tnum text-foreground">{fmt(BOND, BigInt(m.slashed))}</dd>
                   </div>
                 </dl>
+                <TrackRecord record={records?.get(acc)} loading={!records && !recordError} failed={recordError} />
                 <p className="flex items-start gap-2 border-t border-line pt-3 text-[13px] leading-relaxed text-soft">
                   {wallets[acc] ? (
                     <>
@@ -110,6 +119,8 @@ export default function MakersPage() {
             ))}
           </ul>
         )}
+
+        {current && current.length > 0 && <p className="max-w-[64ch] text-[13.5px] leading-relaxed text-soft">{RECORD_RULE}</p>}
 
         {retired.length > 0 && (
           <section className="grid gap-2">
@@ -161,5 +172,46 @@ export default function MakersPage() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+/** A maker's recent record: settled, lapsed and the lapse rate, and whether requests ask it. */
+function TrackRecord({ record, loading, failed }: { record: MakerRecord | undefined; loading: boolean; failed: string | null }) {
+  if (loading) return <div className="hd-skeleton h-[60px]" aria-label="Reading its record" />;
+  if (failed)
+    return (
+      <p className="border-t border-line pt-3 text-[13px] text-mute" title={failed}>
+        Its record could not be read just now.
+      </p>
+    );
+  const standing = recordStanding(record);
+  return (
+    <div className="grid gap-2 border-t border-line pt-3 text-[13px]" data-record>
+      {record && record.ended > 0 && (
+        <dl className="grid grid-cols-3 gap-x-4">
+          <div>
+            <dt className="text-mute">Settled</dt>
+            <dd className="tnum text-foreground">{record.settled}</dd>
+          </div>
+          <div>
+            <dt className="text-mute">Lapsed</dt>
+            <dd className="tnum text-foreground">{record.lapsed}</dd>
+          </div>
+          <div>
+            <dt className="text-mute">Lapse rate</dt>
+            <dd className="tnum text-foreground">{lapsePercent(record)}</dd>
+          </div>
+        </dl>
+      )}
+      <p className="flex items-start gap-2 leading-relaxed text-soft">
+        <span className="flex h-[1lh] shrink-0 items-center">
+          <StateDot tone={standing.tone} />
+        </span>
+        <span>
+          {record && record.ended > 0 ? `Last ${record.ended} ended ${record.ended === 1 ? "deal" : "deals"}. ` : ""}
+          {standing.words}.
+        </span>
+      </p>
+    </div>
   );
 }
