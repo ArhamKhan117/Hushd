@@ -168,9 +168,16 @@ test("a deal's receipt reads in words: repeats folded, amounts in tokens, events
   await expect(main).not.toContainText("1000000000");
 });
 
-test("dark theme keeps text readable", async ({ page }) => {
+test("the site opens light, even when the system is dark", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("dark theme keeps text readable", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("hushd_theme", "dark"));
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const [bg, fg] = await page.evaluate(() => {
     const s = getComputedStyle(document.body);
     return [s.backgroundColor, s.color];
@@ -375,4 +382,17 @@ test.describe("NEAR AI intake (Hushd API stubbed)", () => {
     await off.getByRole("button", { name: "Fill the form" }).click();
     await expect(page.getByRole("button", { name: "Fill the form" }).first()).toHaveAttribute("aria-pressed", "true");
   });
+});
+
+test("the sidebar's network menu shows mainnet as coming soon", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/app");
+  const sidebar = page.getByRole("complementary", { name: "App" });
+  await sidebar.getByRole("button", { name: "Network: NEAR testnet" }).click();
+  const list = page.getByRole("listbox", { name: "Network" });
+  await expect(list.getByRole("option", { name: /NEAR testnet/ })).toHaveAttribute("aria-selected", "true");
+  const mainnet = list.getByRole("option", { name: /NEAR mainnet/ });
+  await expect(mainnet).toHaveAttribute("aria-disabled", "true");
+  await expect(mainnet).toContainText("Soon");
+  await expect(page.getByText("Hushd on NEAR testnet (Mainnet ready).")).toBeVisible();
 });

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { Select } from "@/components/ui/Select";
 import { IS_TESTNET, NETWORK } from "@/lib/hushd/config";
 import { icons } from "./icons";
 import { WalletMenu } from "./WalletMenu";
@@ -148,15 +149,20 @@ function TabBar({ pathname }: { pathname: string }) {
   );
 }
 
+/** The network this app runs on, as a dropdown: the other network shows as coming soon. */
 function NetworkBadge() {
+  const other = IS_TESTNET ? "mainnet" : "testnet";
   return (
-    <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2 text-[13px]">
-      <span className="flex items-center gap-2 text-soft">
-        <span aria-hidden className="livedot h-1.5 w-1.5 rounded-full bg-accent" />
-        NEAR {NETWORK.id}
-      </span>
-      <span className="text-faint">{IS_TESTNET ? "test tokens" : "real tokens"}</span>
-    </div>
+    <Select
+      label="Network"
+      variant="row"
+      value={NETWORK.id}
+      onChange={() => {}}
+      options={[
+        { value: NETWORK.id, label: `NEAR ${NETWORK.id}`, icon: <span className="livedot h-1.5 w-1.5 rounded-full bg-accent" /> },
+        { value: other, label: `NEAR ${other}`, icon: <span className="h-1.5 w-1.5 rounded-full bg-line-strong" />, badge: IS_TESTNET ? "Soon" : undefined, disabled: true },
+      ]}
+    />
   );
 }
 
@@ -250,7 +256,7 @@ export function AppShell({ children, title, subtitle, actions }: { children: Rea
         </main>
         <footer className="mx-auto w-full max-w-[1120px] px-4 pb-8 sm:px-8">
           <div className="flex flex-col gap-3 border-t border-line pt-5 text-[12.5px] text-mute sm:flex-row sm:items-center sm:justify-between sm:gap-8">
-            <p>Hushd on NEAR {NETWORK.id}. {IS_TESTNET ? "Test tokens only." : "Real tokens."} Not investment, legal or tax advice.</p>
+            <p>Hushd on NEAR {NETWORK.id}{IS_TESTNET ? " (Mainnet ready)" : ""}. {IS_TESTNET ? "Test tokens only." : "Real tokens."} Not investment, legal or tax advice.</p>
             {/* the links keep one line beside the note; the note wraps instead */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:shrink-0">
               <Link href="/verify" className="hover:text-foreground">Verify a proof</Link>

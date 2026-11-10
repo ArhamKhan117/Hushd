@@ -1,7 +1,7 @@
 "use client";
 
 import { accountUrl, custodyView, deskView, readLimit, readMakerRecords, type MakerRecord, type MakerView } from "@hushd/sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { NETWORK } from "@/lib/hushd/config";
 import { StateDot } from "@/lib/hushd/deal";
@@ -120,56 +120,74 @@ export default function MakersPage() {
           </ul>
         )}
 
-        {current && current.length > 0 && <p className="max-w-[64ch] text-[13.5px] leading-relaxed text-soft">{RECORD_RULE}</p>}
+        {makers && (
+          <div className="hd-card divide-y divide-line">
+            {current && current.length > 0 && (
+              <Note label="How a record counts">
+                <p>{RECORD_RULE}</p>
+              </Note>
+            )}
 
-        {retired.length > 0 && (
-          <section className="grid gap-2">
-            <p className="t-label">Paused accounts</p>
-            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">These desk accounts are paused and hold no bond: their makers quote from policy wallets instead. Their deals stay on record.</p>
-            <ul className="grid gap-1.5 text-[13px]">
-              {retired.map(([acc, m]) => (
-                <li key={acc} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                  <span className="text-foreground">{m.name}</span>
-                  <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="text-mute underline decoration-line-strong underline-offset-4 hover:text-foreground">
-                    {acc}
-                  </a>
-                  <span className="tnum text-mute">
-                    {m.deals} {m.deals === 1 ? "deal" : "deals"}
-                    {BigInt(m.slashed) > 0n ? `, ${fmt(BOND, BigInt(m.slashed))} ${symbol(BOND)} slashed` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+            {retired.length > 0 && (
+              <Note label="Paused accounts">
+                <p>These desk accounts are paused and hold no bond: their makers quote from policy wallets instead. Their deals stay on record.</p>
+                <ul className="mt-4 divide-y divide-line rounded-xl border border-line text-[13px]">
+                  {retired.map(([acc, m]) => (
+                    <li key={acc} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+                      <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                        <span className="font-medium text-foreground">{m.name}</span>
+                        <a href={accountUrl(NETWORK, acc)} target="_blank" rel="noreferrer" className="break-all text-mute underline decoration-line-strong underline-offset-4 hover:text-foreground">
+                          {acc}
+                        </a>
+                      </span>
+                      <span className="tnum text-mute">
+                        {m.deals} {m.deals === 1 ? "deal" : "deals"}
+                        {BigInt(m.slashed) > 0n ? `, ${fmt(BOND, BigInt(m.slashed))} ${symbol(BOND)} slashed` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Note>
+            )}
+
+            {enclave && (
+              <Note label="The matcher">
+                <p>
+                  Requests and quotes are opened only inside a TEE: the matcher runs as the OutLayer project <span className="text-foreground">{enclave.project.split("@")[0]}</span>
+                  {enclave.project.includes("@") && (
+                    <>
+                      {" "}
+                      (pinned to build <span className="font-mono text-foreground">{enclave.project.split("@")[1]!.slice(0, 12)}…</span>, changed only after the desk&apos;s timelock)
+                    </>
+                  )}
+                  , with keys generated inside the enclave. The desk accepts a match only from OutLayer&apos;s on-chain callback or signed by this enclave key.
+                </p>
+                <dl className="mt-4 grid gap-3 text-[13px] sm:grid-cols-2">
+                  {(
+                    [
+                      ["Signing key", enclave.sign_key],
+                      ["Sealing key", enclave.enc_key],
+                    ] as const
+                  ).map(([k, v]) => (
+                    <div key={k} className="rounded-xl border border-line px-4 py-3">
+                      <dt className="text-mute">{k}</dt>
+                      <dd className="mt-1 break-all font-mono text-[12.5px] text-foreground">{short(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Note>
+            )}
+
+            <Note label="Run your own maker">
+              <p>
+                A maker is an agent with a NEAR account (best a policy wallet, so it never holds a NEAR key), a quote key and a bond. It reads the asks sealed to it, prices them (Hyperliquid mids and NEAR Intents quotes for reference), seals a signed quote to the enclave and settles its leg in the pool. The reference makers in this repo are a starting point.
+              </p>
+              <a href="/docs/makers" className="btn btn-ghost btn-sm mt-4 w-fit">
+                Read the maker guide
+              </a>
+            </Note>
+          </div>
         )}
-
-        {enclave && (
-          <section className="grid gap-2">
-            <p className="t-label">The matcher</p>
-            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">
-              Requests and quotes are opened only inside a TEE: the matcher runs as the OutLayer project <span className="text-foreground">{enclave.project.split("@")[0]}</span>
-              {enclave.project.includes("@") && (
-                <>
-                  {" "}
-                  (pinned to build <span className="font-mono text-foreground">{enclave.project.split("@")[1]!.slice(0, 12)}…</span>, changed only after the desk&apos;s timelock)
-                </>
-              )}
-              , with keys generated inside the enclave. The desk accepts a match only from OutLayer&apos;s on-chain callback or signed by this enclave key.
-            </p>
-            <p className="break-all text-[12.5px] text-mute">Signing key {short(enclave.sign_key)} · Sealing key {short(enclave.enc_key)}</p>
-          </section>
-        )}
-
-        <section className="grid gap-2">
-          <p className="t-label">Run your own maker</p>
-          <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">
-            A maker is an agent with a NEAR account (best a policy wallet, so it never holds a NEAR key), a quote key and a bond. It reads the asks sealed to it, prices them (Hyperliquid mids and NEAR Intents quotes for reference), seals a signed quote to the enclave and settles its leg in the pool. The reference makers in this repo are a starting point:{" "}
-            <a href="/docs/makers" className="text-foreground underline decoration-line-strong underline-offset-4">
-              maker guide
-            </a>
-            .
-          </p>
-        </section>
       </div>
     </AppShell>
   );
@@ -213,5 +231,15 @@ function TrackRecord({ record, loading, failed }: { record: MakerRecord | undefi
         </span>
       </p>
     </div>
+  );
+}
+
+/** One part of the notes card under the makers: its label on the left on wide screens, above on narrow ones. */
+function Note({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="grid gap-3 p-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-8 sm:p-6">
+      <h2 className="text-[14px] font-medium text-foreground">{label}</h2>
+      <div className="max-w-[68ch] text-[14px] leading-relaxed text-soft">{children}</div>
+    </section>
   );
 }

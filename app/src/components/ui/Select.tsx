@@ -36,6 +36,8 @@ export type SelectOption<V extends string | number = string> = {
   icon?: ReactNode;
   /** A second, quieter line in the row. */
   description?: string;
+  /** A small tag at the row's end, such as "Soon". */
+  badge?: string;
   disabled?: boolean;
 };
 
@@ -47,9 +49,10 @@ type Props<V extends string | number> = {
   label: string;
   /**
    * "pill": a compact pill beside a big value. "field": the form field look
-   * (.hd-input). Size it with `className`.
+   * (.hd-input). "row": a quiet full-width outlined row, as in the app's sidebar.
+   * Size it with `className`.
    */
-  variant?: "pill" | "field";
+  variant?: "pill" | "field" | "row";
   /** Line the list up with the button's left ("start") or right ("end") edge. */
   align?: "start" | "end";
   className?: string;
@@ -306,7 +309,9 @@ export function Select<V extends string | number>({
   const icon = selected?.icon;
 
   const trigger =
-    variant === "pill"
+    variant === "row"
+      ? "flex w-full items-center gap-2 rounded-xl border border-line px-3 py-2 text-left text-[13px] text-soft transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/50 aria-expanded:bg-surface aria-expanded:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+      : variant === "pill"
       ? `flex h-11 items-center gap-2 rounded-full bg-panel pr-3 text-[15px] font-medium text-foreground shadow-card transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/50 aria-expanded:ring-2 aria-expanded:ring-foreground/15 disabled:cursor-not-allowed disabled:opacity-45 ${
           icon ? "pl-1.5" : "pl-3.5"
         }`
@@ -334,7 +339,7 @@ export function Select<V extends string | number>({
             {icon}
           </span>
         )}
-        <span className={`min-w-0 truncate ${variant === "field" ? "flex-1" : ""} ${selected ? "" : "text-faint"}`}>
+        <span className={`min-w-0 truncate ${variant === "pill" ? "" : "flex-1"} ${selected ? "" : "text-faint"}`}>
           {triggerLabel}
         </span>
         <Chevron open={open} className={variant === "field" ? "pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" : ""} />
@@ -375,7 +380,7 @@ export function Select<V extends string | number>({
                     }}
                     className={`flex w-full select-none items-center gap-2.5 rounded-xl px-2.5 text-left text-[14px] transition-colors duration-150 motion-reduce:transition-none ${
                       twoLine ? "min-h-[52px] py-1.5" : "min-h-11"
-                    } ${o.disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"} ${active && !o.disabled ? "bg-surface" : ""}`}
+                    } ${o.disabled ? (o.badge ? "cursor-not-allowed text-mute" : "cursor-not-allowed opacity-45") : "cursor-pointer"} ${active && !o.disabled ? "bg-surface" : ""}`}
                   >
                     {o.icon && (
                       <span aria-hidden className="flex shrink-0">
@@ -386,6 +391,9 @@ export function Select<V extends string | number>({
                       <span className={`block truncate leading-tight ${isSelected ? "font-medium" : ""}`}>{o.label}</span>
                       {second && <span className="mt-0.5 block truncate text-[12px] leading-tight text-mute">{second}</span>}
                     </span>
+                    {o.badge && (
+                      <span className="shrink-0 rounded-full border border-line-strong bg-accent-soft px-2 py-0.5 text-[11px] font-medium leading-none text-accent">{o.badge}</span>
+                    )}
                     {isSelected && <Check />}
                   </div>
                 );
