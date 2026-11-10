@@ -17,6 +17,7 @@ import {
   freezeCall,
   hushdPolicyRules,
   isAddress,
+  readLimit,
   storePolicyCall,
   txUrl,
   unfreezeCall,
@@ -38,6 +39,13 @@ import { useHushd, type ChainCall } from "@/lib/hushd/session";
 
 const CUST = CUSTODY[NETWORK.id];
 const MILLI_NEAR = 10n ** 21n;
+
+/**
+ * Every chain read this page makes goes through here, two at a time: a burst of views
+ * trips the free RPCs' rate limits, and the browser's fallback answers its own 429s
+ * without CORS headers ("Failed to fetch").
+ */
+const read = readLimit(2);
 
 /** One row of `get_wallet_policies_by_owner` on OutLayer's contract. */
 interface OwnedWallet {
@@ -77,7 +85,7 @@ async function until(check: () => Promise<boolean>, tries = 8, gapMs = 1500): Pr
 }
 
 const readWallets = async (owner: string) =>
-  [...(await view<OwnedWallet[]>(NETWORK, CUST.contract, "get_wallet_policies_by_owner", { owner }))].sort((a, b) => b.updated_at - a.updated_at);
+  [...(await read(() => view<OwnedWallet[]>(NETWORK, CUST.contract, "get_wallet_policies_by_owner", { owner })))].sort((a, b) => b.updated_at - a.updated_at);
 
 function useOwnerWallets(owner: string) {
   const [wallets, setWallets] = useState<OwnedWallet[] | null>(null);
@@ -189,7 +197,7 @@ function HushdWallets({ owner, labels }: { owner: string; labels: WalletLabel[] 
   const { wallets, error } = useOwnerWallets(owner);
   const [makerNames, setMakerNames] = useState<Map<string, string>>(new Map());
   useEffect(() => {
-    deskView.makers(NETWORK).then(
+    read(() => deskView.makers(NETWORK)).then(
       (m) => setMakerNames(new Map(m.map(([acc, x]) => [acc, x.name]))),
       () => undefined,
     );
@@ -304,7 +312,7 @@ function YourWallets({ owner, wallets, error, reload, fresh }: { owner: string; 
     try {
       const freeze = !w.frozen;
       const { txHash } = await s.call(toChainCall((freeze ? freezeCall : unfreezeCall)(CUST.contract, w.wallet_pubkey)));
-      const ok = await until(async () => (await custodyView.policy(NETWORK, w.wallet_pubkey))?.frozen === freeze);
+      const ok = await until(async () => (await read(() => custodyView.policy(NETWORK, w.wallet_pubkey)))?.frozen === freeze);
       await reload();
       if (!ok) throw new Error(`The chain does not show the wallet ${freeze ? "frozen" : "unfrozen"} yet. Check the transaction, then reload this page.`);
       setLast({ hash: txHash, text: freeze ? `${shortAccount(accountOf(w))} is frozen: the TEE refuses every signature until you unfreeze it.` : `${shortAccount(accountOf(w))} is active again, inside its policy.` });
@@ -506,7 +514,7 @@ function CreateWallet({ owner, onCreated }: { owner: string; onCreated: (account
     setBusy(true);
     let stored = false;
     try {
-      const have = await accountBalance(NETWORK, owner);
+      const have = await read(() => accountBalance(NETWORK, owner));
       const need = form.fund + 20n * MILLI_NEAR;
       if (have === null || have < need) {
         throw new Error(`Your account holds ${nearText(have ?? 0n)} NEAR. This needs about ${nearText(need)} NEAR: the policy's storage deposit, ${nearText(form.fund)} NEAR for the wallet's gas, and the fees.`);
@@ -517,11 +525,11 @@ function CreateWallet({ owner, onCreated }: { owner: string; onCreated: (account
       set({ at: "sign" });
       const signed = await wallet.signPolicy(encrypted, owner);
       const pubkey = `ed25519:${signed.publicKeyHex}`;
-      const deposit = (await custodyView.cost(NETWORK, pubkey, encrypted)) + MILLI_NEAR;
+      const deposit = (await read(() => custodyView.cost(NETWORK, pubkey, encrypted))) + MILLI_NEAR;
       set({ at: "store", deposit });
       const { txHash } = await s.call(toChainCall(storePolicyCall(CUST.contract, signed.publicKeyHex, encrypted, signed.signatureHex, deposit)));
       set({ storeTx: txHash });
-      if (!(await until(async () => (await custodyView.policy(NETWORK, pubkey))?.owner === owner))) {
+      if (!(await until(async () => (await read(() => custodyView.policy(NETWORK, pubkey)))?.owner === owner))) {
         throw new Error("The chain does not show the policy yet, so the agent's key stays hidden. Check the transaction on NearBlocks before trying again.");
       }
       stored = true;

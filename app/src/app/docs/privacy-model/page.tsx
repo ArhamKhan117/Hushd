@@ -23,6 +23,7 @@ const ROWS: [string, string][] = [
   ["That a deal happened: its maker, class, expiry, bond, outcome and evidence", "Anyone"],
   ["A hedge order: the coin, the side, the size and the limit", "Anyone, on the desk and on Hyperliquid"],
   ["The agreed amounts, and who the trader was", "The trader and the winning maker"],
+  ["That a deal room message was sent: its deal, size and time, and the key it is sealed to", "The API, until the deal settles or closes, and a day at most"],
   ["Your words to the intake", "You and the attested model"],
   ["The fact a proof shows", "Whoever holds the proof"],
 ];
@@ -81,8 +82,9 @@ export default function PrivacyModelPage() {
       </p>
       <p>
         <strong>Hedges.</strong> A hedged deal carries its Hyperliquid order in the deal record, because the desk
-        rebuilds and signs that exact order. The order is public on Hyperliquid too, from an address used for that deal
-        only.
+        rebuilds and signs that exact order. The order is public on Hyperliquid too. It is signed from an address
+        derived for that deal, but that address trades for the maker&apos;s own Hyperliquid account, so all of one
+        maker&apos;s hedges show together on that account.
       </p>
       <p>
         <strong>Makers.</strong> Makers are public, like any market maker: their account, name, style, bond, deal
@@ -142,11 +144,19 @@ export default function PrivacyModelPage() {
           <strong>A hedged deal&apos;s size.</strong> The desk takes a bond only in fixed steps (its minimum times 1, 2,
           5, 10, 20, 50 and so on), so a public bond says only which step the trade falls in. The hedge order is
           different: it runs on Hyperliquid, a public venue, so its size is in the deal record and on Hyperliquid. A
-          spot deal has neither a bond nor a hedge.
+          spot deal has neither a bond nor a hedge. On Hyperliquid, every hedge a maker places shows on that
+          maker&apos;s account, whichever per-deal address signed it.
         </li>
         <li>
           <strong>Your receive address.</strong> The winning maker learns your hushd1… address, since it makes a note
           for you. Deals with the same maker from the same address can be linked by that maker.
+        </li>
+        <li>
+          <strong>Deal rooms.</strong> The two sides of a deal swap sealed messages through the API. It files the
+          maker&apos;s under the maker&apos;s public key, and the trader&apos;s under a key the trader&apos;s wallet
+          made for that deal alone, so nothing it holds says which deals a hushd1… address took part in. It sees each
+          message&apos;s deal, size and time, and deletes a room once its deal settles or closes on the desk, and any
+          message after a day.
         </li>
         <li>
           <strong>Request metadata.</strong> The API and the relayer see the network side of your requests: when they
@@ -185,8 +195,18 @@ export default function PrivacyModelPage() {
           </tr>
           <tr>
             <td>The API</td>
-            <td>Passing sealed messages on, and not logging their metadata</td>
-            <td>The content of any request, quote or deal room message</td>
+            <td>Passing sealed messages on, deleting deal rooms once their deals are done, and not logging their metadata</td>
+            <td>The content of any request, quote or deal room message, or which deals a hushd1… address took part in</td>
+          </tr>
+          <tr>
+            <td>The matcher client</td>
+            <td>Putting every sealed quote from the API&apos;s database into the enclave&apos;s batch: the enclave cannot tell if one is left out</td>
+            <td>The content of a request or a quote, or forging a match</td>
+          </tr>
+          <tr>
+            <td>The keeper</td>
+            <td>Reporting truly whether a hedge order filled: the desk releases or slashes the maker&apos;s bond on its word</td>
+            <td>Changing a hedge order, or moving a note</td>
           </tr>
           <tr>
             <td>The desk owner</td>

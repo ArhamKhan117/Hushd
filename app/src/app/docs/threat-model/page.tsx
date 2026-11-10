@@ -6,7 +6,7 @@ import { Callout } from "@/components/docs/FlowDiagram";
 export const metadata: Metadata = {
   title: "Security and threat model",
   description:
-    "What each part of Hushd can and cannot do to you: your keys, the relayer, the matcher enclave, the intake model, makers, the contracts and the development proving keys. Testnet only and not audited.",
+    "What each part of Hushd can and cannot do to you: your keys, the relayer, the matcher enclave, the intake model, Hushd's API, matcher client and keeper, makers, the contracts and the development proving keys. Testnet only and not audited.",
   alternates: { canonical: "/docs/threat-model" },
 };
 
@@ -45,6 +45,16 @@ export default function ThreatModelPage() {
         Your seed comes from a NEAR wallet&apos;s signature of one fixed message, or from a passkey. Anyone who gets it
         can spend your private balance. Malware on your device, or a tampered copy of the app, could take it. The app
         at hushd.net is open source; you can build and run it yourself instead.
+      </p>
+
+      <h2 id="agents">Agents</h2>
+      <p>
+        An agent&apos;s private balance is guarded by the spending limits in its local MCP server, which runs beside the
+        agent with its seed. The relayer sends whatever was proved and does not know those limits. Anything that can
+        read the seed, the agent itself included when it has shell or file access, can spend the whole balance without
+        asking the server. A policy wallet guards the agent&apos;s NEAR account in a TEE, not its private balance, so
+        keep in that balance only what the agent may lose. See{" "}
+        <Link href="/docs/agents#spending-limits">spending limits</Link>.
       </p>
 
       <h2 id="the-relayer">The relayer</h2>
@@ -88,18 +98,58 @@ export default function ThreatModelPage() {
       <h2 id="the-intake-model">The intake model</h2>
       <p>
         The API verifies the model&apos;s TDX and NVIDIA GPU attestation and gives your browser its signing key; your
-        browser encrypts your words to that key and checks the TEE&apos;s signature on the answer. The browser relies
-        on the API&apos;s attestation check; you can check the same model yourself at{" "}
+        browser encrypts your words to that key and checks the TEE&apos;s signature on the answer. It accepts only a
+        signature by that same key, whatever signer the API names, so an API that swapped in a key of its own for the
+        answer gets a draft marked not verified. The browser relies on the API&apos;s attestation check; you can check the same model yourself at{" "}
         <a href="https://cloud.near.ai/verify" target="_blank" rel="noreferrer">
           cloud.near.ai/verify
         </a>
         . Whatever the model answers is only a draft in a form you check.
       </p>
 
+      <h2 id="hushds-services">The API, the matcher client and the keeper</h2>
+      <p>
+        Hushd runs these services itself, next to the relayer. Their health is on{" "}
+        <Link href="/transparency">Transparency</Link>.
+      </p>
+      <ul>
+        <li>
+          <strong>The API</strong> stores the sealed requests, quotes and deal-room messages and hands them on. It
+          cannot open them, but it sees the network side of everything that passes through it: IP addresses, timing
+          and deal-room traffic. It can refuse, delay or drop a message. In a deal room it sees which deal each
+          message is for, its size and time, and the key it is sealed to: the maker&apos;s own, or a key the
+          trader&apos;s wallet made for that deal alone, which leads to no hushd1… address. It deletes a room once its
+          deal settles or closes on the desk, and any message after a day.
+        </li>
+        <li>
+          <strong>The matcher client</strong> builds each batch for the enclave from the quotes in the API&apos;s
+          database. It cannot read them or forge a match, but it could leave a quote out, and the enclave could not
+          tell: the best quote the enclave sees may not be the best one sent. It can also hold a batch back until the
+          match is too late for the desk.
+        </li>
+        <li>
+          <strong>The keeper</strong> submits each hedge order to Hyperliquid and alone reports whether it filled. The
+          desk releases or slashes the maker&apos;s bond on that report, so a false fill would keep a missed
+          hedge&apos;s bond from you, and a false miss would take an honest maker&apos;s bond. If the keeper reports
+          nothing, anyone may slash an overdue hedge (<code>slash_overdue</code>) and expire an unsettled deal
+          (<code>expire</code>).
+        </li>
+      </ul>
+
       <h2 id="makers">Makers</h2>
       <ul>
         <li>A maker can decline to quote, quote badly, or fail to settle. An unsettled deal expires, and nothing moves.</li>
-        <li>A maker that misses a hedge loses its bond to the trader.</li>
+        <li>
+          A maker has a last look. You prove your leg first and hand it over, and the maker submits both legs, so it
+          can wait out the settlement window and settle only if the price still suits it. On a spot deal that costs it
+          nothing, since there is no bond; a hedged deal&apos;s bond is released too when a deal expires unsettled.
+          See <Link href="/docs/desk#last-look">last look</Link>.
+        </li>
+        <li>
+          A maker that misses a hedge, as the keeper reports it, loses its bond to the trader. The hedge itself trades
+          for the maker&apos;s own Hyperliquid account: it does not hedge the trader (see{" "}
+          <Link href="/docs/packages#spot-and-hedge">packages</Link>).
+        </li>
         <li>
           A bond is public, so the desk takes it only in fixed steps of its minimum (1, 2, 5, 10, 20, 50 and so on
           times it): the bond says which step a trade falls in, not its size. A hedge order is public on Hyperliquid,

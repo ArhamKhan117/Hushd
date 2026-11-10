@@ -14,7 +14,7 @@
 - 1Click confidential quotes need a partner key (`ONECLICK_API_KEY`, sent as `X-API-Key`); public dry quotes need none.
 - The free neardata stream is slower than testnet; the indexer defaults to FastNEAR's transactions API (`INDEXER_SOURCE=transactions`).
 - RPC calls rotate across the free endpoints in `TESTNET.rpc` (or `MAINNET.rpc`) and rest one that rate-limits (`rpcOrder` in `packages/sdk/src/rpc.ts`); `app/csp.config.mjs` repeats both lists as its defaults, so change both together.
-  Servers read FastNEAR and keep dRPC as `rpcFallback`; the browser reads `browserRpc` (dRPC) first (`forBrowser`): FastNEAR's 429 carries no CORS headers, so a browser logs every one as a CORS error, and there FastNEAR is only the fallback. A local stack and a browser share one address, so the split keeps each on its own quota.
+  Servers read FastNEAR and keep dRPC as `rpcFallback`; the browser reads `browserRpc` (dRPC) first (`forBrowser`): FastNEAR's 429 carries no CORS headers, so a browser logs every one as a CORS error, and there FastNEAR is only the fallback. A local stack and a browser share one address, so the split keeps each on its own quota. A browser network (`retryRateLimited`, set by `forBrowser`) asks a rate-limited dRPC once more after a pause before falling back; a server falls back at once.
 - The app picks its network from `NEXT_PUBLIC_HUSHD_NETWORK` (testnet by default; `app/src/lib/hushd/config.ts`).
   Faucet and passkey activation are testnet only (`IS_TESTNET`); on mainnet a new passkey account waits for NEAR sent to it.
 - Free dRPC refuses transactions with more than about 2 KB of arguments ("method is not available"), so it only serves reads: build signers on `sendEndpoints(net)`, never `net.rpc`.
@@ -34,4 +34,6 @@
 - The API rate-limits per client in four budgets (`limitFor` in `services/src/api.ts`: market, makers, flow, rest). Local test runs share one address, so many parallel browsers can still exhaust the free RPCs (FastNEAR answers 429 without CORS headers, which a browser sees as "Failed to fetch").
 - `PrivateWallet.planLeg` holds the notes it picks until `settled` or `release`: a wallet settling two deals at once never spends one note twice.
   A held note counts toward the balance even after a sync sees it spent, and the leg's change is an expected note from the start: deals overlap all the time on the makers.
+- Deal rooms: a trader reads its room with `roomKeyFor(seed, refundBlinding)` and names it in its sealed plan (`replyTo`), never its address key; the API's `sweepDealRooms` deletes a room once its deal leaves matched/settling, and any message after a day.
+- The testnet e2e uses a stand-in intake model (its own key, routed in the test) whenever the API's NEAR AI attestation is unavailable. Parallel Playwright runs share `app/test-results` and wipe each other's traces: pass `--output <dir>`.
 - npm: `pnpm publish:packages` publishes protocol, sdk and mcp in that order; the `@hushd` scope is an npm org.

@@ -8,7 +8,7 @@
  * The API serves the same prices to the app (`marketRoutes`), so a trader sees what the
  * makers price from without the browser calling Hyperliquid itself.
  */
-import { CANDLE_INTERVALS, INTERVAL_MS, OneClick, quoteRequest, realizedVolBps, type Candle, type CandleInterval, type HushdNetwork, type MarketCandles, type MarketMids } from "@hushd/sdk";
+import { CANDLE_INTERVALS, INTERVAL_MS, OneClick, quoteRequest, realizedVolBps, type Candle, type CandleInterval, type HushdNetwork, type MarketCandles, type MarketMids, type TokenInfo } from "@hushd/sdk";
 import type { Hono } from "hono";
 import { settings } from "./config.js";
 import { BadRequest } from "./http.js";
@@ -36,6 +36,21 @@ export async function mids(): Promise<Record<string, number>> {
   for (const [k, v] of Object.entries(raw)) out[k] = Number(v);
   midsCache = { at: Date.now(), mids: out };
   return out;
+}
+
+/**
+ * The least to accept for `amount` of `sell` paid in `buy` at mid prices `m`, less
+ * `slippageBps`: a trade's `min_receive`, in `buy`'s own units ("0.0063"). Throws when a
+ * mid is missing, so a floor is never made up.
+ */
+export function minReceiveAt(m: Record<string, number>, sell: TokenInfo, amount: number, buy: TokenInfo, slippageBps = 300): string {
+  const usd = (t: TokenInfo) => (t.symbol === "USDC" ? 1 : t.hedgeCoin ? m[t.hedgeCoin] : undefined);
+  const sellUsd = usd(sell);
+  const buyUsd = usd(buy);
+  if (!sellUsd || !buyUsd) throw new Error(`No mid price for ${sellUsd ? buy.symbol : sell.symbol}`);
+  const text = (((amount * sellUsd) / buyUsd) * (1 - slippageBps / 10_000)).toFixed(Math.min(buy.decimals, 8));
+  if (!(Number(text) > 0)) throw new Error(`${amount} ${sell.symbol} is too small to price in ${buy.symbol}`);
+  return text;
 }
 
 /** Realized volatility over the last hour from 1-minute candles, in basis points. */

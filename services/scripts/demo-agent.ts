@@ -16,10 +16,11 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAgent, createServer } from "@hushd/mcp";
-import { CUSTODY, CustodyWallet, PolicyRefusal, type ProofKind } from "@hushd/sdk";
+import { CUSTODY, CustodyWallet, PolicyRefusal, TESTNET, tokenInfo, type ProofKind } from "@hushd/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Near } from "near-kit";
+import { mids, minReceiveAt } from "../src/market.js";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 process.loadEnvFile(join(ROOT, ".env"));
@@ -100,11 +101,13 @@ async function main() {
   console.log("x402 paid:", JSON.stringify(paid.paid));
   await call("hushd_cash_out", { to_account: account, token: "USDC", amount: "10" });
   await call("hushd_balance");
-  await call("hushd_trade", { kind: "spot", sell_token: "USDC", sell_amount: "500", buy_token: "BTC", window_seconds: 30 });
+  // the floor: the mid price less 3%, so a maker quoting far below the market cannot fill it
+  const floor = async (sell: string, amount: number, buy: string) => minReceiveAt(await mids(), tokenInfo(TESTNET, sell), amount, tokenInfo(TESTNET, buy));
+  await call("hushd_trade", { kind: "spot", sell_token: "USDC", sell_amount: "500", buy_token: "BTC", min_receive: await floor("USDC", 500, "BTC"), window_seconds: 30 });
   await call("hushd_prove", { what: "payment", reader: "judge.testnet", days: 30 });
   await call("hushd_prove", { what: "funds", reader: "judge.testnet", days: 30, token: "USDC", threshold: "1000" });
   // a maker quotes a hedged package only with Hyperliquid testnet margin behind it
-  await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: "2000", buy_token: "wNEAR", window_seconds: 30 }).catch((e) => console.log(`\n= hedged trade not matched (${(e as Error).message}): no maker has Hyperliquid margin yet`));
+  await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: "2000", buy_token: "wNEAR", min_receive: await floor("USDC", 2000, "wNEAR"), window_seconds: 30 }).catch((e) => console.log(`\n= hedged trade not matched (${(e as Error).message}): no maker has Hyperliquid margin yet`));
   await call("hushd_my_deals");
   await client.close();
   process.exit(0);

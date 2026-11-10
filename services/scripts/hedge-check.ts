@@ -20,13 +20,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAgent, createServer } from "@hushd/mcp";
-import { deskView, keepRpcErrorBodies, sendEndpoints, TESTNET, type ProofKind } from "@hushd/sdk";
+import { deskView, keepRpcErrorBodies, sendEndpoints, TESTNET, tokenInfo, type ProofKind } from "@hushd/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Near } from "near-kit";
 import { addressOfKey, approveDealAgent, dealAddress } from "../src/hyperliquid.js";
 import { hedgeMargin } from "../src/makers.js";
-import { hedgePerps, hedgeWithdrawable, mids } from "../src/market.js";
+import { hedgePerps, hedgeWithdrawable, mids, minReceiveAt } from "../src/market.js";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
 process.loadEnvFile(join(ROOT, ".env"));
@@ -132,7 +132,8 @@ async function run() {
     await near.transaction(deployer).functionCall(net.tokens[0]!.id, "mint", { account_id: account, amount: String((RUN.sellUsdc + 100) * 1e6) }, { gas: "30 Tgas" }).send();
     await call("hushd_shield", { token: "USDC", amount: String(RUN.sellUsdc + 50) });
   }
-  const trade = (await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: String(RUN.sellUsdc), buy_token: "wNEAR", window_seconds: 30 })) as { deal_id?: string | number };
+  const minReceive = minReceiveAt(await mids(), tokenInfo(net, "USDC"), RUN.sellUsdc, tokenInfo(net, "wNEAR"));
+  const trade = (await call("hushd_trade", { kind: "spot_hedge", sell_token: "USDC", sell_amount: String(RUN.sellUsdc), buy_token: "wNEAR", min_receive: minReceive, window_seconds: 30 })) as { deal_id?: string | number };
   const dealId = Number(trade.deal_id);
   console.log(`deal ${dealId} settled its spot legs; the keeper now runs the hedge leg`);
   const start = Date.now();

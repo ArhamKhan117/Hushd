@@ -1,6 +1,6 @@
 "use client";
 
-import { accountUrl, custodyView, deskView, type MakerView } from "@hushd/sdk";
+import { accountUrl, custodyView, deskView, readLimit, type MakerView } from "@hushd/sdk";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { NETWORK } from "@/lib/hushd/config";
@@ -8,6 +8,8 @@ import { StateDot } from "@/lib/hushd/deal";
 import { fmt, symbol } from "@/lib/hushd/format";
 
 const BOND = NETWORK.bondToken ?? NETWORK.tokens[0]!.id;
+/** Anyone can register as a maker: read their policy wallets two at a time, not all at once. */
+const read = readLimit(2);
 
 const STYLE_WORDS: Record<string, string> = {
   fixed: "Fixed spread: 25 bps on every quote",
@@ -30,7 +32,7 @@ export default function MakersPage() {
         setMakers(m);
         setEnclave(e);
         return Promise.all(
-          m.filter(([acc]) => /^[0-9a-f]{64}$/.test(acc)).map(async ([acc]) => ({ acc, policy: await custodyView.policy(NETWORK, `ed25519:${acc}`).catch(() => null) })),
+          m.filter(([acc]) => /^[0-9a-f]{64}$/.test(acc)).map(async ([acc]) => ({ acc, policy: await read(() => custodyView.policy(NETWORK, `ed25519:${acc}`)).catch(() => null) })),
         );
       })
       .then((found) => setWallets(Object.fromEntries(found.flatMap(({ acc, policy }) => (policy ? [[acc, policy]] : [])))))

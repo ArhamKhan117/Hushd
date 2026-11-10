@@ -4,7 +4,7 @@ import { after, describe, test } from "node:test";
 import { MAINNET, TESTNET, type HushdNetwork, type MarketCandles, type MarketMids } from "@hushd/sdk";
 import { buildApi } from "../src/api.js";
 import { Db } from "../src/db.js";
-import { parseCandles } from "../src/market.js";
+import { minReceiveAt, parseCandles } from "../src/market.js";
 
 const MIN = 60_000;
 
@@ -134,4 +134,16 @@ describe("market routes (Hyperliquid stubbed, no network)", () => {
     ]);
     assert.throws(() => parseCandles({ error: "x" }), /other than candles/);
   });
+});
+
+test("a trade's floor comes from the mids less the slippage, and is never made up", () => {
+  const usdc = TESTNET.tokens.find((t) => t.symbol === "USDC")!;
+  const btc = TESTNET.tokens.find((t) => t.symbol === "BTC")!;
+  const wnear = TESTNET.tokens.find((t) => t.symbol === "wNEAR")!;
+  const m = { BTC: 100_000, NEAR: 4 };
+  assert.equal(minReceiveAt(m, usdc, 500, btc), "0.00485000");
+  assert.equal(minReceiveAt(m, wnear, 5, btc, 100), "0.00019800");
+  assert.equal(minReceiveAt(m, usdc, 2000, wnear), "485.00000000");
+  assert.throws(() => minReceiveAt({ BTC: 100_000 }, usdc, 10, wnear), /No mid price for wNEAR/);
+  assert.throws(() => minReceiveAt(m, usdc, 0.000001, btc), /too small/);
 });

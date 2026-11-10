@@ -37,11 +37,12 @@ import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import { createAgent, createServer } from "@hushd/mcp";
-import { MAINNET, MAINNET_USDC, type MarketCandles, type MarketMids, type ProofKind } from "@hushd/sdk";
+import { MAINNET, MAINNET_USDC, tokenInfo, type MarketCandles, type MarketMids, type ProofKind } from "@hushd/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Near } from "near-kit";
 import { Sandbox, type StateRecord } from "near-kit/sandbox";
+import { mids as hlMids, minReceiveAt } from "../src/market.js";
 import { deployHushd } from "./deploy.js";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
@@ -305,7 +306,9 @@ async function main() {
     assert.equal(friend.wallet.balances().get(USDC), 25_000_000n);
     pass("a private send reached the second agent", "25 USDC, found by trial decryption on the board");
 
-    const spot = await tool("hushd_trade", { kind: "spot", sell_token: "USDC", sell_amount: "1000", buy_token: "wNEAR", window_seconds: 15 });
+    // each floor: the mid price less 3%, the least the agent accepts
+    const floor = async (sell: string, amount: number, buy: string) => minReceiveAt(await hlMids(), tokenInfo(MAINNET, sell), amount, tokenInfo(MAINNET, buy));
+    const spot = await tool("hushd_trade", { kind: "spot", sell_token: "USDC", sell_amount: "1000", buy_token: "wNEAR", min_receive: await floor("USDC", 1000, "wNEAR"), window_seconds: 15 });
     // a finished deal is closed, and its receipt carries the outcome
     const settled = async (dealId: number) => {
       const d = await viewOf<{ status: string; receipt: { outcome: string } | null }>(net.desk!, "deal", { deal_id: String(dealId) });
@@ -313,7 +316,7 @@ async function main() {
     };
     assert.equal(await settled(spot.deal_id as number), "closed/settled");
     pass("a spot trade matched in the sealed auction and settled privately", `deal ${spot.deal_id} with ${spot.maker}: gave ${spot.gave}, got ${spot.got}`);
-    const btcTrade = await tool("hushd_trade", { kind: "spot", sell_token: "wNEAR", sell_amount: "5", buy_token: "BTC", window_seconds: 15 });
+    const btcTrade = await tool("hushd_trade", { kind: "spot", sell_token: "wNEAR", sell_amount: "5", buy_token: "BTC", min_receive: await floor("wNEAR", 5, "BTC"), window_seconds: 15 });
     assert.equal(await settled(btcTrade.deal_id as number), "closed/settled");
     pass("a wNEAR to BTC trade settled in real-code nBTC", `deal ${btcTrade.deal_id}: gave ${btcTrade.gave}, got ${btcTrade.got}`);
 
