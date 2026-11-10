@@ -49,7 +49,7 @@ pub fn hash3(a: &Field, b: &Field, c: &Field) -> Field {
     from_fr(&permute([Fr::zero(), to_fr(a), to_fr(b), to_fr(c)], &ARK_4, &MDS_4, PARTIAL_ROUNDS_4))
 }
 
-/// Kept as a type so call sites read the same as before; it holds no state.
+/// What the tree and the pool hash with: a unit type, since the hash holds no state.
 #[derive(Default)]
 pub struct Hasher;
 

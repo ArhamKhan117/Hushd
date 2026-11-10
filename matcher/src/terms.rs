@@ -1,5 +1,5 @@
 //! Requests, quotes and agreed terms: the Rust twin of packages/protocol/src/package.ts.
-//! The canonical bytes here must equal the TypeScript ones (see the vectors test).
+//! The canonical bytes here must equal the TypeScript ones (tests/interop.json, checked in main.rs).
 
 use borsh::BorshSerialize;
 use serde::Deserialize;

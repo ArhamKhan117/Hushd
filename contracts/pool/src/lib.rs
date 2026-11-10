@@ -38,7 +38,7 @@ const GAS_FT_TRANSFER: Gas = Gas::from_tgas(10);
 /// A refund inserts a note (about 28 Tgas); 50 leaves room so a refund can never run out.
 const GAS_ON_PAYOUT: Gas = Gas::from_tgas(50);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
-/// Amounts are below 2^128 in the circuits; u128 already guarantees it.
+/// The longest memo a cash out may carry, in bytes.
 const MAX_MEMO: usize = 256;
 /// A volume proof covers at most this many legs (the circuit's slots).
 const MAX_LEGS: usize = 16;
@@ -154,7 +154,7 @@ impl ExtData {
     ///
     /// No refund note and a zero `refund_inner` encode alike, so `transact` refuses a zero one.
     /// The pool's own account is not part of it: a proof is bound to this pool only through
-    /// its root (kept as is, the circuits do not change).
+    /// its root.
     pub fn hash(&self) -> Field {
         let mut b = b"hushd.ext.v1".to_vec();
         for a in [&self.recipient, &self.relayer] {

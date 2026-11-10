@@ -5,7 +5,7 @@
  *   `token_diff` (NEP-413), and either submits both with `execute_intents`; both legs
  *   happen or neither does. Deposits are `ft_transfer_call`s to the verifier; withdrawals
  *   are `ft_withdraw` intents.
- * - The 1Click API: solver quotes and cross-chain swaps (38 chains), settled confidentially.
+ * - The 1Click API: solver quotes and cross-chain swaps (39 chains, NEAR included), settled confidentially.
  *
  * Signing here takes a raw ed25519 secret (an agent's own key); submitting a transaction
  * is the caller's (its own NEAR client), so the same code runs on mainnet and on a sandbox

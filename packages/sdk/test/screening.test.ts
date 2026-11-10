@@ -32,7 +32,7 @@ test("a listed address is blocked in any case its format allows; others pass", (
   assert.ok(isSanctioned(LISTED_BECH32.toUpperCase()), "bech32 is case-insensitive");
   assert.ok(isSanctioned(LISTED_BASE58));
   assert.ok(!isSanctioned(LISTED_BASE58.toLowerCase()), "base58 is case-sensitive: another address");
-  for (const a of ["alice.testnet", "hushd.testnet", "c28d8a83efa928b37fe29ac569f912b045d86e1fabaa4f8347f56ff3c5ae8f86", "", "   "]) assert.ok(!isSanctioned(a), a);
+  for (const a of ["alice.testnet", "hushd.testnet", "5b0f83c1e2a94d6b8a7c0e1f2d3b4a5968778695a4b3c2d1e0f9a8b7c6d5e4f3", "", "   "]) assert.ok(!isSanctioned(a), a);
 });
 
 test("one action is blocked if any of its addresses is listed, with one neutral message", () => {

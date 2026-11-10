@@ -70,7 +70,7 @@ export function registerReadTools(server: McpServer, net: HushdNetwork, vkey: (k
   );
   server.registerTool(
     "hushd_makers",
-    { title: "Makers", description: "Market makers taking requests now: name, pricing style, bond, deals and slashed amount. Retired accounts only with include_inactive.", inputSchema: { include_inactive: z.boolean().default(false) }, annotations: { readOnlyHint: true } },
+    { title: "Makers", description: "Market makers taking requests now: name, pricing style, bond, deals and slashed amount. Paused accounts only with include_inactive.", inputSchema: { include_inactive: z.boolean().default(false) }, annotations: { readOnlyHint: true } },
     ({ include_inactive }) => run(async () => (await deskView.makers(net)).filter(([, m]) => include_inactive || m.active).map(([account, m]) => ({ account, ...m }))),
   );
   server.registerTool(

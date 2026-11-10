@@ -31,6 +31,7 @@ export class Db {
     // services starting together on an empty database would race on `create table if not exists`
     const c = await this.pool.connect();
     try {
+      // one migration at a time when several services start together (7317: any fixed key of our own)
       await c.query("select pg_advisory_lock(7317)");
       await c.query(SCHEMA);
     } finally {

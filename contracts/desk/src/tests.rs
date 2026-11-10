@@ -590,7 +590,7 @@ fn a_match_the_maker_did_not_sign_is_refused() {
     assert!(get_logs().iter().any(|l| l.contains("did not sign these terms")));
 }
 
-/// Consent v2 covers the class, the hedge, the maker and the desk: a matcher that changes
+/// The maker's consent covers the class, the hedge, the maker and the desk: a matcher that changes
 /// any of them after the maker signed is refused.
 #[test]
 fn a_match_that_changes_what_the_maker_signed_is_refused() {
