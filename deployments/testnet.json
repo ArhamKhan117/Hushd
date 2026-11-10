@@ -23,9 +23,9 @@
     },
     "pool": {
       "account": "pool.hushd.testnet",
-      "codeHash": "9njTymxJ8mS4kULzHP9VLtGzBM1Ztmoc3tkyRo51mV1g",
+      "codeHash": "DbJjSmqwTLZfbxc6Qc93y86MQBigJJxYwf85MeA7pKN9",
       "tx": "9wTpkYhWTCB1YRjgFb65tAUsAAnVATyYZ4P1WoJguP8b",
-      "redeployed": "DPXAk4hussq5vDGVPW2w7puknRecZXDCTKZYAt9zC3du"
+      "redeployed": "524pPvtoQNsvCZMvthqvUYzrdWFiqUE1a14BT1oCAfF7"
     },
     "board": {
       "account": "board.hushd.testnet",
@@ -35,9 +35,9 @@
     },
     "desk": {
       "account": "desk.hushd.testnet",
-      "codeHash": "Cj72o2ebn5Yab58bB3PPDjJK8gR2pSPSfRZ8vknvgoJ4",
+      "codeHash": "5wDjp4nd8gBmkWtkjMmeNqmFBZmMx79UAVqEAbp3PeHX",
       "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
-      "redeployed": "2QUkdRnmMp5Gy4gY4YgzeVWV5MhmhA8N35Tgb95HxvSB"
+      "redeployed": "BFEMZPKaYe7ocR5JmSxYQgWgg2zu1QpsWkPdwevd4qc7"
     }
   },
   "services": {
