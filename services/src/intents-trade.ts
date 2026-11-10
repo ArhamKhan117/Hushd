@@ -29,7 +29,7 @@ export class IntentsAgent {
   ) {
     this.accountId = implicitAccount(secret);
     const pub = ed25519.getPublicKey(secret);
-    keepRpcErrorBodies(net.rpc);
+    keepRpcErrorBodies(net);
     this.client = new Near({
       network: { networkId: net.id, rpcUrl: sendEndpoints(net)[0]! },
       privateKey: `ed25519:${base58.encode(new Uint8Array([...secret, ...pub]))}`,

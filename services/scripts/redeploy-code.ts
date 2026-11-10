@@ -26,7 +26,7 @@ const code = new Uint8Array(readFileSync(wasm));
 // the deployed contracts name their commit and build image (NEP-330 build_info); keep it that way
 if (!Buffer.from(code).includes("source_code_snapshot")) throw new Error(`${wasm} is not a reproducible build: run \`cargo near build reproducible-wasm\` in contracts/${wasmName} on a clean, committed tree`);
 // a free endpoint may be rate-limiting this machine: try each, with the RPC's own reason when one refuses
-keepRpcErrorBodies(net.rpc);
+keepRpcErrorBodies(net);
 let out: { transaction?: { hash?: string } } | undefined;
 for (const rpcUrl of rpcOrder(sendEndpoints(net))) {
   const near = new Near({ network: { networkId: "testnet", rpcUrl }, privateKey: key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });

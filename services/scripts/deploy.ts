@@ -133,7 +133,7 @@ export async function deployHushd(o: DeployOptions): Promise<{ report: Report; n
   const tokenId = (t: TokenPlan) => t.id ?? sub(t.name);
   const deployTokens = o.network === "testnet";
   const net0 = withOverrides(profile.base, o.rpc ? { rpc: o.rpc } : {});
-  keepRpcErrorBodies(net0.rpc);
+  keepRpcErrorBodies(net0);
   if (o.network === "mainnet" && !o.dryRun && !net0.rpc.every(isLocal) && process.env.HUSHD_MAINNET_GO !== DEPLOYER) {
     throw new Error(`Refusing to send on NEAR mainnet: the owner says yes first, then HUSHD_MAINNET_GO=${DEPLOYER}`);
   }

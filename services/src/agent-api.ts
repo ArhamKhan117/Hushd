@@ -82,7 +82,7 @@ export async function signOwnerIntent(intent: Intent, owner: OwnerKey, net: Hush
       return { ...intent, public_key: owner.publicKey, signature: base64.encode(signature) };
     }
     case "nep366": {
-      keepRpcErrorBodies(net.rpc);
+      keepRpcErrorBodies(net);
       const near = new Near({
         network: { networkId: net.id, rpcUrl: sendEndpoints(net)[0]! },
         privateKey: `ed25519:${base58.encode(new Uint8Array([...owner.secret, ...ed25519.getPublicKey(owner.secret)]))}`,

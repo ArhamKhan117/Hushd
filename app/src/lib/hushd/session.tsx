@@ -165,7 +165,7 @@ export function HushdProvider({ children }: { children: ReactNode }) {
   const passkeySigner = useCallback(async (seed: Uint8Array): Promise<Signer> => {
     const k = nearKeyFromSeed(seed);
     const { Near } = await import("near-kit");
-    keepRpcErrorBodies(NETWORK.rpc);
+    keepRpcErrorBodies(NETWORK);
     // one client per endpoint that takes transactions
     const clients = new Map(sendEndpoints(NETWORK).map((rpcUrl) => [rpcUrl, new Near({ network: { networkId: NETWORK.id, rpcUrl }, privateKey: k.secretKey as `ed25519:${string}`, defaultSignerId: k.implicitAccount })]));
     type Builder = ReturnType<InstanceType<typeof Near>["transaction"]>;

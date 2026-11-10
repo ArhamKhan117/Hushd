@@ -27,7 +27,7 @@ type Config = Record<(typeof FIELDS)[number] | "config_timelock_ns", string>;
 function owner(account: string): Near {
   const file = join(homedir(), ".near-credentials/testnet", `${account}.json`);
   const key = JSON.parse(readFileSync(file, "utf8")) as { private_key: string };
-  keepRpcErrorBodies(net.rpc);
+  keepRpcErrorBodies(net);
   return new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: key.private_key as `ed25519:${string}`, defaultSignerId: account, defaultWaitUntil: "FINAL" });
 }
 

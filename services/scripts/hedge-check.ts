@@ -127,7 +127,7 @@ async function run() {
   if (account) {
     const deployer = process.env.DEPLOYER_ACCOUNT ?? "hushd.testnet";
     const dk = (JSON.parse(readFileSync(join(homedir(), ".near-credentials/testnet", `${deployer}.json`), "utf8")) as { private_key: string }).private_key;
-    keepRpcErrorBodies(net.rpc);
+    keepRpcErrorBodies(net);
     const near = new Near({ network: { networkId: "testnet", rpcUrl: sendEndpoints(net)[0]! }, privateKey: dk as `ed25519:${string}`, defaultSignerId: deployer, defaultWaitUntil: "FINAL" });
     await near.transaction(deployer).functionCall(net.tokens[0]!.id, "mint", { account_id: account, amount: String((RUN.sellUsdc + 100) * 1e6) }, { gas: "30 Tgas" }).send();
     await call("hushd_shield", { token: "USDC", amount: String(RUN.sellUsdc + 50) });

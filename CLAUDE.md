@@ -14,11 +14,11 @@
 - 1Click confidential quotes need a partner key (`ONECLICK_API_KEY`, sent as `X-API-Key`); public dry quotes need none.
 - The free neardata stream is slower than testnet; the indexer defaults to FastNEAR's transactions API (`INDEXER_SOURCE=transactions`).
 - RPC calls rotate across the free endpoints in `TESTNET.rpc` (or `MAINNET.rpc`) and rest one that rate-limits (`rpcOrder` in `packages/sdk/src/rpc.ts`); `app/csp.config.mjs` repeats both lists as its defaults, so change both together.
-  The browser reads `browserRpc` first (`forBrowser`): FastNEAR's 429 carries no CORS headers, so a browser logs every one as a CORS error; there FastNEAR is only the fallback.
+  Servers read FastNEAR and keep dRPC as `rpcFallback`; the browser reads `browserRpc` (dRPC) first (`forBrowser`): FastNEAR's 429 carries no CORS headers, so a browser logs every one as a CORS error, and there FastNEAR is only the fallback. A local stack and a browser share one address, so the split keeps each on its own quota.
 - The app picks its network from `NEXT_PUBLIC_HUSHD_NETWORK` (testnet by default; `app/src/lib/hushd/config.ts`).
   Faucet and passkey activation are testnet only (`IS_TESTNET`); on mainnet a new passkey account waits for NEAR sent to it.
 - Free dRPC refuses transactions with more than about 2 KB of arguments ("method is not available"), so it only serves reads: build signers on `sendEndpoints(net)`, never `net.rpc`.
-- FastNEAR answers a rejected transaction with HTTP 400; call `keepRpcErrorBodies(net.rpc)` before using near-kit or the reason (and near-kit's stale-nonce retry) is lost.
+- FastNEAR answers a rejected transaction with HTTP 400; call `keepRpcErrorBodies(net)` (every endpoint it reads, falls back to or sends through) before using near-kit or the reason (and near-kit's stale-nonce retry) is lost.
 - The testnet contracts are reproducible builds: redeploy only the output of `cargo near build reproducible-wasm` (Docker, a clean committed tree; about 6 min a contract on Apple silicon). `redeploy-code.ts` refuses anything else, and `pnpm verify` fails a contract without NEP-330 `build_info`.
   Sandbox tests rebuild the same `target/near` paths non-reproducibly, so rebuild reproducibly before a redeploy. The commit a contract names must reach GitHub unchanged (no history rewrite) for NearBlocks to verify it.
 - Mainnet is one code path with testnet: `HUSHD_NETWORK` (services, MCP) and `NEXT_PUBLIC_HUSHD_NETWORK` (app) pick everything. Never add a testnet-only constant; put it in the SDK's network config or a deploy profile (`services/scripts/deploy.ts`).

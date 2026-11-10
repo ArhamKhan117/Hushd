@@ -49,8 +49,14 @@ async function attestation(): Promise<Verified> {
 
 export function intakeRoutes(a: Hono) {
   a.get("/v1/intake/attestation", async (c) => {
-    const v = await attestation();
-    if (!v.signingPublicKey) throw new Error("The attestation carries no encryption key");
+    // NEAR AI Cloud down, or a quote that does not check out: the intake is off, and the answer says why
+    let v: Awaited<ReturnType<typeof attestation>>;
+    try {
+      v = await attestation();
+      if (!v.signingPublicKey) throw new Error("The attestation carries no encryption key");
+    } catch (e) {
+      return c.json({ model: MODEL(), enabled: false, unavailable: (e as Error).message });
+    }
     return c.json({
       model: MODEL(),
       signing_public_key: v.signingPublicKey,

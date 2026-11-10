@@ -79,7 +79,7 @@ async function recordEvents(net: HushdNetwork, o: Outcome) {
 }
 
 async function rpcBlock(net: HushdNetwork, hash: string): Promise<{ header: { height: number; timestamp_nanosec: string } }> {
-  const order = rpcOrder(net.rpc);
+  const order = [...rpcOrder(net.rpc), ...(net.rpcFallback ?? [])];
   for (const url of [...order, ...order]) {
     const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "block", params: { block_id: hash } }) })
       .then((r) => r.json())
@@ -102,7 +102,7 @@ export class Signer {
   private stats = { sent: 0, failed: 0, gasBurnt: 0n, perLane: new Map<number, number>() };
 
   constructor(readonly net: HushdNetwork, readonly cfg: AccountConfig) {
-    keepRpcErrorBodies(net.rpc);
+    keepRpcErrorBodies(net);
     this.sendUrls = sendEndpoints(net);
     this.clients = new Map(
       this.sendUrls.map((rpcUrl) => [
