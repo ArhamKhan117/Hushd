@@ -25,7 +25,7 @@ export function parseCaps(net: HushdNetwork, s: string): Map<string, bigint> {
 /** The owner's other rules: a date the limits stop working, and who the agent may pay. */
 export interface Rules {
   expiresAt?: Date;
-  /** hushd1... addresses and NEAR accounts this agent may send or cash out to (any, when unset). */
+  /** hushd1... addresses and NEAR accounts this agent may send, cash out or pay an x402 resource to (any, when unset). */
   allowTo?: Set<string>;
 }
 

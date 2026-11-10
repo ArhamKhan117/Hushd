@@ -115,3 +115,65 @@ test("a claim refuses a damaged link and a token the network does not list, befo
   assert.match(text(other), /does not list on NEAR testnet/);
   await c.close();
 });
+
+/** A resource that answers 402 asking for `price` USDC base units to `payTo`, and counts its requests. */
+async function paywall(payTo: string, price = "1000000") {
+  const { createServer: http } = await import("node:http");
+  let hits = 0;
+  const srv = http((req, res) => {
+    hits++;
+    const accepts = [{ scheme: "hushd", network: "near-testnet", maxAmountRequired: price, asset: "usdc.hushd.testnet", payTo, resource: `http://${req.headers.host}${req.url}` }];
+    res.writeHead(402, { "content-type": "application/json" }).end(JSON.stringify({ x402Version: 1, accepts }));
+  });
+  await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+  const { port } = srv.address() as { port: number };
+  return { url: `http://127.0.0.1:${port}/quote`, hits: () => hits, close: () => new Promise((r) => srv.close(r)) };
+}
+
+test("an x402 payment obeys the payee list and the limits' end date, like a private send, before anything is proved", async () => {
+  const payee = identityFromSeed(new Uint8Array(32).fill(9)).address;
+  const wall = await paywall(payee);
+  try {
+    // a payee list without the 402's address refuses it
+    const listed = await connect(true, undefined, { HUSHD_ALLOW_TO: "bob.testnet" });
+    const r = await listed.callTool({ name: "hushd_pay_x402", arguments: { url: wall.url } });
+    assert.equal(r.isError, true);
+    assert.match(text(r), new RegExp(`${payee} is not on this agent's list of payees`));
+    await listed.close();
+    // limits that ended refuse it too
+    const expired = await connect(true, undefined, { HUSHD_LIMITS_EXPIRE: "2020-01-01" });
+    const e = await expired.callTool({ name: "hushd_pay_x402", arguments: { url: wall.url } });
+    assert.equal(e.isError, true);
+    assert.match(text(e), /limits expired on 2020-01-01/);
+    await expired.close();
+    // and a price over the cap per payment is refused, not paid
+    const capped = await connect(true);
+    const wall2 = await paywall(payee, "11000000");
+    try {
+      const o = await capped.callTool({ name: "hushd_pay_x402", arguments: { url: wall2.url } });
+      assert.equal(o.isError, true);
+      assert.match(text(o), /above the limit for one payment/);
+    } finally {
+      await wall2.close();
+      await capped.close();
+    }
+    // each call fetched the resource once and paid nothing
+    assert.equal(wall.hits(), 2);
+  } finally {
+    await wall.close();
+  }
+});
+
+test("a trade needs a floor above zero, before anything is asked", async () => {
+  const c = await connect(true);
+  const trade = (await c.listTools()).tools.find((t) => t.name === "hushd_trade")!;
+  assert.ok((trade.inputSchema.required ?? []).includes("min_receive"));
+  assert.match(String((trade.inputSchema.properties as Record<string, { description?: string }>).min_receive?.description), /^Required: the least you accept/);
+  const none = await c.callTool({ name: "hushd_trade", arguments: { sell_token: "USDC", sell_amount: "5", buy_token: "wNEAR" } });
+  assert.equal(none.isError, true);
+  assert.match(text(none), /min_receive/);
+  const zero = await c.callTool({ name: "hushd_trade", arguments: { sell_token: "USDC", sell_amount: "5", buy_token: "wNEAR", min_receive: "0" } });
+  assert.equal(zero.isError, true);
+  assert.match(text(zero), /Set min_receive above zero/);
+  await c.close();
+});

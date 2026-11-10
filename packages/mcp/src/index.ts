@@ -13,7 +13,7 @@ Money sits in a shielded pool as notes only their owner can spend; payments, tra
 Read tools work for anyone. Wallet tools act for this agent inside its spending limits (hushd_limits).
 To start: hushd_address, then hushd_faucet and hushd_shield (testnet), then hushd_balance.
 Pay someone not on Hushd yet with hushd_pay_link (a claim link they open), and claim a link with hushd_claim_link.
-Trade with hushd_trade; prove a payment, funds or volume to one named reader with hushd_prove.`;
+Trade with hushd_trade, always with a min_receive worked out from a fair price; prove a payment, funds or volume to one named reader with hushd_prove.`;
 
 export function createServer(opts: { net: HushdNetwork; vkey: (kind: ProofKind) => Promise<unknown>; agent?: Agent; verifyBase?: string; appUrl?: string }) {
   const server = new McpServer({ name: "hushd", version: "0.1.0" }, { instructions: INSTRUCTIONS });

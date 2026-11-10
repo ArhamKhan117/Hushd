@@ -57,23 +57,41 @@ export function paymentRequired(net: HushdNetwork, r: Omit<X402Requirement, "sch
 const b64json = (v: unknown) => utf8ToB64(JSON.stringify(v));
 const unb64json = <T>(s: string): T => JSON.parse(new TextDecoder().decode(fromB64(s))) as T;
 
+/** One payment a 402 asks for, as `x402Fetch` hands it to `beforePay`. */
+export interface X402Ask {
+  token: string;
+  /** Base units. */
+  amount: bigint;
+  /** The hushd1… address it would pay. */
+  payTo: string;
+  url: string;
+}
+
 /**
  * Fetch, paying a "hushd" 402 privately when asked. `maxAmount` (base units, per
  * token) caps what a single call may pay; anything above is refused, not paid.
+ * `beforePay` sees the payment once it is known and before anything is proved: it
+ * throws to refuse it (a payee the caller may not pay, limits that expired).
  */
 export async function x402Fetch(
   wallet: PrivateWallet,
   url: string,
   init: RequestInit = {},
-  opts: { maxAmount: (token: string) => bigint; onPaid?: (p: { token: string; amount: bigint; txHash: string; payTo: string }) => void | Promise<void> },
+  opts: {
+    maxAmount: (token: string) => bigint;
+    beforePay?: (ask: X402Ask) => void | Promise<void>;
+    onPaid?: (p: { token: string; amount: bigint; txHash: string; payTo: string }) => void | Promise<void>;
+  },
 ): Promise<{ response: Response; paid?: { token: string; amount: bigint; txHash: string } }> {
   const first = await fetch(url, init);
   if (first.status !== 402) return { response: first };
   const body = (await first.json().catch(() => null)) as { accepts?: X402Requirement[] } | null;
   const req = body?.accepts?.find((a) => a.scheme === X402_SCHEME && a.network === x402Network(wallet.net));
   if (!req) throw new Error(`${url} asks for payment, but not privately on NEAR ${wallet.net.id}`);
+  if (typeof req.maxAmountRequired !== "string" || !/^\d+$/.test(req.maxAmountRequired)) throw new Error(`${url} asks for a price that is not an amount`);
   const amount = BigInt(req.maxAmountRequired);
   if (amount > opts.maxAmount(req.asset)) throw new Error(`${url} asks ${amount} of ${req.asset}, above the limit for one payment`);
+  await opts.beforePay?.({ token: req.asset, amount, payTo: req.payTo, url });
   const sent = await wallet.send(req.payTo, req.asset, amount, `x402 ${new URL(req.resource || url).pathname}`.slice(0, 120));
   const payTo = decodeAddress(req.payTo);
   const info = await wallet.relayerInfo();

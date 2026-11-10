@@ -24,13 +24,24 @@ The read tools are also hosted: `claude mcp add --transport http hushd-read http
 - Agent economy: `hushd_pay_x402` pays an x402 resource from the private balance.
 
 Every spending tool checks the per-payment and per-day limits first, and a token without a limit cannot be spent.
-A link counts like any payment, and an agent limited to a list of payees (`HUSHD_ALLOW_TO`) may not pay one.
+`hushd_send`, `hushd_cash_out` and `hushd_pay_x402` also obey the end date (`HUSHD_LIMITS_EXPIRE`) and the list of payees (`HUSHD_ALLOW_TO`): an x402 resource is paid only when its hushd1 address is on the list.
+A link counts like any payment, and an agent limited to a list of payees may not pay one.
+`hushd_trade` needs `min_receive`, the least the agent accepts, above zero: anyone can register as a maker, so the floor is what keeps a fill fair.
+
+## Who guards the balance
+
+The private balance is guarded by these limits, inside this MCP process, and nothing else enforces them.
+The seed sits on the agent's machine (`~/.hushd/seed`, or `HUSHD_SEED`): anything that can read it, an agent with shell or file access included, can spend the whole balance without going through this server.
+The relayer only sends what was proved: it does not know an agent's limits and does not check them.
+So keep in the balance only what you would let the agent lose, and do not give an agent that can read the seed a larger one.
+A policy wallet guards the agent's NEAR account in a TEE, but not the private balance.
 
 ## Settings
 
 | Variable | Meaning |
 | --- | --- |
 | `HUSHD_LIMIT_PER_PAYMENT`, `HUSHD_LIMIT_PER_DAY` | Spending limits, `TOKEN=amount` pairs |
+| `HUSHD_LIMITS_EXPIRE`, `HUSHD_ALLOW_TO` | The date the agent stops spending, and the hushd1 addresses and NEAR accounts it may pay (any, when unset) |
 | `HUSHD_SEED` or `HUSHD_HOME` | The agent seed (64 hex), or the folder holding `seed` (default `~/.hushd`) |
 | `HUSHD_NEAR_ACCOUNT`, `HUSHD_NEAR_PRIVATE_KEY` | A NEAR testnet account for shields and cash-outs (optional) |
 | `HUSHD_API_URL`, `HUSHD_RPC_URL` | The Hushd API and the NEAR RPC (defaults: `https://api.hushd.net`, FastNEAR) |

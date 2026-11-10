@@ -293,7 +293,9 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         sell_token: TOKEN,
         sell_amount: AMOUNT,
         buy_token: TOKEN,
-        min_receive: AMOUNT.optional().describe("Least you accept of the buy token; sealed to the enclave"),
+        min_receive: AMOUNT.describe(
+          "Required: the least you accept of the buy token, in its units (e.g. \"0.0123\"), above zero. Work it out from a fair price for the whole size, less the slippage you accept. It is sealed to the matcher enclave, which matches no quote below it, and checked again here before anything settles. Anyone can register as a maker, so a low floor can be filled at a low price.",
+        ),
         window_seconds: z.number().int().min(10).max(300).default(45),
       },
     },
@@ -301,10 +303,13 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
       run(async () => {
         const sell = amountIn(net, sell_token, sell_amount);
         const buy = tokenInfo(net, buy_token);
+        if (buy.id === sell.token) throw new Error("Sell and buy different tokens");
+        const floor = parseUnits(min_receive.replace(/,/g, ""), buy.decimals);
+        if (floor <= 0n) throw new Error("Set min_receive above zero: it is the least you accept, and any maker may fill you at that price");
         await a.assertNotFrozen();
         a.limits.check(sell.token, sell.amount);
         await wallet.sync();
-        const draft = { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: min_receive ? parseUnits(min_receive, buy.decimals) : 0n } };
+        const draft = { kind, sell: { token: sell.token, amount: sell.amount }, buy: { token: buy.id, minAmount: floor } };
         const { request, ask, refundBlinding } = packageRequest(a.id, net, draft);
         const opened = await openRfq({ net, api: a.api, relayer: a.relayer, request, ask, windowMs: window_seconds * 1000 });
         const match = await awaitMatch(a.api, a.id, opened.rfqId, window_seconds * 1000 + 120_000);
@@ -385,15 +390,20 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
     "hushd_pay_x402",
     {
       title: "Pay an x402 resource privately",
-      description: "Fetch a URL; if it answers 402 asking for a private Hushd payment, pay it from the private balance (inside the limits) and fetch again. Returns the response body.",
+      description:
+        "Fetch a URL; if it answers 402 asking for a private Hushd payment, pay it from the private balance and fetch again. Returns the response body. The payment obeys every limit hushd_send does: the caps per payment and per day, the date the limits end, and the list of payees (the 402's hushd1… address must be on it when the owner set one).",
       inputSchema: { url: z.string().url(), method: z.enum(["GET", "POST"]).default("GET"), body: z.string().max(20_000).optional() },
     },
     ({ url, method, body }) =>
       run(async () => {
         await a.assertNotFrozen();
-        await wallet.sync();
         const { response, paid } = await x402Fetch(wallet, url, { method, ...(body ? { body, headers: { "content-type": "application/json" } } : {}) }, {
           maxAmount: (token) => a.limits.maxFor(tokenInfo(net, token).id),
+          // the same checks as a private send to that address, before anything is synced or proved
+          beforePay: async (ask) => {
+            a.limits.check(tokenInfo(net, ask.token).id, ask.amount, ask.payTo);
+            await wallet.sync();
+          },
           onPaid: (p) => a.limits.record(tokenInfo(net, p.token).id, p.amount),
         });
         const text = await response.text();
