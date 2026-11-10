@@ -76,7 +76,7 @@ export const PAGE_META: Record<string, PageMeta> = {
   "/docs/threat-model": {
     description: "What each part can and cannot do to you, the dev proving keys, and how to report a problem.",
     keywords: ["security", "threat", "attack", "trusted setup", "keys", "audit", "bug", "report", "relayer", "tee"],
-    headings: ["What Hushd protects", "Your keys and notes", "The relayer", "The matcher enclave", "The intake model", "Makers", "The contracts", "Proving keys", "Not audited", "Not covered", "Reporting a problem"],
+    headings: ["What Hushd protects", "Your keys and notes", "The relayer", "The matcher enclave", "The intake model", "The API, the matcher client and the keeper", "Makers", "The contracts", "Proving keys", "Not audited", "Not covered", "Reporting a problem"],
   },
   "/docs/contracts": {
     description: "The testnet accounts, what each contract does, its events, and how to check them on NearBlocks.",

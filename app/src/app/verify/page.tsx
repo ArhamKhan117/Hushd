@@ -59,6 +59,14 @@ function readerOf(raw: string | null): string | null {
   return raw ? (decode(raw)?.reader ?? null) : null;
 }
 
+/** "6 December 2026, 11:24 UTC": the same moment for every reader, whatever their time zone. */
+function utcDate(ms: number): string {
+  const d = new Date(ms);
+  const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return `${day}, ${time} UTC`;
+}
+
 export default function VerifyPage() {
   // a link carries the proof in the fragment (#p=…), which never reaches a server
   const hash = useSyncExternalStore(subscribeHash, () => location.hash, () => "");
@@ -184,7 +192,7 @@ export default function VerifyPage() {
               </div>
               <div>
                 <dt className="inline">Expires: </dt>
-                <dd className="inline text-soft">{new Date(proof.expiresAtMs).toLocaleString("en-GB")}</dd>
+                <dd className="inline text-soft">{utcDate(proof.expiresAtMs)}</dd>
               </div>
               <div>
                 <dt className="inline">Pool: </dt>

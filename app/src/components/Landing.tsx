@@ -107,13 +107,13 @@ const PACKAGES = [
   {
     icon: <IconHedge />,
     title: "Spot + hedge",
-    body: "The swap, plus a Hyperliquid testnet short of what you buy, signed for this one deal by NEAR Chain Signatures and bonded by the maker.",
+    body: "Experimental. You get the swap, and the maker commits, with its bond, to place a Hyperliquid testnet hedge order for its own account, signed for this one deal by NEAR Chain Signatures.",
     href: "/docs/packages#spot-and-hedge",
   },
   {
     icon: <IconCarry />,
     title: "Cash and carry",
-    body: "Buy with a stablecoin and short the perp of the same size, as one package with one receipt, bonded the same way.",
+    body: "Experimental. Buy with a stablecoin, with the same bonded hedge order from the maker, as one package with one receipt.",
     href: "/docs/packages#cash-and-carry",
   },
 ];
@@ -131,8 +131,8 @@ const NEAR_ONLY = [
     body: "The pool verifies every Groth16 proof inside the call, with NEAR's alt_bn128 host functions.",
   },
   {
-    title: "A fresh hedge address per deal",
-    body: "Chain Signatures sign each Hyperliquid hedge from the path hushd/hedge/<deal id>, so deals do not link there.",
+    title: "A hedge order signed per deal",
+    body: "Chain Signatures sign each Hyperliquid hedge order from the path hushd/hedge/<deal id>, and the desk rebuilds what it signs from the maker's own terms.",
   },
   {
     title: "Matching in a TEE, answered on chain",
@@ -167,7 +167,7 @@ const NEAR_ONLY = [
 const LIMITS = [
   {
     title: "Testnet only",
-    body: "Every contract runs on NEAR testnet. Tokens come from a faucet and have no value, and the hedge trades on Hyperliquid testnet.",
+    body: "Every contract runs on NEAR testnet. Tokens come from a faucet and have no value, and the experimental hedge leg trades on Hyperliquid testnet.",
   },
   {
     title: "Development keys",
@@ -183,7 +183,7 @@ const LIMITS = [
   },
   {
     title: "Who you trust",
-    body: "The relayer can refuse an action, never change what you proved. Keeping quotes and limits private rests on the matcher's TEE.",
+    body: "The relayer can refuse an action, never change what you proved. Keeping quotes and limits private rests on the matcher's TEE. Hushd's API sees timing and IP addresses, its matcher client could leave a quote out, and its keeper's report decides a hedge's bond.",
   },
   {
     title: "The model only drafts",
@@ -231,8 +231,9 @@ export function Landing() {
                 </p>
                 <h1 className="t-display-xl mt-5">Private OTC, run by agents.</h1>
                 <p className="mt-6 max-w-[48ch] text-[18px] leading-[1.55] text-soft">
-                  Say what you want to trade. Maker agents quote inside an enclave, both sides settle privately in one
-                  call, and you can prove one fact about it to one named reader.
+                  Say what you want to trade, or let your agent say it. Maker agents quote by formula into a sealed
+                  auction inside an enclave, both sides settle privately in one call, and you can prove one fact about
+                  it to one named reader.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-2">
                   <AppLink href="/app" className="btn btn-ink btn-lg">
@@ -400,9 +401,10 @@ export function Landing() {
             ))}
           </Reveal>
           <p className="mt-8 max-w-[70ch] text-[15px] leading-relaxed text-mute">
-            <span className="text-foreground">When a hedge misses.</span> The maker posts a bond on chain for every
-            hedged deal. If the hedge misses its deadline, the bond is paid to you as a private note, and only your
-            per-deal key can close the hedge.{" "}
+            <span className="text-foreground">Hedged packages are experimental.</span> You receive the spot leg. The
+            maker posts a bond on chain for every hedged deal, and its hedge order trades for its own Hyperliquid
+            account, so the position is the maker&apos;s, not yours. If the order misses its deadline, the bond is
+            paid to you as a private note.{" "}
             <Link href="/docs/packages" className="text-foreground underline-offset-4 hover:underline">
               Packages and settlement <span aria-hidden>→</span>
             </Link>
@@ -500,7 +502,8 @@ export function Landing() {
                 <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-mute sm:text-[18px]" data-reveal-item>
                   The Hushd MCP server gives an agent its own private balance and a seat at the desk. It proves every
                   payment on its own machine, refuses anything over its limits, and can pay for HTTP resources over
-                  private x402.
+                  private x402. The makers it trades with are agents too: they price by formula, quote, settle and act
+                  on NEAR through policy wallets.
                 </p>
                 <div className="mt-8 flex flex-wrap gap-2" data-reveal-item>
                   <Link href="/agents" className="btn btn-ink">

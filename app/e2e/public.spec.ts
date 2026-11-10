@@ -97,6 +97,76 @@ test("the hosted MCP server lists its read tools", async ({ request }) => {
   expect(names).toEqual(expect.arrayContaining(["hushd_status", "hushd_verify_proof"]));
 });
 
+test("the hosted MCP server names only the tools it serves, and a browser gets a note", async ({ request }) => {
+  const init = await request.post("/mcp", {
+    headers: { accept: "application/json, text/event-stream", "content-type": "application/json" },
+    data: { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1" } } },
+  });
+  expect(init.ok()).toBeTruthy();
+  const { instructions } = ((await init.json()) as { result: { instructions: string } }).result;
+  expect(instructions).toContain("read tools only");
+  for (const tool of ["hushd_status", "hushd_makers", "hushd_desk_deals", "hushd_deal", "hushd_verify_proof"]) expect(instructions).toContain(tool);
+  for (const wallet of ["hushd_address", "hushd_faucet", "hushd_shield", "hushd_balance", "hushd_trade", "hushd_prove", "hushd_pay_link"]) expect(instructions).not.toContain(wallet);
+  const note = await request.get("/mcp", { headers: { accept: "text/html" } });
+  expect(note.status()).toBe(200);
+  expect(note.headers()["content-type"]).toContain("text/html");
+  expect(await note.text()).toContain("claude mcp add --transport http");
+  const json = await request.get("/mcp", { headers: { accept: "*/*" } });
+  expect(json.status()).toBe(200);
+  expect(((await json.json()) as { tools: string[] }).tools).toHaveLength(5);
+});
+
+test("every app page names itself in the tab", async ({ request }) => {
+  const titles: [string, string][] = [
+    ["/app", "Desk"],
+    ["/app/trade", "Trade"],
+    ["/app/deals", "Deals"],
+    ["/app/deals/2", "Deal #2"],
+    ["/app/makers", "Makers"],
+    ["/app/agents", "Agents"],
+    ["/app/prove", "Prove"],
+    ["/app/settings", "Settings"],
+    ["/app/balance", "Private balance"],
+    ["/app/balance/add", "Add privately"],
+    ["/app/balance/send", "Send privately"],
+    ["/app/balance/receive", "Receive"],
+    ["/app/balance/cash-out", "Cash out"],
+    ["/app/claim", "Claim a payment"],
+  ];
+  for (const [path, title] of titles) {
+    const html = await (await request.get(path)).text();
+    expect(/<title>([^<]*)<\/title>/.exec(html)?.[1], path).toBe(`${title} · Hushd`);
+  }
+});
+
+test("older deals load on request, down to the first one", async ({ page }) => {
+  await page.goto("/app/deals");
+  const older = page.getByRole("button", { name: "Show older deals" });
+  // the line under the table says how far down the list goes: each page moves it
+  const summary = page.getByText(/^(The \d+ newest deals, down to #\d+|All \d+ deals, newest first)\.$/);
+  await expect(summary).toBeVisible({ timeout: 30_000 });
+  for (let i = 0; i < 10; i++) {
+    const before = (await summary.textContent()) ?? "";
+    if (before.startsWith("All")) break;
+    await older.click();
+    await expect(summary).not.toHaveText(before, { timeout: 30_000 });
+  }
+  await expect(summary).toHaveText(/^All \d+ deals, newest first\.$/);
+  await expect(older).toBeHidden();
+  await expect(page.getByRole("link", { name: "#2", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "#0", exact: true })).toBeVisible();
+});
+
+test("a deal's receipt reads in words: repeats folded, amounts in tokens, events named", async ({ page }) => {
+  await page.goto("/app/deals/3");
+  const main = page.locator("main");
+  await expect(main.getByText("Hyperliquid did not fill (3 times):")).toBeVisible({ timeout: 30_000 });
+  await expect(main.getByText("1,000 USDC to a pool note")).toBeVisible();
+  await expect(main.getByText(/Hedge order missed: order 1 of 3/)).toBeVisible({ timeout: 30_000 });
+  await expect(main).not.toContainText("hedge_retry");
+  await expect(main).not.toContainText("1000000000");
+});
+
 test("dark theme keeps text readable", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
@@ -236,6 +306,7 @@ test.describe("NEAR Intents previews (Hushd API stubbed)", () => {
     await page.goto("/transparency");
     const section = page.locator("#intents");
     await expect(section.getByRole("heading", { name: /On NEAR.Intents \(mainnet\)/ })).toBeVisible();
+    await expect(section).toContainText("No mainnet trade has run yet, so there is no transaction to list.");
     await expect(section).toContainText("built and waiting for the owner's go-ahead");
     await page.unroute("**/v1/intents/trades");
     const hash = "4Af6nGq3bWJ1m8Y2cZp9Q7tR5sV1xK3dL6hN8wE2fT9a";

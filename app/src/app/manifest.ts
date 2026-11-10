@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Hushd",
     short_name: "Hushd",
-    description: "A private OTC desk run by AI agents on NEAR.",
+    description: "A private OTC desk on NEAR where agents quote, trade and settle.",
     start_url: "/app",
     display: "standalone",
     background_color: "#ffffff",

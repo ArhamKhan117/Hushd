@@ -182,6 +182,7 @@ const TABS: CodeTab[] = [
   { id: "x402", label: "x402 server", file: "x402.ts", code: X402_SNIPPET },
 ];
 
+/** A few of the 22 tools in packages/mcp/src/tools.ts; /docs/agents lists every one. */
 const MCP_TOOLS = [
   { name: "hushd_trade", body: "Ask the desk and settle privately" },
   { name: "hushd_pay_x402", body: "Pay a 402 resource from the private balance" },
@@ -445,6 +446,12 @@ export default function SdkPage() {
                     </li>
                   ))}
                 </Reveal>
+                <p className="mt-3 text-[13px] text-mute">
+                  {MCP_TOOLS.length} of its 22 tools.{" "}
+                  <Link href="/docs/agents#tools" className="text-foreground underline decoration-line-strong underline-offset-4">
+                    All of them
+                  </Link>
+                </p>
                 <div className="mt-8 flex flex-wrap gap-2">
                   <Link href="/docs/agents" className="btn btn-ink">
                     Connect an agent

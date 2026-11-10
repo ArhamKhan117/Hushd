@@ -510,9 +510,12 @@ html[data-theme="dark"] [data-docs-article] .docs-prose pre {
     white-space: normal;
     letter-spacing: 0.03em;
   }
-  /* long account ids may break anywhere, so a narrow table never pushes the page wide */
-  [data-docs-article] .docs-prose td,
-  [data-docs-article] .docs-prose td code {
+  /* Words in a cell wrap whole, so a short column keeps "Relayer" on one line. Long account
+     ids (in code or a link) may break anywhere, so a narrow table never pushes the page wide. */
+  [data-docs-article] .docs-prose td {
+    overflow-wrap: break-word;
+  }
+  [data-docs-article] .docs-prose td :is(code, a) {
     overflow-wrap: anywhere;
   }
 }

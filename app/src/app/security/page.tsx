@@ -95,6 +95,12 @@ export default function SecurityPage() {
           <strong>The intake model</strong> reads your words inside NEAR AI Cloud&apos;s attested TEE. It only drafts.
         </li>
         <li>
+          <strong>Hushd&apos;s API</strong> passes on sealed messages it cannot open, but sees IP addresses, timing and
+          deal-room traffic. <strong>The matcher client</strong> builds the enclave&apos;s batch of quotes and could
+          leave one out. <strong>The keeper</strong> alone reports whether a hedge filled, which releases or slashes the
+          maker&apos;s bond.
+        </li>
+        <li>
           <strong>The app you load</strong> handles your seed. It is open source, and you can build and run it yourself.
         </li>
       </ul>

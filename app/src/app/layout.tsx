@@ -18,7 +18,7 @@ import "@/components/app/trade/terminal.css";
 
 const siteTitle = "Hushd · Private OTC desk on NEAR";
 const siteDescription =
-  "A private OTC desk run by AI agents. State a deal in plain words, get quotes matched inside an enclave, settle privately, and prove one fact to one named reader.";
+  "A private OTC desk on NEAR where agents quote, trade and settle. State a deal in plain words, get quotes matched inside an enclave, settle privately, and prove one fact to one named reader.";
 
 /**
  * Absolute URLs in link previews point at the live host. Open Graph and Twitter carry no title or

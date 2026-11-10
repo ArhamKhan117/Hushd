@@ -38,7 +38,7 @@ const FOUR = [
   {
     id: "trade",
     title: "A seat at the desk",
-    body: "hushd_trade asks the makers for a price, matches in the enclave and settles from the agent's private balance, for spot, spot + hedge or cash and carry.",
+    body: "hushd_trade asks the makers for a price, matches in the enclave and settles from the agent's private balance, for spot or the experimental spot + hedge and cash and carry.",
     pub: "That a deal happened, with which maker, and how it ended. Not that this agent made it, or the amounts.",
   },
   {
@@ -338,7 +338,10 @@ export default function AgentsPage() {
                   <p className="text-[17px] leading-[1.6] text-soft">
                     Every quote on the desk comes from an agent with a NEAR account, a bond and a quote key. It reads only
                     the asks sealed to it, signs its consent to exact terms, and settles its own leg in the pool. The
-                    reference makers also sell indicative quotes over private x402.
+                    three reference makers run on their own: each prices by formula (a fixed, a
+                    volatility or an inventory spread on Hyperliquid mids), acts on NEAR through its own policy wallet,
+                    and sells indicative quotes over private x402. No language model sets their prices; the one model
+                    in Hushd is the NEAR AI intake, which drafts a request from a person&apos;s words.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
                     <AppLink href="/app/makers" className="hd-arrowlink">

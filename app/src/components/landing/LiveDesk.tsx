@@ -130,7 +130,7 @@ export function LiveDesk() {
                 <Tile label="Deposits" value={state.pool.shields} />
                 <Tile label="Private transfers" value={state.pool.transfers} sealed />
                 <Tile label="Desk deals" value={state.desk.deals} />
-                <Tile label="Settled privately" value={state.pool.swaps} sealed />
+                <Tile label="Deals settled" value={state.desk.settled} sealed />
               </div>
               {state.deals.length > 0 ? (
                 <ul className="mt-3 divide-y divide-line rounded-[14px] border border-line px-4">

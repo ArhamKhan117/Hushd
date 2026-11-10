@@ -29,7 +29,7 @@ const SERVICE_WORDS: Record<string, string> = {
   indexer: "Reads Hushd's events from the block stream",
   matcher: "Carries sealed batches to the enclave",
   makers: "The three reference makers",
-  keeper: "Expires deals, runs hedge legs, records receipts",
+  keeper: "Expires deals, submits hedge orders and reports how each went",
   topup: "Keeps the service accounts funded",
 };
 
@@ -113,7 +113,7 @@ function useServices() {
 type DeskStats = { rfqs: number; deals: number; settled: number; recovered: number; failed: number; unresolved: number };
 type ChainState =
   | { status: "loading" }
-  | { status: "ready"; pool: PoolStats; assets: AssetView[]; desk: DeskStats; makers: number }
+  | { status: "ready"; pool: PoolStats; assets: AssetView[]; desk: DeskStats; makers: { quoting: number; paused: number } }
   | { status: "missing"; account: string }
   | { status: "error" };
 
@@ -132,7 +132,8 @@ function useChain() {
           status: "ready",
           pool,
           assets,
-          makers: makers.length,
+          // the Makers page lists the same split: accounts quoting now, and paused ones
+          makers: { quoting: makers.filter(([, m]) => m.active).length, paused: makers.filter(([, m]) => !m.active).length },
           desk: { rfqs: num(r.rfqs), deals: num(r.deals), settled: num(r.settled), recovered: num(r.recovered), failed: num(r.failed), unresolved: num(r.unresolved) },
         });
       })
@@ -171,6 +172,23 @@ function useIntentsTrades() {
 }
 
 /* ---------------------------------------------------------------- pieces */
+
+/** What the deal counts are made of: one receipt per finished deal, and the deals still open. */
+function ReceiptCounts({ desk: d, paused, refunds }: { desk: DeskStats; paused: number; refunds: number }) {
+  const open = Math.max(0, d.deals - d.settled - d.recovered - d.failed - d.unresolved);
+  return (
+    <>
+      <p className="tnum mt-3 text-[12.5px] leading-relaxed text-mute">
+        Every deal ends with one receipt: {intFmt.format(d.settled)} settled, {intFmt.format(d.recovered)} recovered (a missed hedge, its bond paid to
+        the trader), {intFmt.format(d.failed)} failed (expired unsettled), {intFmt.format(d.unresolved)} unresolved
+        {open > 0 ? `; ${intFmt.format(open)} still open` : ""}.
+      </p>
+      <p className="tnum mt-1 text-[12.5px] leading-relaxed text-mute">
+        Requests opened {intFmt.format(d.rfqs)} · paused maker accounts {intFmt.format(paused)} · refund notes {intFmt.format(refunds)}
+      </p>
+    </>
+  );
+}
 
 function LockIcon({ size = 14 }: { size?: number }) {
   return (
@@ -501,14 +519,10 @@ export function TransparencyView() {
                     <Count label="Private transfers" value={chain.state.pool.transfers} sealed />
                     <Count label="Cash outs" value={chain.state.pool.cash_outs} />
                     <Count label="Desk deals" value={chain.state.desk.deals} />
-                    <Count label="Settled" value={chain.state.desk.settled} />
-                    <Count label="Makers" value={chain.state.makers} />
+                    <Count label="Deals settled" value={chain.state.desk.settled} />
+                    <Count label="Makers quoting" value={chain.state.makers.quoting} />
                   </div>
-                  <p className="tnum mt-3 text-[12.5px] leading-relaxed text-mute">
-                    Requests opened {intFmt.format(chain.state.desk.rfqs)} · recovered {intFmt.format(chain.state.desk.recovered)} · failed{" "}
-                    {intFmt.format(chain.state.desk.failed)} · unresolved {intFmt.format(chain.state.desk.unresolved)} · refund notes{" "}
-                    {intFmt.format(chain.state.pool.refunds)}
-                  </p>
+                  <ReceiptCounts desk={chain.state.desk} paused={chain.state.makers.paused} refunds={chain.state.pool.refunds} />
                 </>
               )}
             </Card>
@@ -594,8 +608,9 @@ export function TransparencyView() {
                 On NEAR&nbsp;Intents (mainnet)
               </h2>
               <p className="mt-5 max-w-[36ch] text-[15px] leading-relaxed text-mute">
-                Two Hushd agents trade with each other on intents.near, with real tokens. Each signs its side of the trade, and one
-                call settles both sides or neither. Every transaction is listed here.
+                Two Hushd agents can trade with each other on intents.near, with real tokens: each signs its side of the trade,
+                and one call settles both sides or neither. The trade is tested on a local node running intents.near&apos;s code
+                and ready to run on mainnet. Once it runs, each of its transactions is listed here.
               </p>
               <a href="https://nearblocks.io/address/intents.near" target="_blank" rel="noreferrer" className="hd-arrowlink mt-6">
                 intents.near on NearBlocks <ArrowUpRight />
@@ -613,7 +628,8 @@ export function TransparencyView() {
               </Notice>
             ) : trades.record.steps.length === 0 ? (
               <p className="pg-card self-start px-5 py-4 text-[14.5px] leading-relaxed text-soft sm:px-6">
-                The mainnet demo trades between Hushd&apos;s agents are built and waiting for the owner&apos;s go-ahead.
+                No mainnet trade has run yet, so there is no transaction to list. The trade between Hushd&apos;s agents is
+                built and waiting for the owner&apos;s go-ahead.
               </p>
             ) : (
               <ul className="pg-card self-start divide-y divide-line overflow-hidden">

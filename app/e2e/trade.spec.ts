@@ -147,6 +147,7 @@ test.describe("a trade on NEAR testnet", () => {
     await expect(ticket.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 4 * 60_000 });
     await expect(ticket.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
     const dealId = (await ticket.getByRole("link", { name: /Open deal #\d+/ }).textContent())!.match(/#(\d+)/)![1]!;
+    console.log(`[${info.project.name}] deal #${dealId} settled`);
 
     // 4. the workspace: the request settled, the deal with its private terms, then its receipt from the desk
     const work = page.getByRole("region", { name: "Your requests and deals" });

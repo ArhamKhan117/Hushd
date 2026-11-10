@@ -1102,32 +1102,33 @@ html.hd-lite .hd-field.hd-drift {
 
 /* Syntax colours (lib/highlight.ts), graphite: no hue, so value, weight and
    style tell the parts apart. Keywords in steel and medium weight, functions in
-   ink, strings a step lighter, comments faint and italic. Light + dark. */
+   ink, strings a step lighter, comments quieter and italic. Light + dark; comments
+   and punctuation keep at least 4.5:1 on every code ground (panel, surface, surface-2). */
 :root,
 .theme-light {
   --tok-kw: #3d4450;
   --tok-str: #5c6370;
   --tok-num: #262a32;
-  --tok-com: #8a8f97;
+  --tok-com: #62666e;
   --tok-fn: #0b0c0e;
   --tok-prop: #4b5059;
   --tok-type: #262a32;
   --tok-const: #262a32;
   --tok-lit: #262a32;
-  --tok-punc: #8a8f97;
+  --tok-punc: #62666e;
 }
 html[data-theme="dark"],
 .theme-dark {
   --tok-kw: #c3cad5;
   --tok-str: #a3aab5;
   --tok-num: #e6e9ee;
-  --tok-com: #6f747c;
+  --tok-com: #8d929a;
   --tok-fn: #f4f5f6;
   --tok-prop: #c3c8cf;
   --tok-type: #e6e9ee;
   --tok-const: #e6e9ee;
   --tok-lit: #e6e9ee;
-  --tok-punc: #6f747c;
+  --tok-punc: #8d929a;
 }
 .tok-kw { color: var(--tok-kw); font-weight: 500; }
 .tok-str { color: var(--tok-str); }
