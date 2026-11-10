@@ -49,8 +49,7 @@ function page(url: string): string {
 <meta name="robots" content="noindex">
 <title>Hushd MCP server</title>
 <style>
-:root { color-scheme: light dark; --bg: #ffffff; --fg: #0b0c0e; --mute: #5f636a; --line: #e4e6e9; --code: #f3f4f5; }
-@media (prefers-color-scheme: dark) { :root { --bg: #08090a; --fg: #f4f5f6; --mute: #9b9fa6; --line: #232529; --code: #17181b; } }
+:root { color-scheme: light; --bg: #ffffff; --fg: #0b0c0e; --mute: #5f636a; --line: #e4e6e9; --code: #f3f4f5; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }

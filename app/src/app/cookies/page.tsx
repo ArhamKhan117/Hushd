@@ -33,7 +33,7 @@ export default function CookiesPage() {
           <code>{CONSENT_KEY}</code>: your choice on this page.
         </li>
         <li>
-          <code>{THEME_KEY}</code>: light or dark, if you picked one.
+          <code>{THEME_KEY}</code>: dark or auto, if you picked one (light is the default and stores nothing).
         </li>
         <li>
           <code>hushd.passkey.account</code>: which account your passkey opens, if you use one.

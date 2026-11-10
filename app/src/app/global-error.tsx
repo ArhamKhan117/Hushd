@@ -27,7 +27,7 @@ export default function GlobalError({
       const saved = localStorage.getItem(THEME_KEY);
       const dark =
         saved === "dark" ||
-        (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        (saved === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       const d = document.documentElement;
       d.dataset.theme = dark ? "dark" : "light";
       d.classList.toggle("dark", dark);

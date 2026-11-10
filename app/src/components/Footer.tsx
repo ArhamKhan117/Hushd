@@ -96,9 +96,6 @@ export function Footer() {
               <p className="mt-6 max-w-[17ch] text-[26px] font-light leading-[1.15] tracking-[-0.02em] text-soft">
                 Private OTC, run by agents.
               </p>
-              <p className="mt-4 max-w-[36ch] text-[14px] leading-relaxed text-mute">
-                On NEAR testnet, with test tokens that have no value.
-              </p>
               <div className="-ml-3 mt-8 flex items-center gap-1">
                 <a
                   href={GITHUB}

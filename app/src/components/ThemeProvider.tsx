@@ -32,17 +32,18 @@ const ThemeContext = createContext<{
   choice: ThemeChoice;
   setTheme: (t: ThemeChoice) => void;
   toggle: () => void;
-}>({ theme: "light", choice: "system", setTheme: () => {}, toggle: () => {} });
+}>({ theme: "light", choice: "light", setTheme: () => {}, toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [choice, setChoice] = useState<ThemeChoice>("system");
+  // light by default; Auto (follow the system) is a choice the visitor makes
+  const [choice, setChoice] = useState<ThemeChoice>("light");
   const [theme, setResolved] = useState<ResolvedTheme>("light");
 
   useEffect(() => {
-    let saved: ThemeChoice = "system";
+    let saved: ThemeChoice = "light";
     try {
       const v = localStorage.getItem(THEME_KEY);
-      if (v === "light" || v === "dark") saved = v;
+      if (v === "dark" || v === "system") saved = v;
     } catch {
       /* storage unavailable */
     }
@@ -69,7 +70,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((t: ThemeChoice) => {
     try {
-      if (t === "system") localStorage.removeItem(THEME_KEY);
+      if (t === "light") localStorage.removeItem(THEME_KEY);
       else localStorage.setItem(THEME_KEY, t);
     } catch {
       /* ignore */
