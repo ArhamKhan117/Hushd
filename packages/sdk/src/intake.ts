@@ -5,7 +5,9 @@
  * ed25519 key, HKDF-SHA256 "ed25519_encryption", XChaCha20-Poly1305), so neither the
  * Hushd API (which only adds the API key) nor the NEAR AI gateway can read it. The
  * answer comes back encrypted to a one-time client key. The browser then checks the
- * TEE's ed25519 signature over sha256(request body) and sha256(response body).
+ * TEE's ed25519 signature over sha256(request body) and sha256(response body), and that
+ * it was made by the very key the browser encrypted to: whatever signer the API names,
+ * an answer signed by any other key is not verified.
  *
  * The model only drafts a package; the trader reviews it before anything is sent.
  */
@@ -52,7 +54,7 @@ export function decryptFromModel(fieldHex: string, x25519Secret: Uint8Array): st
 export const INTAKE_SYSTEM = `You turn a trader's words into an OTC package request. Answer with JSON only, no prose:
 {"kind":"spot"|"spot_hedge"|"carry","sell":{"symbol":"USDC"|"wNEAR"|"BTC","amount":"<decimal>"},"buy":{"symbol":"USDC"|"wNEAR"|"BTC"},
 "min_receive":"<decimal amount of the buy symbol, or null>","limit_price":"<buy per sell, or null>","hedge":true|false,"window_minutes":<1-60>,"notes":"<one short sentence>"}
-Rules: "hedge it" or "keep me neutral" means kind "spot_hedge" and hedge true. Buying an asset with a stablecoin and shorting its perp is "carry".
+Rules: "hedge it" or "with a hedge" means kind "spot_hedge" and hedge true (the maker hedges on its own account; it does not keep the trader neutral). Buying an asset with a stablecoin and shorting its perp is "carry".
 Never invent an amount the trader did not give; use null. Map NEAR to wNEAR.`;
 
 export interface IntakeDraft {
@@ -86,10 +88,73 @@ export async function intakeAttestation(apiBase: string): Promise<IntakeAttestat
   return att;
 }
 
+/**
+ * The signing address an attestation names for an ed25519 key: the key's own 32 bytes,
+ * hex, as NEAR AI's verifier compares them. Null when it is not a 32-byte key.
+ */
+export function ed25519SigningAddress(publicKeyHex: string): string | null {
+  const h = publicKeyHex.trim().replace(/^0x/i, "").toLowerCase();
+  return /^[0-9a-f]{64}$/.test(h) ? h : null;
+}
+
+/** What the browser checked about one answer; it is verified only when every one holds. */
+export interface IntakeChecks {
+  /** The signed text ends with sha256(request) and sha256(response) of these exact bytes. */
+  hashesMatch: boolean;
+  /** The signer the API names is the attested key the words were encrypted to. */
+  signerIsAttested: boolean;
+  /** The signature checks out against that attested key (never a key the API supplies). */
+  signatureValid: boolean;
+  /** The API's own check against the verified attestation said yes. */
+  apiVerified: boolean;
+}
+
 export interface IntakeResult {
   draft: IntakeDraft;
   /** Everything a reader needs to check the answer came from the attested model. */
-  proof: { model: string; chatId: string; requestHash: string; responseHash: string; signedText: string; signature: string; signingKey: string; signatureKind: string; verified: boolean };
+  proof: {
+    model: string;
+    chatId: string;
+    requestHash: string;
+    responseHash: string;
+    signedText: string;
+    signature: string;
+    /** The signer the API named for this answer. */
+    signingKey: string;
+    /** The attested key the words were encrypted to, and the only one accepted. */
+    attestedKey: string;
+    signatureKind: string;
+    checks: IntakeChecks;
+    verified: boolean;
+  };
+}
+
+/** Check one answer's signature against the attested key; the API's word alone verifies nothing. */
+export function checkIntakeAnswer(p: {
+  attestedKey: string;
+  attestedAddress?: string;
+  requestHash: string;
+  responseHash: string;
+  signature: { text: string; signature: string; signing_address: string; signature_kind?: string };
+  serverVerified?: boolean;
+}): IntakeChecks {
+  const expected = ed25519SigningAddress(p.attestedKey);
+  const named = ed25519SigningAddress(p.signature.signing_address ?? "");
+  // the attestation's own address must name the same key it hands out for encryption
+  const attestationAgrees = p.attestedAddress === undefined || ed25519SigningAddress(p.attestedAddress) === expected;
+  const signerIsAttested = expected !== null && named === expected && attestationAgrees && (p.signature.signature_kind ?? "provider_tee") === "provider_tee";
+  let signatureValid = false;
+  try {
+    signatureValid = expected !== null && ed25519.verify(unhex(p.signature.signature), enc.encode(p.signature.text), unhex(expected));
+  } catch {
+    signatureValid = false;
+  }
+  return {
+    hashesMatch: p.signature.text.endsWith(`${p.requestHash}:${p.responseHash}`),
+    signerIsAttested,
+    signatureValid,
+    apiVerified: p.serverVerified === true,
+  };
 }
 
 /** Run the intake through a Hushd API (`/v1/intake/*`). */
@@ -122,13 +187,7 @@ export async function intake(apiBase: string, text: string): Promise<IntakeResul
   const requestHash = hex(sha256(enc.encode(body)));
   const responseHash = hex(sha256(enc.encode(out.response)));
   const sig = out.signature;
-  const hashesMatch = sig.text.endsWith(`${requestHash}:${responseHash}`);
-  let sigOk = false;
-  try {
-    sigOk = ed25519.verify(unhex(sig.signature), enc.encode(sig.text), unhex(sig.signing_address || att.signing_public_key));
-  } catch {
-    sigOk = false;
-  }
+  const checks = checkIntakeAnswer({ attestedKey: att.signing_public_key, attestedAddress: att.signing_address, requestHash, responseHash, signature: sig, ...(out.serverVerified !== undefined ? { serverVerified: out.serverVerified } : {}) });
   return {
     draft,
     proof: {
@@ -139,8 +198,10 @@ export async function intake(apiBase: string, text: string): Promise<IntakeResul
       signedText: sig.text,
       signature: sig.signature,
       signingKey: sig.signing_address,
+      attestedKey: att.signing_public_key,
       signatureKind: sig.signature_kind ?? "provider_tee",
-      verified: hashesMatch && sigOk && (out.serverVerified ?? true),
+      checks,
+      verified: checks.hashesMatch && checks.signerIsAttested && checks.signatureValid && checks.apiVerified,
     },
   };
 }

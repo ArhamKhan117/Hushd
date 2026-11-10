@@ -7,12 +7,12 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58 } from "@scure/base";
 import * as snarkjs from "snarkjs";
 import { openJson, sealJson } from "../src/box.ts";
-import { closeHedgeMessage, closeHedgeSignature, ownerKeyFor } from "../src/desk.ts";
+import { closeHedgeMessage, closeHedgeSignature, DeskApi, ownerKeyFor, roomKeyFor } from "../src/desk.ts";
 import { extHash } from "../src/field.ts";
 import { decodeAddress, identityFromSeed, isAddress } from "../src/keys.ts";
 import { allEndpoints, forBrowser, MAINNET, sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
 import { makeNote, own } from "../src/note.ts";
-import { keepRpcErrorBodies, restEndpoint, rpcOrder, view } from "../src/rpc.ts";
+import { keepRpcErrorBodies, rateLimitPauseMs, readLimit, restEndpoint, rpcOrder, view } from "../src/rpc.ts";
 import { loadPoseidon } from "../src/poseidon.ts";
 import { proveJoinsplit, type ArtifactSource } from "../src/prove.ts";
 import { MerkleTree } from "../src/tree.ts";
@@ -47,6 +47,44 @@ test("a hedge close is signed for one desk and one deal", () => {
   const other = withOverrides(TESTNET, { desk: "desk.sandbox" });
   assert.ok(!ed25519.verify(sig, new TextEncoder().encode(closeHedgeMessage(other, 12)), owner));
   assert.ok(ed25519.verify(closeHedgeSignature(id, 77n, 12, other), new TextEncoder().encode("hushd.close:desk.sandbox:12"), owner));
+});
+
+test("a trader's deal room key names one deal, and nothing in the room names its address", async () => {
+  const id = identityFromSeed(new Uint8Array(32).fill(4));
+  const room = roomKeyFor(id, 77n);
+  const hexOf = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
+  // the same seed and blinding find it again; another deal, or another trader, has another
+  assert.deepEqual(roomKeyFor(id, 77n), room);
+  assert.notDeepEqual(roomKeyFor(id, 78n).encPublic, room.encPublic);
+  assert.notDeepEqual(roomKeyFor(identityFromSeed(new Uint8Array(32).fill(5)), 77n).encPublic, room.encPublic);
+  assert.notDeepEqual(room.encPublic, id.encPublic);
+  assert.notDeepEqual(room.encSecret, ownerKeyFor(id, 77n).secret);
+  // through the API: the maker's answer is filed under the room key, and only it opens it
+  const stored: { to: string; box: string }[] = [];
+  const asked: string[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    asked.push(url);
+    if (init?.method === "POST") {
+      stored.push(JSON.parse(String(init.body)) as { to: string; box: string });
+      return Response.json({ id: stored.length });
+    }
+    const to = new URL(url).searchParams.get("to");
+    return Response.json(stored.flatMap((m, i) => (m.to === to ? [{ id: i + 1, box: m.box }] : [])));
+  }) as typeof fetch;
+  try {
+    const api = new DeskApi("https://api.example.test");
+    await api.send(9, room.encPublic, { t: "plan", outputs: ["1", "2"] });
+    assert.deepEqual((await api.inbox(9, room)).map((m) => m.msg), [{ t: "plan", outputs: ["1", "2"] }]);
+    assert.equal(stored[0]!.to, hexOf(room.encPublic));
+    const wire = JSON.stringify(stored) + asked.join(" ");
+    assert.ok(!wire.includes(hexOf(id.encPublic).slice(2)) && !wire.includes(id.address));
+    // the key in the address finds nothing there
+    assert.deepEqual(await api.inbox(9, id), []);
+  } finally {
+    globalThis.fetch = real;
+  }
 });
 
 test("a sealed box opens only for its recipient", () => {
@@ -193,6 +231,82 @@ test("a browser reads from endpoints that keep CORS headers, falls back to the r
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test("in a browser, a rate-limited first endpoint is asked once more after a pause before the fallback is", async () => {
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  const ok = () => new Response(JSON.stringify({ jsonrpc: "2.0", id: "hushd", result: { result: [...new TextEncoder().encode('"ok"')], logs: [] } }), { status: 200 });
+  const limited = () => new Response("Too Many Requests", { status: 429, headers: { "retry-after": "0" } });
+  let script: Record<string, (n: number) => Response> = {};
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    asked.push(url);
+    return script[url]!(asked.filter((u) => u === url).length);
+  }) as typeof fetch;
+  try {
+    // the browser's case: one first endpoint and a fallback; the rate limit lifts in a moment
+    script = { "https://limited.example": (n) => (n === 1 ? limited() : ok()), "https://cors-less.example": ok };
+    const browser = withOverrides(TESTNET, { rpc: ["https://limited.example"], rpcFallback: ["https://cors-less.example"], retryRateLimited: true });
+    assert.equal(await view<string>(browser, "pool.hushd.testnet", "anything"), "ok");
+    assert.deepEqual(asked, ["https://limited.example", "https://limited.example"]);
+    // it does not lift: the fallback answers after the one retry
+    asked.length = 0;
+    script = { "https://still-limited.example": limited, "https://later.example": ok };
+    const busy = withOverrides(TESTNET, { rpc: ["https://still-limited.example"], rpcFallback: ["https://later.example"], retryRateLimited: true });
+    assert.equal(await view<string>(busy, "pool.hushd.testnet", "anything"), "ok");
+    assert.deepEqual(asked, ["https://still-limited.example", "https://still-limited.example", "https://later.example"]);
+    // with two first endpoints, the second is asked at once, and only it waits for its retry
+    asked.length = 0;
+    script = { "https://one.example": limited, "https://two.example": limited, "https://last.example": ok };
+    const two = withOverrides(TESTNET, { rpc: ["https://one.example", "https://two.example"], rpcFallback: ["https://last.example"], retryRateLimited: true });
+    assert.equal(await view<string>(two, "pool.hushd.testnet", "anything"), "ok");
+    assert.equal(asked.length, 4);
+    assert.deepEqual(new Set(asked.slice(0, 2)), new Set(["https://one.example", "https://two.example"]));
+    assert.equal(asked[2], asked[1]);
+    assert.equal(asked[3], "https://last.example");
+    // without a fallback there is nothing to save a retry for: a 429 moves on at once
+    asked.length = 0;
+    script = { "https://alone.example": limited };
+    await assert.rejects(view(withOverrides(TESTNET, { rpc: ["https://alone.example"], rpcFallback: [], retryRateLimited: true }), "pool.hushd.testnet", "anything"), /answered 429/);
+    assert.deepEqual(asked, ["https://alone.example"]);
+    // a server goes straight to its fallback, which answers its 429s readably
+    asked.length = 0;
+    script = { "https://server-first.example": limited, "https://server-fallback.example": ok };
+    assert.equal(await view<string>(withOverrides(TESTNET, { rpc: ["https://server-first.example"], rpcFallback: ["https://server-fallback.example"] }), "pool.hushd.testnet", "anything"), "ok");
+    assert.deepEqual(asked, ["https://server-first.example", "https://server-fallback.example"]);
+    assert.equal(forBrowser(TESTNET).retryRateLimited, true);
+    assert.equal(TESTNET.retryRateLimited, undefined);
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(rateLimitPauseMs("0"), 200);
+  assert.equal(rateLimitPauseMs("2"), 2_000);
+  assert.equal(rateLimitPauseMs("60"), 3_000);
+  assert.equal(rateLimitPauseMs(null, 0), 1_000);
+  assert.equal(rateLimitPauseMs("Wed, 21 Oct 2026 07:28:00 GMT", 1), 1_500);
+});
+
+test("a read limit runs at most that many reads at once, and every one of them", async () => {
+  const limit = readLimit(2);
+  let now = 0;
+  let most = 0;
+  const done: number[] = [];
+  const reads = [30, 10, 20, 5, 1].map((ms, i) =>
+    limit(async () => {
+      most = Math.max(most, ++now);
+      await new Promise((r) => setTimeout(r, ms));
+      now--;
+      done.push(i);
+      return i;
+    }),
+  );
+  assert.deepEqual(await Promise.all(reads), [0, 1, 2, 3, 4]);
+  assert.equal(most, 2);
+  assert.equal(done.length, 5);
+  // a read that fails frees its slot too
+  await assert.rejects(limit(async () => Promise.reject(new Error("no"))), /no/);
+  assert.equal(await limit(async () => "after"), "after");
 });
 
 test("an RPC's HTTP 400 with a JSON-RPC error reaches near-kit as an answer; other 400s stay", async () => {
