@@ -37,7 +37,7 @@ export default function MakersPage() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  // a maker that moved to a policy wallet leaves its old account paused with no bond: list those apart
+  // a paused desk account with no bond belongs to a maker that quotes from a policy wallet: list those apart
   const retired = makers?.filter(([, m]) => !m.active && BigInt(m.bond) === 0n) ?? [];
   const current = makers?.filter((x) => !retired.includes(x)) ?? null;
 
@@ -111,8 +111,8 @@ export default function MakersPage() {
 
         {retired.length > 0 && (
           <section className="grid gap-2">
-            <p className="t-label">Retired accounts</p>
-            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">These makers moved to policy wallets. Their old accounts no longer quote and hold no bond; their deals stay on record.</p>
+            <p className="t-label">Paused accounts</p>
+            <p className="max-w-[64ch] text-[14px] leading-relaxed text-soft">These desk accounts are paused and hold no bond: their makers quote from policy wallets instead. Their deals stay on record.</p>
             <ul className="grid gap-1.5 text-[13px]">
               {retired.map(([acc, m]) => (
                 <li key={acc} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">

@@ -18,24 +18,21 @@ const VERT = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
 const FRAG = `precision mediump float;
 uniform vec2 uRes;uniform float uTime;
 uniform vec3 cBase,cHi,cMid,cDeep,cTint;
-vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
-vec2 mod289(vec2 x){return x-floor(x*(1./289.))*289.;}
-vec3 permute(vec3 x){return mod289(((x*34.)+1.)*x);}
-float snoise(vec2 v){const vec4 C=vec4(.211324865405187,.366025403784439,-.577350269189626,.024390243902439);
-vec2 i=floor(v+dot(v,C.yy));vec2 x0=v-i+dot(i,C.xx);vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.);
-vec4 x12=x0.xyxy+C.xxzz;x12.xy-=i1;i=mod289(i);
-vec3 p=permute(permute(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.));
-vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.);m=m*m;m=m*m;
-vec3 x=2.*fract(p*C.www)-1.;vec3 h=abs(x)-.5;vec3 ox=floor(x+.5);vec3 a0=x-ox;
-m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
-vec3 g;g.x=a0.x*x0.x+h.x*x0.y;g.yz=a0.yz*x12.xz+h.yz*x12.yw;return 130.*dot(m,g);}
+// a lattice hash: two rounds of fold and multiply, no trigonometry
+float hash(vec2 c){c=fract(c*vec2(.1373,.2179)+.0731);c+=dot(c,c.yx+23.17);return fract(c.x*c.y*41.73);}
+// gradient noise: a hashed unit gradient at each lattice corner, blended with a quintic fade, about -1..1
+float noise(vec2 v){vec2 i=floor(v),f=fract(v);vec2 u=f*f*f*(f*(f*6.-15.)+10.);
+float a=6.2831853*hash(i),b=6.2831853*hash(i+vec2(1.,0.)),c=6.2831853*hash(i+vec2(0.,1.)),d=6.2831853*hash(i+1.);
+float na=dot(vec2(cos(a),sin(a)),f),nb=dot(vec2(cos(b),sin(b)),f-vec2(1.,0.));
+float nc=dot(vec2(cos(c),sin(c)),f-vec2(0.,1.)),nd=dot(vec2(cos(d),sin(d)),f-1.);
+return 2.1*mix(mix(na,nb,u.x),mix(nc,nd,u.x),u.y);}
 void main(){
   vec2 uv=gl_FragCoord.xy/uRes;
   vec2 p=uv*vec2(uRes.x/uRes.y,1.)*.42;
   float t=uTime*.045;
-  vec2 q=vec2(snoise(p+vec2(0.,t)),snoise(p+vec2(5.2,-t*.8)));
-  vec2 r=vec2(snoise(p+.85*q+vec2(1.7,9.2)+t*.5),snoise(p+.85*q+vec2(8.3,2.8)-t*.4));
-  float f=snoise(p+1.1*r);
+  vec2 q=vec2(noise(p+vec2(0.,t)),noise(p+vec2(5.2,-t*.8)));
+  vec2 r=vec2(noise(p+.85*q+vec2(1.7,9.2)+t*.5),noise(p+.85*q+vec2(8.3,2.8)-t*.4));
+  float f=noise(p+1.1*r);
   vec3 col=cBase;
   col=mix(col,cMid,smoothstep(-.7,.9,f)*.9);
   col=mix(col,cHi,smoothstep(-.2,.85,r.x));
@@ -44,7 +41,7 @@ void main(){
   float corner=smoothstep(.2,1.1,uv.x*.75+(1.-uv.y)*.7);
   float g=corner*(.6+.4*smoothstep(-.6,.9,q.y));
   col=mix(col,cTint,g*.62);
-  float n=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453);
+  float n=hash(gl_FragCoord.xy);
   col+=(n-.5)*(2./255.);
   gl_FragColor=vec4(col,1.);
 }`;

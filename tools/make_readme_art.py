@@ -624,7 +624,7 @@ def repository() -> Columns:
             Item("desk/src/hedge.rs", "Hyperliquid msgpack and EIP-712 digest, pinned against reference vectors", mono=True, accent=True),
             Item("contracts/board, token", "Sealed note posts; test tokens with a faucet", mono=True),
         ],
-        subtitle="Rust, near-sdk 5, 135 unit tests and 6 sandbox tests",
+        subtitle="Rust, near-sdk 5, 150 unit tests and 6 sandbox tests",
     )
     zk = Panel(
         "Proofs and the enclave",
@@ -640,7 +640,7 @@ def repository() -> Columns:
         "Agents and services",
         [
             Item("packages/sdk", "Private wallet, desk flows, proofs, private x402", mono=True),
-            Item("packages/mcp", "17 tools, limits per payment and per day", mono=True, accent=True),
+            Item("packages/mcp", "22 tools, limits per payment and per day", mono=True, accent=True),
             Item("services/", "Relayer (dry-runs every proof), API with NEAR AI intake, indexer, makers, keeper", mono=True),
             Item("app/", "The desk, deals, proofs and /verify; hosted MCP at /mcp", mono=True),
         ],

@@ -604,7 +604,7 @@ html.hd-lite .hd-field.hd-drift {
   outline: none;
 }
 
-/* The big amount cards (Add, Pay, Prove): a soft surface that rises to
+/* The big amount cards (Add, Send, Cash out): a soft surface that rises to
    the panel colour with a gentle edge while you type in it. */
 .hd-inputcard {
   border-radius: 20px;

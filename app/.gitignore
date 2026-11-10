@@ -43,3 +43,5 @@ next-env.d.ts
 
 # env examples are tracked
 !.env.example
+# Written by `next dev` for coding agents; it regenerates on its own
+/AGENTS.md

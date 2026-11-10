@@ -103,7 +103,7 @@ What held up, with the evidence in the review:
 
 ## Tests that guard the contracts
 
-- 148 unit tests with real Groth16 proofs: pool 48, desk 69, board 24, token 7.
+- 150 unit tests with real Groth16 proofs: pool 48, desk 71, board 24, token 7.
 - 6 sandbox tests on a local nearcore with the real wasm: shield, send, cash out, a refund note, a settled swap through the desk, a bonded hedge signed by the MPC double, and a refused slash payout retried.
 - The matcher's 7 tests, including byte vectors shared with the desk and the TypeScript protocol package.
 
