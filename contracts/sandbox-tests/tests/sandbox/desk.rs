@@ -259,7 +259,9 @@ async fn desk_settles_the_swap_through_the_pool() -> TestResult {
     let spend = w.env.view(&w.pool, "spend_of", json!({ "nullifier": w.f["swap"]["legB"]["nullifiers"][0] })).await?;
     assert_eq!(spend["deal_id"], DEAL.to_string());
     assert_eq!(w.stats().await?["swaps"], 1);
-    println!("pool.settle_swap burnt {:.2} Tgas of the desk's 180 Tgas budget", pool_gas.as_gas() as f64 / 1e12);
+    println!("pool.settle_swap burnt {:.2} Tgas of the desk's 230 Tgas budget", pool_gas.as_gas() as f64 / 1e12);
+    // the desk forwards 230 Tgas; the worst case seen on testnet (an odd leaf index) is about 177
+    assert!(pool_gas.as_gas() < 200_000_000_000_000, "settle_swap burnt {} Tgas: too close to the desk's 230 Tgas budget", pool_gas.as_tgas());
 
     // the reader proofs: as views, then as transactions to see what they burn
     for kind in ["receipt", "funds", "volume"] {

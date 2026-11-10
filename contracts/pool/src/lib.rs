@@ -214,6 +214,29 @@ struct ShieldMsg {
     inner: FieldStr,
 }
 
+/// What a disclosure says on its face, which its context binds: the network, the reader and the expiry.
+#[near(serializers = [json])]
+pub struct DisclosureLabel {
+    pub network: String,
+    pub reader: String,
+    pub expires_at_ms: U64,
+}
+
+/// A disclosure's context, as the SDK makes it (`proofContext` in packages/sdk/src/field.ts):
+/// sha256("hushd.proof.v1" ‖ kind ‖ network ‖ pool ‖ reader ‖ expiry), each string after a
+/// one-byte length, the expiry as u64 LE, the top byte cleared.
+pub fn proof_context(kind: &str, network: &str, pool: &str, reader: &str, expires_at_ms: u64) -> Field {
+    let mut b = b"hushd.proof.v1".to_vec();
+    for s in [kind, network, pool, reader] {
+        b.push(s.len() as u8);
+        b.extend_from_slice(s.as_bytes());
+    }
+    b.extend_from_slice(&expires_at_ms.to_le_bytes());
+    let mut h = env::sha256_array(&b);
+    h[0] = 0;
+    h
+}
+
 #[near(serializers = [json])]
 pub struct DisclosureCheck {
     /// The Groth16 proof verifies against the reader-proof key for its kind.
@@ -615,24 +638,39 @@ impl Pool {
 
     /// Check a proof made for one named reader. Public inputs follow each circuit's
     /// order (see circuits/). `legs` is the plain (commitment, nullifier) list of a
-    /// volume proof. Context and expiry are checked by the reader against the label.
+    /// volume proof. `label` is what the proof says on its face: its context must bind
+    /// exactly that network, this pool, that reader and that expiry, and the expiry must
+    /// not have passed on chain.
     pub fn verify_disclosure(
         &self,
         kind: String,
         proof: Proof,
         public_inputs: Vec<FieldStr>,
         legs: Option<Vec<[FieldStr; 2]>>,
+        label: Option<DisclosureLabel>,
     ) -> DisclosureCheck {
         let inputs: Vec<Field> = public_inputs.iter().map(|f| f.0).collect();
         let mut problems = Vec::new();
         let mut deal_ids = Vec::new();
-        let (key, asset_at) = match kind.as_str() {
-            "receipt" => (vk::receipt(), 2),
-            "funds" => (vk::funds(), 1),
-            "volume" => (vk::volume(), 0),
+        let (key, asset_at, context_at) = match kind.as_str() {
+            "receipt" => (vk::receipt(), 2, 8),
+            "funds" => (vk::funds(), 1, 3),
+            "volume" => (vk::volume(), 0, 4),
             _ => env::panic_str("kind is receipt, funds or volume"),
         };
         let proof_valid = groth16::verify(&key, &proof, &inputs);
+        match &label {
+            None => problems.push("No reader and expiry to check the proof against".into()),
+            Some(l) => {
+                let pool = env::current_account_id();
+                if inputs.get(context_at) != Some(&proof_context(&kind, &l.network, pool.as_str(), &l.reader, l.expires_at_ms.0)) {
+                    problems.push("The proof was not made for this reader and expiry on this pool".into());
+                }
+                if env::block_timestamp_ms() > l.expires_at_ms.0 {
+                    problems.push("The proof has expired".into());
+                }
+            }
+        }
         let token = inputs.get(asset_at).and_then(|f| self.token_by_field.get(f).cloned());
         if token.is_none() {
             problems.push("The proof names an asset the pool does not list".into());
@@ -649,8 +687,8 @@ impl Pool {
                     }
                 }
                 "funds" => {
-                    if !self.tree.is_known_root(&inputs[0]) {
-                        problems.push("The proof is against a root the pool no longer keeps".into());
+                    if !self.tree.is_known_root(&inputs[0]) && !tree::was_root(&inputs[0]) {
+                        problems.push("The proof is against a root this pool never had".into());
                     }
                     let ns: Vec<Field> = inputs[4..].iter().copied().filter(|n| n != &ZERO).collect();
                     for (i, n) in ns.iter().enumerate() {

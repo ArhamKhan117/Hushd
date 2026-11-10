@@ -1,8 +1,10 @@
 //! Incremental Poseidon Merkle tree with a ring of recent roots.
 //!
 //! parent = Poseidon(left, right); empty leaves are 0 and an empty subtree of
-//! height h is zeros[h] = Poseidon(zeros[h-1], zeros[h-1]). Proofs may name any of
+//! height h is zeros[h] = Poseidon(zeros[h-1], zeros[h-1]). Spends may name any of
 //! the last `ROOT_HISTORY` roots, so a proof made a few blocks ago still lands.
+//! Every root is also logged under its own storage key (`was_root`), so a disclosure
+//! proven against an old root still checks out; its notes are checked unspent live.
 //!
 //! There are no tree epochs: once all 2^20 leaves are used the pool takes no new
 //! notes (spends of existing notes still need a free pair of leaves). A full pool is
@@ -10,7 +12,7 @@
 
 use crate::field::{Field, ZERO};
 use crate::poseidon::Hasher;
-use near_sdk::near;
+use near_sdk::{env, near};
 
 pub const LEVELS: usize = 20;
 pub const ROOT_HISTORY: usize = 100;
@@ -107,7 +109,18 @@ impl Tree {
     fn push_root(&mut self, root: Field) {
         self.current = ((self.current as usize + 1) % ROOT_HISTORY) as u32;
         self.roots[self.current as usize] = root;
+        env::storage_write(&root_log_key(&root), &[1]);
     }
+}
+
+/// The storage key logging one root: outside the contract's own state, so it needs no migration.
+fn root_log_key(root: &Field) -> Vec<u8> {
+    [b"root:".as_slice(), root.as_slice()].concat()
+}
+
+/// Whether this root is in the log (every root the tree records goes there).
+pub fn was_root(root: &Field) -> bool {
+    root != &ZERO && env::storage_has_key(&root_log_key(root))
 }
 
 #[cfg(test)]

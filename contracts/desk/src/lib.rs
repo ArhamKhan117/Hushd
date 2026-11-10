@@ -29,7 +29,9 @@ use near_sdk::{
     Promise, PromiseError, PromiseOrValue, PublicKey,
 };
 
-const GAS_POOL_SETTLE: Gas = Gas::from_tgas(180);
+/// What `pool.settle_swap` may burn: two proofs and four leaves, about 125 Tgas, up to about 177 when
+/// the pair lands on an odd leaf index (measured on testnet), with room to spare.
+const GAS_POOL_SETTLE: Gas = Gas::from_tgas(230);
 const GAS_ON_SETTLED: Gas = Gas::from_tgas(15);
 const GAS_FT: Gas = Gas::from_tgas(15);
 const GAS_FT_CALL: Gas = Gas::from_tgas(80);

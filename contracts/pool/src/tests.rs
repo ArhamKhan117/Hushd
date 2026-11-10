@@ -27,9 +27,14 @@ fn proof(v: &Value) -> Proof {
     serde_json::from_value(v["proof"].clone()).unwrap()
 }
 
+/// The label the fixture's reader proofs were made with (judge.sandbox on this pool).
+fn label(f: &Value) -> Option<DisclosureLabel> {
+    Some(serde_json::from_value(f["label"].clone()).unwrap())
+}
+
 fn builder(predecessor: &str, deposit: NearToken) -> VMContextBuilder {
     let mut b = VMContextBuilder::new();
-    b.current_account_id("pool.test".parse().unwrap())
+    b.current_account_id("pool.sandbox".parse().unwrap())
         .predecessor_account_id(predecessor.parse().unwrap())
         .attached_deposit(deposit)
         .prepaid_gas(Gas::from_tgas(300))
@@ -293,7 +298,7 @@ fn receipt_proof_checks_against_the_swap() {
     let (pool, f) = replay(5);
     let r = &f["receipt"];
     let inputs: Vec<FieldStr> = r["publicSignals"].as_array().unwrap().iter().map(field).collect();
-    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None);
+    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None, label(&f));
     assert!(check.proof_valid && check.chain_valid, "{:?}", check.problems);
     assert_eq!(check.deal_ids, vec![Some(U64(7))]);
     assert_eq!(check.token.unwrap().as_str(), "usdc.sandbox");
@@ -304,7 +309,7 @@ fn receipt_proof_before_settlement_is_not_on_chain() {
     let (pool, f) = replay(4);
     let r = &f["receipt"];
     let inputs: Vec<FieldStr> = r["publicSignals"].as_array().unwrap().iter().map(field).collect();
-    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None);
+    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None, label(&f));
     assert!(check.proof_valid && !check.chain_valid);
 }
 
@@ -313,20 +318,69 @@ fn funds_and_volume_proofs_check() {
     let (pool, f) = replay(5);
     let fu = &f["funds"];
     let inputs: Vec<FieldStr> = fu["publicSignals"].as_array().unwrap().iter().map(field).collect();
-    let check = pool.verify_disclosure("funds".into(), proof(fu), inputs, None);
+    let check = pool.verify_disclosure("funds".into(), proof(fu), inputs, None, label(&f));
     assert!(check.proof_valid && check.chain_valid, "{:?}", check.problems);
 
     let v = &f["volume"];
     let inputs: Vec<FieldStr> = v["publicSignals"].as_array().unwrap().iter().map(field).collect();
     let legs: Vec<[FieldStr; 2]> = v["legs"].as_array().unwrap().iter().map(|l| [field(&l[0]), field(&l[1])]).collect();
-    let check = pool.verify_disclosure("volume".into(), proof(v), inputs.clone(), Some(legs));
+    let check = pool.verify_disclosure("volume".into(), proof(v), inputs.clone(), Some(legs), label(&f));
     assert!(check.proof_valid && check.chain_valid, "{:?}", check.problems);
     assert_eq!(check.deal_ids, vec![Some(U64(7))]);
 
     // a tampered public input fails the proof
     let mut bad = inputs;
     bad[1] = FieldStr(field::from_u128(3));
-    assert!(!pool.verify_disclosure("volume".into(), proof(v), bad, None).proof_valid);
+    assert!(!pool.verify_disclosure("volume".into(), proof(v), bad, None, label(&f)).proof_valid);
+}
+
+#[test]
+fn a_disclosure_holds_only_for_the_reader_and_expiry_it_was_made_for() {
+    let (pool, f) = replay(5);
+    let r = &f["receipt"];
+    let inputs: Vec<FieldStr> = r["publicSignals"].as_array().unwrap().iter().map(field).collect();
+    let made_for = label(&f).unwrap();
+    let check = |l: Option<DisclosureLabel>| pool.verify_disclosure("receipt".into(), proof(r), inputs.clone(), None, l);
+
+    let other_reader = DisclosureLabel { reader: "someone-else.sandbox".into(), ..label(&f).unwrap() };
+    let c = check(Some(other_reader));
+    assert!(c.proof_valid && !c.chain_valid);
+    assert!(c.problems.iter().any(|p| p.contains("not made for this reader")), "{:?}", c.problems);
+
+    let later = DisclosureLabel { expires_at_ms: U64(made_for.expires_at_ms.0 + 1), ..label(&f).unwrap() };
+    assert!(!check(Some(later)).chain_valid, "a changed expiry is another context");
+
+    let c = check(None);
+    assert!(!c.chain_valid && c.problems.iter().any(|p| p.contains("No reader and expiry")));
+
+    // past its expiry on chain, a proof no longer holds
+    let mut b = builder("anyone.test", NearToken::from_yoctonear(0));
+    b.block_timestamp((made_for.expires_at_ms.0 + 1) * 1_000_000);
+    testing_env!(b.build());
+    let c = check(label(&f));
+    assert!(c.problems.iter().any(|p| p.contains("expired")), "{:?}", c.problems);
+}
+
+#[test]
+fn a_funds_proof_against_a_root_that_left_the_recent_ring_still_checks() {
+    let (mut pool, f) = replay(5);
+    let fu = &f["funds"];
+    let inputs: Vec<FieldStr> = fu["publicSignals"].as_array().unwrap().iter().map(field).collect();
+    // more than ROOT_HISTORY roots later, the proof's root is no longer a recent one
+    for i in 0..(tree::ROOT_HISTORY as u128 + 2) {
+        let mut h = Hasher::new();
+        pool.tree.insert(field::from_u128(1_000_000 + i), &mut h);
+    }
+    assert!(!pool.is_known_root(inputs[0].clone()));
+    let check = pool.verify_disclosure("funds".into(), proof(fu), inputs, None, label(&f));
+    assert!(check.chain_valid, "{:?}", check.problems);
+}
+
+#[test]
+fn the_proof_context_matches_the_sdk() {
+    // the same vector is pinned in packages/sdk/test/core.test.ts (proofContext)
+    let c = proof_context("receipt", "testnet", "pool.hushd.testnet", "judge.testnet", 1_796_000_000_000);
+    assert_eq!(hex::encode(c), "00d76a7dabc3a22e33a1c23f69ec04078b50fb5bb639ece5f9857081fea473ee");
 }
 
 #[test]
@@ -446,7 +500,7 @@ fn a_refund_note_that_already_exists_is_held_instead() {
     let usdc: AccountId = s(&f["tokens"]["usdc"]).parse().unwrap();
     // the refund note for 100 to alice's shield inner is her shield note itself
     let inner = field(&f["shieldAlice"]["inner"]);
-    with_results("pool.test", vec![PromiseResult::Failed]);
+    with_results("pool.sandbox", vec![PromiseResult::Failed]);
     pool.on_payout(usdc.clone(), "alice.test".parse().unwrap(), U128(100), None, U128(0), Some(inner));
     assert_eq!(pool.next_leaf_index().0, 1, "no second leaf with the same commitment");
     assert_eq!(pool.unclaimed("alice.test".parse().unwrap(), usdc).0, 100);
@@ -494,7 +548,7 @@ fn a_minimum_above_the_per_deposit_limit_is_refused() {
 fn a_payout_that_returns_a_long_value_still_counts_as_paid() {
     let (mut pool, f) = replay(1);
     let usdc: AccountId = s(&f["tokens"]["usdc"]).parse().unwrap();
-    with_results("pool.test", vec![PromiseResult::Successful(vec![b'1'; 200])]);
+    with_results("pool.sandbox", vec![PromiseResult::Successful(vec![b'1'; 200])]);
     pool.on_payout(usdc, "alice.test".parse().unwrap(), U128(29), None, U128(0), Some(field(&f["shieldAlice"]["inner"])));
     assert!(get_logs().iter().any(|l| l.contains("\"outcome\":\"paid\"")), "{:?}", get_logs());
     assert_eq!(pool.stats().refunds, 0);
@@ -511,7 +565,7 @@ fn a_receipt_only_counts_the_payment_slot() {
     let nullifier = field(&f["swap"]["legA"]["nullifiers"][0]).0;
     let spend = pool.spends.get_mut(&nullifier).unwrap();
     spend.outputs.swap(0, 1);
-    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None);
+    let check = pool.verify_disclosure("receipt".into(), proof(r), inputs, None, label(&f));
     assert!(check.proof_valid && !check.chain_valid);
     assert_eq!(check.problems, vec!["The proven note is the payer's change, not the payment".to_string()]);
     assert!(check.deal_ids.is_empty());
@@ -525,7 +579,7 @@ fn a_volume_leg_only_counts_the_payment_slot() {
     let legs: Vec<[FieldStr; 2]> = v["legs"].as_array().unwrap().iter().map(|l| [field(&l[0]), field(&l[1])]).collect();
     let spend = pool.spends.get_mut(&legs[0][1].0).unwrap();
     spend.outputs.swap(0, 1);
-    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(legs));
+    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(legs), label(&f));
     assert!(check.proof_valid && !check.chain_valid);
     assert!(check.problems.iter().any(|p| p.contains("own change")), "{:?}", check.problems);
 }
@@ -536,7 +590,7 @@ fn a_volume_check_with_too_many_legs_stops_early() {
     let v = &f["volume"];
     let inputs: Vec<FieldStr> = v["publicSignals"].as_array().unwrap().iter().map(field).collect();
     let many: Vec<[FieldStr; 2]> = (0..1_000u128).map(|i| [FieldStr(field::from_u128(i)), FieldStr(field::from_u128(i))]).collect();
-    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(many));
+    let check = pool.verify_disclosure("volume".into(), proof(v), inputs, Some(many), label(&f));
     assert!(check.proof_valid && !check.chain_valid);
     assert_eq!(check.problems, vec!["A volume proof covers at most 16 legs".to_string()]);
 }

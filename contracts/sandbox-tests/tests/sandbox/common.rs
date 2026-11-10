@@ -322,7 +322,7 @@ pub fn leg(v: &Value) -> Value {
 /// `verify_disclosure` args for one of the fixture's reader proofs.
 pub fn disclosure_args(f: &Value, kind: &str) -> Value {
     let p = &f[kind];
-    json!({ "kind": kind, "proof": p["proof"], "public_inputs": p["publicSignals"], "legs": p.get("legs") })
+    json!({ "kind": kind, "proof": p["proof"], "public_inputs": p["publicSignals"], "legs": p.get("legs"), "label": f["label"] })
 }
 
 // ---------- the Hushd world ----------

@@ -17,7 +17,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as snarkjs from "snarkjs";
-import { assetField, extHash, noteScheme, swapExtHash, Tree } from "./notes.mjs";
+import { assetField, extHash, hashToField, noteScheme, swapExtHash, Tree } from "./notes.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = here.endsWith("scripts") ? join(here, "..") : here;
@@ -114,8 +114,18 @@ const legA = await joinsplit({ inputs: [bobNote, dummy(usdc, 3n)], outputs: [usd
 const legB = await joinsplit({ inputs: [m0, dummy(btc, 4n)], outputs: [btcToBob, makerChange], ext: binding, asset: btc });
 for (const c of [usdcToMaker, bobChange, btcToBob, makerChange]) tree.insert(c.commitment);
 
+// every reader proof is made for judge.sandbox on the sandbox pool, as the SDK makes them
+// (proofContext): the pool checks the label against the context
+const LABEL = { network: "testnet", reader: "judge.sandbox", expires_at_ms: "4102444800000" };
+const contextFor = (kind) => {
+  const parts = [Buffer.from("hushd.proof.v1")];
+  for (const s of [kind, LABEL.network, "pool.sandbox", LABEL.reader]) parts.push(Buffer.from([Buffer.byteLength(s)]), Buffer.from(s));
+  const expiry = Buffer.alloc(8);
+  expiry.writeBigUInt64LE(BigInt(LABEL.expires_at_ms));
+  return hashToField(Buffer.concat([...parts, expiry]));
+};
+
 // receipt: Bob paid the maker at least 40 USDC in deal 7, amount shown, payee hidden
-const context = 4242n;
 const receipt = await prove("receipt", {
   commitment: S(usdcToMaker.commitment),
   nullifier: S(bobNote.nullifier),
@@ -125,7 +135,7 @@ const receipt = await prove("receipt", {
   shownAmount: "50",
   showPayee: "0",
   shownPayee: "0",
-  context: S(context),
+  context: S(contextFor("receipt")),
   payeePk: S(makerPk),
   blinding: "31",
   amount: "50",
@@ -142,7 +152,7 @@ const funds = await prove("funds", {
   root: S(tree.root()),
   asset: S(btc),
   threshold: "2",
-  context: S(context),
+  context: S(contextFor("funds")),
   nullifier: fundsSlots.map((n) => (n ? S(n.nullifier) : "0")),
   used: fundsSlots.map((n) => (n ? "1" : "0")),
   sk: fundsSlots.map((n) => (n ? S(n.sk) : "0")),
@@ -162,7 +172,7 @@ const volume = await prove("volume", {
   total: "2",
   count: "1",
   legsHash: S(acc),
-  context: S(context),
+  context: S(contextFor("volume")),
   used: slots.map((l) => (l ? "1" : "0")),
   payeePk: slots.map((l) => (l ? S(l.payeePk) : "0")),
   blinding: slots.map((l) => (l ? S(l.blinding) : "0")),
@@ -182,6 +192,7 @@ const fixture = {
   cashOut: { ...cashOut, ext: { recipient: cashExt.recipient, relayer: cashExt.relayer, fee: "1", refund_inner: S(cashExt.refundInner) }, publicAmount: "30" },
   shieldMaker,
   swap: { dealId: S(dealId), legA, legB },
+  label: LABEL,
   receipt,
   funds,
   volume: { ...volume, legs: legs.map((l) => [S(l.c), S(l.n)]) },
