@@ -73,18 +73,18 @@ export default function ProofsPage() {
 
       <h2 id="one-named-reader">One named reader</h2>
       <p>
-        The reader is a NEAR account, such as <code>auditor.testnet</code>. A proof can be copied, like any file. What
-        it cannot do is pass for someone else&apos;s: anyone checking it is told who it was made for, and the checker
-        at <Link href="/verify">/verify</Link> asks who you are and flags a proof made for another account rather than
-        quietly accepting it.
+        The reader is a NEAR account, such as <code>auditor.testnet</code>. A proof can be copied, like any file, and
+        anyone holding it can check it: the reader is who it was made for, not a lock. What it cannot do is pass for
+        someone else&apos;s: the reader is bound into the proof, the pool refuses it for any other reader, and the
+        checker at <Link href="/verify">/verify</Link> asks who you are and flags a proof made for another account
+        rather than quietly accepting it.
       </p>
 
       <h2 id="expiry">Expiry</h2>
       <p>
         You choose how long a proof is valid: one day, seven or thirty in the app, up to ninety over MCP. After that,
-        every checker refuses it. A funds proof also stops holding as soon as you spend a note behind it, or once the
-        pool has moved more than 100 roots past the one it was proved against: it shows what you hold now, not what
-        you once held.
+        every checker refuses it, the pool included, which reads the expiry against block time. A funds proof also
+        stops holding as soon as you spend a note behind it: it shows what you hold now, not what you once held.
       </p>
 
       <h2 id="checking-a-proof">Checking a proof</h2>
@@ -99,14 +99,21 @@ export default function ProofsPage() {
         <li>refuses it if it has expired, or names a different reader than you,</li>
         <li>checks the Groth16 proof against the circuit&apos;s verifying key, in your browser, and</li>
         <li>
-          asks the pool contract&apos;s <code>verify_disclosure</code> view to check it again against the chain.
+          asks the pool contract&apos;s <code>verify_disclosure</code> view to check it again against the chain, with
+          the proof&apos;s network, reader and expiry.
         </li>
       </ol>
       <p>
-        The pool checks what only the chain knows. For a payment, that the note you paid with was really spent into
-        the note the proof names. For funds, that the root is one it still keeps and no note behind the proof has been
-        spent since. For volume, that every leg was a desk settlement, and none is counted twice. Any problem is
-        listed in plain words.
+        The pool checks what only the chain knows. For every proof, that its context binds exactly that network, this
+        pool, that reader and that expiry, and that the expiry has not passed on chain. For a payment, that the note
+        you paid with was really spent into the note the proof names, as the payment and not as change. For funds,
+        that the root is one the pool has had and no note behind the proof has been spent since. For volume, that
+        every leg was a desk settlement, and none is counted twice. Any problem is listed in plain words.
+      </p>
+      <p>
+        What the proofs do not say: a payment proof shows a payment was made, not to whom unless you reveal the payee
+        (paying yourself is a payment too), and a volume proof counts your desk settlements, including any made with
+        a maker you run yourself.
       </p>
       <Callout title="The label is not proven">
         A proof can carry a label in your words, like what the payment was for. The checker shows it, marked as not
