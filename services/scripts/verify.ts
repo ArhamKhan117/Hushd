@@ -24,7 +24,7 @@ async function rpc<T>(method: string, params: unknown): Promise<T> {
   // public RPCs rate-limit: try each endpoint, twice
   let last = "RPC error";
   for (let attempt = 0; attempt < 2; attempt++) {
-    for (const url of rpcOrder(net.rpc)) {
+    for (const url of [...rpcOrder(net.rpc), ...(net.rpcFallback ?? [])]) {
       const j = (await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })
         .then((r) => r.json())
         .catch(() => ({ error: { message: `${url} unreachable` } }))) as { result?: T; error?: { code?: number; message?: string; cause?: { name?: string } } };
@@ -238,14 +238,24 @@ const checks: Check[] = [
   },
 ];
 
+// a free RPC that rate-limits says nothing about a claim: such a failure is checked again, twice, after a pause
+const rateLimited = (e: unknown) => /429|rate limit/i.test((e as Error)?.message ?? "");
 let failed = 0;
 for (const c of checks) {
-  try {
-    const detail = await c.run();
-    console.log(`PASS  ${c.claim}\n      ${detail}`);
-  } catch (e) {
-    failed++;
-    console.log(`FAIL  ${c.claim}\n      ${(e as Error).message}`);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const detail = await c.run();
+      console.log(`PASS  ${c.claim}\n      ${detail}`);
+      break;
+    } catch (e) {
+      if (rateLimited(e) && attempt < 3) {
+        await new Promise((r) => setTimeout(r, 10_000 * attempt));
+        continue;
+      }
+      failed++;
+      console.log(`FAIL  ${c.claim}\n      ${(e as Error).message}`);
+      break;
+    }
   }
 }
 console.log(`\n${checks.length - failed} of ${checks.length} claims hold.`);
