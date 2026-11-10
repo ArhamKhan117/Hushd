@@ -139,8 +139,8 @@ export default function DeskDocsPage() {
           them.
         </li>
         <li>
-          Each checks the note it was sent opens to the agreed token and amount under its own receive key, and that it
-          is the output the other side committed to.
+          Each checks the note it was sent opens to the agreed token and amount under its own receive key (the
+          trader&apos;s is the deal&apos;s one-time key), and that it is the output the other side committed to.
         </li>
         <li>
           Each proves its own leg, bound to the deal id and all four outputs. Neither leg can be replayed alone or
@@ -157,6 +157,11 @@ export default function DeskDocsPage() {
           <code>pool.settle_swap</code>: both proofs and both bindings are checked, and all four spends and four new
           notes are applied in one receipt. Both happen or neither does.
         </li>
+        <li>
+          The maker paid your note to an address your wallet made for this deal alone, named in your sealed request
+          instead of your hushd1… address. Your wallet moves that note into your balance with a private send through
+          the relayer, at no gas, and tries again on its next sync if the move does not go out.
+        </li>
       </ol>
       <p>
         The relayer checks both proofs and both signatures off chain, and that every note is unspent, before it sends
@@ -168,9 +173,23 @@ export default function DeskDocsPage() {
       <p>
         You prove your leg first and hand it to the maker, and the maker submits both. Until the deal expires, the
         maker holds a leg it can use or drop: it can wait and settle only if the price still suits it. Walking away
-        costs it nothing: a spot deal has no bond, and a hedged deal&apos;s bond is released when a deal expires
+        costs it no bond: a spot deal has none, and a hedged deal&apos;s bond is released when a deal expires
         unsettled. Nothing of yours moves unless both legs settle together, but the quote is firm for you and an
-        option for the maker. The desk lists every deal that ended <strong>failed</strong>, with its maker.
+        option for the maker.
+      </p>
+      <p>
+        The lapse is public, and it costs the maker future requests. Every deal ends with a receipt on the desk that
+        names its maker. Before a request goes out, <code>openRfq</code> in the SDK (which the app and the MCP server
+        use) counts each maker&apos;s last 20 deals that ended in the past week: <strong>settled</strong>, or lapsed
+        (expired without settling, or a hedge it missed). A maker that let more than 25% of them lapse is not asked.
+        A maker is judged only once 5 of its deals have ended, so a new one is asked from the start, and a skipped
+        maker is asked again once its lapses are more than a week old. Each maker&apos;s record is on the{" "}
+        <Link href="/app/makers">makers page</Link>, and <code>readMakerRecords</code> counts it for anyone.
+      </p>
+      <p>
+        The desk cannot tell which side let a deal expire, so a deal the trader walked away from counts against the
+        maker too; the threshold leaves room for that. The rule is the client&apos;s, not the contract&apos;s: code
+        that does not use <code>openRfq</code> can still ask any maker.
       </p>
 
       <h2 id="5-the-receipt">5. The receipt</h2>

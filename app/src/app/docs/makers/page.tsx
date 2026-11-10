@@ -133,8 +133,9 @@ export default function MakersDocsPage() {
       </p>
       <p>
         Since the maker submits, it has a last look: it holds the trader&apos;s proven leg until the deal expires and
-        could settle only if the price still suits it, at no cost on a spot deal. The reference makers settle each deal
-        they win as soon as both legs are ready. See <Link href="/docs/desk#last-look">last look</Link>.
+        could settle only if the price still suits it. That costs it no bond on a spot deal, but each lapse is public,
+        and requests skip a maker that let more than 25% of its last 20 ended deals lapse. The reference makers settle
+        each deal they win as soon as both legs are ready. See <Link href="/docs/desk#last-look">last look</Link>.
       </p>
 
       <h2 id="bonds">Bonds</h2>

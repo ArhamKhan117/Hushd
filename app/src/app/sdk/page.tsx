@@ -132,16 +132,17 @@ const draft: PackageDraft = {
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
 };
-const { request, ask, refundBlinding } = packageRequest(identity, TESTNET, draft);
+const { request, ask, refundBlinding, dealIdentity } = packageRequest(identity, TESTNET, draft);
 
 // 2. Commit its hash on chain; each maker gets the ask, sealed to it.
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
 
-// 3. The enclave's match, sealed to you. Check it is what you asked for.
-const match = await awaitMatch(api, identity, rfqId);
+// 3. The enclave's match, sealed to this deal's one-time address. Check it is what you asked for.
+const match = await awaitMatch(api, dealIdentity, rfqId);
 checkMatchedTerms(match.terms, draft);
 
-// 4. Approve the four outputs, prove your leg; both legs settle in one pool call.
+// 4. Approve the four outputs, prove your leg; both legs settle in one pool call,
+//    then the note the maker paid to the one-time address moves into your balance.
 await settleAsTrader({
   net: TESTNET, api, wallet, refundBlinding,
   dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address,

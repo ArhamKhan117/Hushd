@@ -116,5 +116,5 @@ What held up, with the evidence in the review:
 - The matcher client builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`), so it could leave a quote out and the enclave could not tell.
 - The keeper alone reports whether a hedge order filled, and the desk releases or slashes the maker's bond on that report.
 - A hedged deal's order trades for the maker's own Hyperliquid account (the per-deal Chain Signatures address is approved as the maker's agent), so it does not hedge the trader; hedged packages are experimental and none has filled on testnet.
-- The maker submits both legs after the trader hands over its proven one, so it has a last look until the deal expires, at no cost on a spot deal.
+- The maker submits both legs after the trader hands over its proven one, so it has a last look until the deal expires; that costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse.
 - The full trust model is on [hushd.net/docs/threat-model](https://hushd.net/docs/threat-model).

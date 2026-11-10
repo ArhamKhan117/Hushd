@@ -100,7 +100,10 @@ export default function ThreatModelPage() {
         The API verifies the model&apos;s TDX and NVIDIA GPU attestation and gives your browser its signing key; your
         browser encrypts your words to that key and checks the TEE&apos;s signature on the answer. It accepts only a
         signature by that same key, whatever signer the API names, so an API that swapped in a key of its own for the
-        answer gets a draft marked not verified. The browser relies on the API&apos;s attestation check; you can check the same model yourself at{" "}
+        answer gets a draft marked not verified. The browser does not check the attestation itself: it relies on the
+        API&apos;s check of the Intel TDX quote and the NVIDIA GPU evidence, and shows beside each answer what the API
+        returned (the model, its signing key, the TDX status and when it was verified), so you can check the same
+        model and key yourself at{" "}
         <a href="https://cloud.near.ai/verify" target="_blank" rel="noreferrer">
           cloud.near.ai/verify
         </a>
@@ -141,9 +144,12 @@ export default function ThreatModelPage() {
         <li>A maker can decline to quote, quote badly, or fail to settle. An unsettled deal expires, and nothing moves.</li>
         <li>
           A maker has a last look. You prove your leg first and hand it over, and the maker submits both legs, so it
-          can wait out the settlement window and settle only if the price still suits it. On a spot deal that costs it
-          nothing, since there is no bond; a hedged deal&apos;s bond is released too when a deal expires unsettled.
-          See <Link href="/docs/desk#last-look">last look</Link>.
+          can wait out the settlement window and settle only if the price still suits it. It loses no bond for that: a
+          spot deal has none, and a hedged deal&apos;s bond is released too when a deal expires unsettled. The lapse is
+          public, though: the deal&apos;s receipt says <strong>failed</strong> and names the maker, and a request from
+          the app, the SDK or the MCP server skips a maker that let more than 25% of its last 20 ended deals lapse
+          (once 5 have ended). The desk cannot tell which side let a deal expire, so a trader that walks away from
+          deals can push a maker toward that line. See <Link href="/docs/desk#last-look">last look</Link>.
         </li>
         <li>
           A maker that misses a hedge, as the keeper reports it, loses its bond to the trader. The hedge itself trades
@@ -157,6 +163,11 @@ export default function ThreatModelPage() {
         </li>
         <li>
           A maker sees the pair, the side and the size of every ask sealed to it, and could act on that elsewhere.
+        </li>
+        <li>
+          The winning maker pays your note to an address your wallet made for that deal alone, never your hushd1…
+          address, so it cannot link two of its deals to one trader by the address. Each deal&apos;s pair, size and
+          timing can still hint at it.
         </li>
       </ul>
 

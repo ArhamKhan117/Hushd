@@ -17,12 +17,12 @@ const ROWS: [string, string][] = [
   ["Who paid whom inside the pool, and how much", "The two sides only"],
   ["Your private balance", "You only"],
   ["A claim link, and so its amount and the right to claim it", "Whoever holds the link"],
-  ["Your request: your limit, your address, your words", "You and the matcher enclave"],
+  ["Your request: your limit, the deal's one-time address, your words", "You and the matcher enclave"],
   ["The ask: the package kind, the pair, the side and the size", "Each registered maker"],
   ["Quotes, including the ones that lose", "The maker that made each, and the enclave"],
   ["That a deal happened: its maker, class, expiry, bond, outcome and evidence", "Anyone"],
   ["A hedge order: the coin, the side, the size and the limit", "Anyone, on the desk and on Hyperliquid"],
-  ["The agreed amounts, and who the trader was", "The trader and the winning maker"],
+  ["The agreed amounts, and the address the maker pays: one made for that deal alone", "The trader and the winning maker"],
   ["That a deal room message was sent: its deal, size and time, and the key it is sealed to", "The API, until the deal settles or closes, and a day at most"],
   ["Your words to the intake", "You and the attested model"],
   ["The fact a proof shows", "Whoever holds the proof"],
@@ -148,8 +148,10 @@ export default function PrivacyModelPage() {
           maker&apos;s account, whichever per-deal address signed it.
         </li>
         <li>
-          <strong>Your receive address.</strong> The winning maker learns your hushd1… address, since it makes a note
-          for you. Deals with the same maker from the same address can be linked by that maker.
+          <strong>Your receive address.</strong> The winning maker never learns your hushd1… address. Your sealed
+          request names an address your wallet made for that deal alone, the maker pays your note to it, and your
+          wallet then moves the note into your balance with a private send. The maker cannot tell from the address that
+          two of its deals came from you; it still sees each deal&apos;s pair, size and time, which can hint at it.
         </li>
         <li>
           <strong>Deal rooms.</strong> The two sides of a deal swap sealed messages through the API. It files the

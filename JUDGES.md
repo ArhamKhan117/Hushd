@@ -28,6 +28,7 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 | NEAR-specific static checks on every contract | `contracts/tools/near-scan`, [security/near-scan.md](security/near-scan.md) |
 | A match must come from the enclave, and each quote carries its maker's consent | `contracts/desk/src/lib.rs` (`on_match`, `submit_match`, `accept_match`), `matcher/src/main.rs` |
 | Makers never see the limit | `packages/sdk/src/desk.ts` (`packageRequest`, `openRfq`) |
+| Each deal pays the trader at a one-time address, then a private send moves the note into its balance | `packages/sdk/src/desk.ts` (`dealIdentityFor`, `settleAsTrader`), `packages/sdk/src/wallet.ts` (`moveDealNote`), `packages/sdk/test/deal.test.ts` |
 | The maker's hedge order is signed by Chain Signatures per deal and trades for the maker's own Hyperliquid account; a missed hedge, as the keeper reports it, pays the bond to the trader privately | `contracts/desk/src/hedge.rs`, `contracts/desk/src/lib.rs` (`sign_hedge_order`, `record_hedge`, `slash_overdue`), `services/src/hyperliquid.ts` (`approveDealAgent`), `services/src/makers.ts`, `services/src/keeper.ts` |
 | Proofs for one reader with an expiry | `circuits/receipt/receipt.circom` (`context`), `packages/sdk/src/field.ts` (`proofContext`), `packages/sdk/src/proofs.ts` |
 | NEAR AI intake is end-to-end encrypted and verified | `packages/sdk/src/intake.ts`, `services/src/intake.ts` |
@@ -47,7 +48,8 @@ Or, from a terminal, with no keys: `pnpm install && pnpm verify` checks the READ
 - Hedged packages are experimental. The hedge order trades on Hyperliquid testnet for the maker's own account (each deal's Chain Signatures address is approved as the maker's agent), so it does not hedge the trader, and Hyperliquid shows all of one maker's hedges on that maker's account. What the trader gets beyond the spot leg is the maker's bond if the order misses.
 - No hedge has filled: the reference makers' Hyperliquid testnet accounts hold no margin, so they do not quote hedged packages, and the one hedged deal so far (#3) ended with its bond paid to the trader.
 - The keeper alone reports a hedge's outcome, and the desk releases or slashes the bond on that report.
-- Makers have a last look: the trader proves its leg first and the maker submits both, so a maker can wait out the settlement window and settle only if the price still suits it, at no cost on a spot deal.
+- The winning maker pays a one-time address per deal, so it cannot link a trader's deals by address; their pairs, sizes and timing can still hint at it.
+- Makers have a last look: the trader proves its leg first and the maker submits both, so a maker can wait out the settlement window and settle only if the price still suits it. It loses no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse (`packages/sdk/src/reputation.ts`).
 - Hushd's own services are trusted for some things: the API sees IP addresses, timing and deal-room traffic, and the matcher client builds the enclave's batch from the API's database, so it could leave a quote out without the enclave knowing.
 - The makers are automated agents that price by formula (a fixed, a volatility or an inventory spread on Hyperliquid mids); the one language model in Hushd is the NEAR AI intake.
 - A policy wallet's TEE checks which contracts an agent calls and the NEAR it attaches, not the token amounts inside a call; those limits are the MCP server's.

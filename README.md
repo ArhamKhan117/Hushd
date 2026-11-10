@@ -77,6 +77,7 @@ It names the commit and the pinned `sourcescan/cargo-near` Docker image it was b
 ## Privacy and security model
 
 What stays private: who holds what, who paid whom, the amounts inside the pool, the parties and amounts of a desk deal, and the trader's limit.
+The winning maker pays the trader at a one-time address made for that deal, so it cannot link two of its deals to one trader by address (pair, size and timing can still hint at it).
 
 What is public: deposits into the pool and cash outs out of it, with their amounts; that a deal exists, its settlement class, its maker and its outcome; a hedged deal's bond (only in fixed steps of the desk minimum, so it does not give the size away) and its hedge order on Hyperliquid (which does).
 On Hyperliquid every hedge a maker places shows on that maker's account, whichever per-deal address signed it.
@@ -91,7 +92,7 @@ Who you trust, and for what:
 - **The matcher client** (run by Hushd) builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell.
 - **The keeper** (run by Hushd) submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report.
 - **The matcher enclave** sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code.
-- **The maker** sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it, at no cost on a spot deal.
+- **The maker** sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse.
 - **NEAR AI Cloud** decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext.
 
 Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review and automated scans ([SECURITY.md](SECURITY.md)), not an external audit.

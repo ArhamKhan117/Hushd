@@ -64,14 +64,16 @@ const GROUPS: { id: string; title: string; rows: [string, string][] }[] = [
     title: "Desk",
     rows: [
       ["packageRequest(id, net, draft)", "The sealed request (with the limit) and the ask makers see"],
-      ["openRfq({ net, api, relayer, request, ask, windowMs })", "Seal and commit the request, and send each maker its ask"],
-      ["awaitMatch(api, id, rfqId)", "Wait for the enclave and open the terms sealed to you"],
+      ["openRfq({ net, api, relayer, request, ask, windowMs })", "Seal and commit the request, and send each maker its ask, skipping makers that let too many deals lapse"],
+      ["readMakerRecords(net), makersToAsk", "Each maker's record from the desk's deals (settled, lapsed, lapse rate), and the makers a request asks"],
+      ["awaitMatch(api, dealIdentity, rfqId)", "Wait for the enclave and open the terms sealed to this deal's one-time address"],
       ["checkMatchedTerms(terms, draft)", "Refuse a match below your limit, in another token or another package"],
       ["isBondStep(bond, minBond), bondStepAtLeast(atLeast, minBond)", "The desk takes a bond only in steps of its minimum (1, 2, 5, 10, 20... times it)"],
-      ["settleAsTrader, settleAsMaker", "Each side's settlement, from planning to the settled deal"],
+      ["settleAsTrader, settleAsMaker", "Each side's settlement, from planning to the settled deal (the trader's then moves into its balance)"],
       ["deskView", "config, enclave, makers, deal, deals, stats"],
       ["new DeskApi(url), new RelayerClient(url)", "The API's request intake and deal rooms, and the relayer"],
       ["ownerKeyFor, closeHedgeSignature", "The per-deal key that alone closes a hedge, and its signature"],
+      ["dealIdentityFor, wallet.moveDealNote(dealId)", "The one-time address a deal pays you at, and the private send that moves its note into your balance"],
     ],
   },
   {
@@ -164,14 +166,16 @@ const draft: PackageDraft = {
   sell: { token: "usdc.hushd.testnet", amount: 100_000_000n },
   buy: { token: "wnear.hushd.testnet", minAmount: 0n },
 };
-const { request, ask, refundBlinding } = packageRequest(id, TESTNET, draft);
+// the request names a one-time address for this deal alone (dealIdentity), never yours
+const { request, ask, refundBlinding, dealIdentity } = packageRequest(id, TESTNET, draft);
 const { rfqId } = await openRfq({ net: TESTNET, api, relayer, request, ask, windowMs: 45_000 });
-const match = await awaitMatch(api, id, rfqId);
+const match = await awaitMatch(api, dealIdentity, rfqId);
 checkMatchedTerms(match.terms, draft); // throws unless the match is what you asked for
-await settleAsTrader({
-  net: TESTNET, api, wallet, refundBlinding, // re-derives the deal's owner key, which approves the outputs
+const { moved } = await settleAsTrader({
+  net: TESTNET, api, wallet, refundBlinding, // re-derives the deal's owner key and its one-time address
   dealId: match.dealId, terms: match.terms, makerAddress: match.maker_address,
-});`}</code>
+});
+// moved.state "moved": the tokens are in your balance; "waiting": the next wallet.sync() moves them`}</code>
       </pre>
       <p>
         The enclave picks the best quote, but you check the result before your leg is proved:{" "}
@@ -180,7 +184,9 @@ await settleAsTrader({
       </p>
       <p>
         For a hedged package, keep the <code>refundBlinding</code> that <code>packageRequest</code> returns: it
-        re-derives the key that closes the hedge, and the note a slashed bond pays you. The desk page in the app does
+        re-derives the key that closes the hedge, the note a slashed bond pays you, and the deal&apos;s one-time
+        address. The maker pays your leg to that address; the wallet keeps the note&apos;s opening and moves it into
+        your balance with a private send through the relayer, trying again on each sync until it lands. The desk page in the app does
         exactly this, in <code>app/src/app/app/page.tsx</code>.
       </p>
 

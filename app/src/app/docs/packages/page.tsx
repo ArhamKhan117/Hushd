@@ -79,7 +79,8 @@ export default function PackagesPage() {
       </p>
       <p>
         The maker submits both legs, after you have handed it yours, so it has a last look: it can wait until the deal
-        expires and settle only if the price still suits it, at no cost on a spot deal. See{" "}
+        expires and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is
+        public and costs it future requests. See{" "}
         <Link href="/docs/desk#last-look">last look</Link>.
       </p>
       <p>
