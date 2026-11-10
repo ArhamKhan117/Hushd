@@ -81,8 +81,8 @@ export interface IntakeAttestation {
 
 export async function intakeAttestation(apiBase: string): Promise<IntakeAttestation> {
   const res = await fetch(`${apiBase.replace(/\/$/, "")}/v1/intake/attestation`);
-  const att = (await res.json()) as IntakeAttestation & { error?: string };
-  if (!res.ok || !att.signing_public_key) throw new Error(att.error ?? "The model's attestation is unavailable");
+  const att = (await res.json()) as IntakeAttestation & { error?: string; unavailable?: string };
+  if (!res.ok || !att.signing_public_key) throw new Error(att.unavailable ?? att.error ?? "The model's attestation is unavailable");
   return att;
 }
 

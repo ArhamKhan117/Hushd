@@ -3,7 +3,7 @@
  * No keys and no wallet: this is all a read-only client needs.
  */
 import { utf8ToB64 } from "./bytes.js";
-import type { HushdNetwork } from "./network.js";
+import { allEndpoints, type HushdNetwork } from "./network.js";
 
 export class RpcError extends Error {
   constructor(message: string, readonly cause?: unknown) {
@@ -41,7 +41,8 @@ const errorBodyHosts = new Set<string>();
  * a stale nonce. After this call, POSTs to these endpoints that fail with a JSON-RPC error body
  * reach near-kit as ordinary answers. Patches `fetch` once; other requests are untouched.
  */
-export function keepRpcErrorBodies(urls: readonly string[]): void {
+export function keepRpcErrorBodies(endpoints: readonly string[] | HushdNetwork): void {
+  const urls = Array.isArray(endpoints) ? endpoints : allEndpoints(endpoints as HushdNetwork);
   const first = errorBodyHosts.size === 0;
   for (const u of urls) errorBodyHosts.add(u.replace(/\/$/, ""));
   if (!first) return;
@@ -87,6 +88,8 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
         // contract errors are answers, not outages: no point asking another endpoint
         if (e instanceof RpcError && e.cause && !String(e.message).includes("answered")) throw e;
         restEndpoint(url);
+        // a rate limit will not lift in a moment: ask the next endpoint rather than this one again
+        if (e instanceof RpcError && /answered 429/.test(e.message)) break;
         await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
       }
     }

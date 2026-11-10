@@ -16,7 +16,7 @@ export interface HushdNetwork {
   id: "testnet" | "mainnet";
   /** Whether the Hushd contracts below exist on this network yet. */
   deployed: boolean;
-  /** Free RPC endpoints; calls rotate across them and fail over (`rpcOrder`). */
+  /** Free RPC endpoints a server reads from; calls rotate across them and fail over (`rpcOrder`). */
   rpc: string[];
   /**
    * The ones among `rpc` that take transactions (`sendEndpoints`). Free dRPC refuses a
@@ -29,7 +29,10 @@ export interface HushdNetwork {
    * browser logs as a CORS error, so in a browser it is only a fallback (`forBrowser`).
    */
   browserRpc?: string[];
-  /** Tried, in order, only after every endpoint in `rpc` has failed. */
+  /**
+   * Tried, in order, only after every endpoint in `rpc` has failed. A server keeps dRPC here, so
+   * a browser on the same address (a local run) keeps dRPC's quota for itself.
+   */
   rpcFallback?: string[];
   pool: string | null;
   desk: string | null;
@@ -48,8 +51,9 @@ export interface HushdNetwork {
 export const TESTNET: HushdNetwork = {
   id: "testnet",
   deployed: true,
-  rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org"],
+  rpc: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
   rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
+  rpcFallback: ["https://near-testnet.drpc.org"],
   browserRpc: ["https://near-testnet.drpc.org"],
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
@@ -73,8 +77,9 @@ export const MAINNET_USDC = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6a
 export const MAINNET: HushdNetwork = {
   id: "mainnet",
   deployed: false,
-  rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://near.drpc.org"],
+  rpc: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
   rpcSend: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.fastnear.com"],
+  rpcFallback: ["https://near.drpc.org"],
   browserRpc: ["https://near.drpc.org", "https://near.api.pocket.network"],
   pool: "pool.hushd.near",
   desk: "desk.hushd.near",
@@ -94,7 +99,8 @@ export const MAINNET: HushdNetwork = {
 
 /** Override any field (a local sandbox, a self-hosted API). */
 export function withOverrides(base: HushdNetwork, o: Partial<HushdNetwork>): HushdNetwork {
-  return { ...base, ...o };
+  // an override of `rpc` names the endpoints to use (a local node): the base's fallbacks are another network's
+  return { ...base, ...(o.rpc && !o.rpcFallback ? { rpcFallback: [] } : {}), ...o };
 }
 
 /** The endpoints to send transactions through: `rpcSend` where it overlaps `rpc` or `rpcFallback` (an override of `rpc` alone, like a sandbox, sends there). */
@@ -108,7 +114,12 @@ export function sendEndpoints(net: HushdNetwork): string[] {
 export function forBrowser(net: HushdNetwork): HushdNetwork {
   const first = net.browserRpc ?? [];
   if (!first.length) return net;
-  return { ...net, rpc: first, rpcFallback: [...net.rpc.filter((u) => !first.includes(u)), ...(net.rpcFallback ?? [])] };
+  return { ...net, rpc: first, rpcFallback: [...net.rpc, ...(net.rpcFallback ?? [])].filter((u) => !first.includes(u)) };
+}
+
+/** Every endpoint a network may call: reads, fallbacks and sends. */
+export function allEndpoints(net: HushdNetwork): string[] {
+  return [...new Set([...net.rpc, ...(net.rpcFallback ?? []), ...(net.rpcSend ?? [])])];
 }
 
 export function tokenInfo(net: HushdNetwork, id: string): TokenInfo {

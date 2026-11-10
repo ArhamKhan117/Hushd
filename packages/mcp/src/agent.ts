@@ -80,7 +80,7 @@ async function nearAccount(env: Env, net: HushdNetwork): Promise<NearAccount | n
   }
   if (!env.HUSHD_NEAR_ACCOUNT || !env.HUSHD_NEAR_PRIVATE_KEY) return null;
   const accountId = env.HUSHD_NEAR_ACCOUNT;
-  keepRpcErrorBodies(net.rpc);
+  keepRpcErrorBodies(net);
   const near = new Near({ network: { networkId: net.id, rpcUrl: sendEndpoints(net)[0]! }, privateKey: env.HUSHD_NEAR_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: accountId });
   return {
     accountId,

@@ -10,7 +10,7 @@ import { openJson, sealJson } from "../src/box.ts";
 import { closeHedgeMessage, closeHedgeSignature, ownerKeyFor } from "../src/desk.ts";
 import { extHash } from "../src/field.ts";
 import { decodeAddress, identityFromSeed, isAddress } from "../src/keys.ts";
-import { forBrowser, MAINNET, sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
+import { allEndpoints, forBrowser, MAINNET, sendEndpoints, TESTNET, withOverrides } from "../src/network.ts";
 import { makeNote, own } from "../src/note.ts";
 import { keepRpcErrorBodies, restEndpoint, rpcOrder, view } from "../src/rpc.ts";
 import { loadPoseidon } from "../src/poseidon.ts";
@@ -160,9 +160,15 @@ test("a browser reads from endpoints that keep CORS headers, falls back to the r
   for (const net of [TESTNET, MAINNET]) {
     const b = forBrowser(net);
     assert.deepEqual(b.rpc, net.browserRpc);
-    assert.ok(b.rpcFallback!.length > 0 && b.rpcFallback!.every((u) => net.rpc.includes(u) && !b.rpc.includes(u)));
+    assert.ok(b.rpcFallback!.length > 0 && b.rpcFallback!.every((u) => [...net.rpc, ...(net.rpcFallback ?? [])].includes(u) && !b.rpc.includes(u)));
     assert.deepEqual(sendEndpoints(b), sendEndpoints(net));
+    // a server reads FastNEAR and keeps dRPC for its fallback, so a browser on the same address keeps dRPC's quota
+    assert.ok(net.rpc.every((u) => !net.browserRpc!.includes(u)));
+    // every endpoint either may call, sends included, keeps its RPC error bodies
+    for (const u of [...b.rpc, ...b.rpcFallback!, ...sendEndpoints(b)]) assert.ok(allEndpoints(b).includes(u), u);
   }
+  // a local node named in place of the endpoints never falls back to the real network's
+  assert.deepEqual(withOverrides(MAINNET, { rpc: ["http://127.0.0.1:3030"] }).rpcFallback, []);
   // the fallback is asked only when every first endpoint fails
   const real = globalThis.fetch;
   const asked: string[] = [];
