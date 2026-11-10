@@ -36,4 +36,6 @@
   A held note counts toward the balance even after a sync sees it spent, and the leg's change is an expected note from the start: deals overlap all the time on the makers.
 - Deal rooms: a trader reads its room with `roomKeyFor(seed, refundBlinding)` and names it in its sealed plan (`replyTo`), never its address key; the API's `sweepDealRooms` deletes a room once its deal leaves matched/settling, and any message after a day.
 - The testnet e2e uses a stand-in intake model (its own key, routed in the test) whenever the API's NEAR AI attestation is unavailable. Parallel Playwright runs share `app/test-results` and wipe each other's traces: pass `--output <dir>`.
+- Salted terms: clients salt requests only when the network's `termsSalt` is on, and it must match the enclave build the desk pins (`95cba282...` hashes salted terms, `7521d46a...` does not). Mainnet is salted from the start.
+- Headless Chromium logs "GPU stall due to ReadPixels" for the landing's WebGL field on its first page: its software compositing path, not the page (launch with `--use-angle=metal` and it is gone).
 - npm: `pnpm publish:packages` publishes protocol, sdk and mcp in that order; the `@hushd` scope is an npm org.
