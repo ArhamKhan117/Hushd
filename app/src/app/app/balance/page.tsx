@@ -10,6 +10,8 @@ import { useHushd } from "@/lib/hushd/session";
 export default function BalancePage() {
   const s = useHushd();
   const pending = s.wallet?.pending() ?? [];
+  // a deal pays a one-time address; the wallet moves those tokens in on its next sync
+  const moving = s.wallet?.dealNotes().filter((n) => !n.ended).length ?? 0;
   return (
     <AppShell title="Private balance" subtitle="Notes only you can spend, in the pool on NEAR. Nobody can see how much you hold or what you move.">
       {s.status !== "ready" ? (
@@ -39,6 +41,7 @@ export default function BalancePage() {
               })}
             </ul>
             {pending.length > 0 && <p className="mt-3 text-[13px] text-mute">{pending.length} note{pending.length > 1 ? "s" : ""} still landing in the pool.</p>}
+            {moving > 0 && <p className="mt-3 text-[13px] text-mute">Tokens from {moving > 1 ? `${moving} deals` : "a deal"} moving into your balance.</p>}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[

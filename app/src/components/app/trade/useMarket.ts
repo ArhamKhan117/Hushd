@@ -5,7 +5,7 @@
  * (Hyperliquid mainnet, cached there a few seconds); desk state comes from chain. Every
  * poll pauses while the tab is hidden and picks up again when it is shown.
  */
-import { crossRate, candleCloses, deskView, hourStats, latestBlock, MarketApi, type Candle, type CandleInterval, type DealView, type DeskConfig, type HourStats, type MakerView, type MarketMids, type PricePoint } from "@hushd/sdk";
+import { crossRate, candleCloses, deskView, hourStats, latestBlock, MarketApi, readMakerRecords, type Candle, type CandleInterval, type DealView, type DeskConfig, type HourStats, type MakerRecord, type MakerView, type MarketMids, type PricePoint } from "@hushd/sdk";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { NETWORK } from "@/lib/hushd/config";
 import type { Pair } from "./pairs";
@@ -125,14 +125,17 @@ export interface DeskPublic {
   stats: Record<string, unknown>;
   config: DeskConfig;
   recent: DealView[];
+  /** Each maker's record over its recent deals (`readMakerRecords`), the one a request checks. */
+  records: Map<string, MakerRecord>;
 }
 
-/** What anyone can read of the desk: makers, counters, settings and the latest deals. */
+/** What anyone can read of the desk: makers, counters, settings, the latest deals and each maker's record. */
 export function useDeskPublic() {
   return usePoll<DeskPublic>(
     async () => {
-      const [makers, stats, config, recent] = await Promise.all([deskView.makers(NETWORK), deskView.stats(NETWORK), deskView.config(NETWORK), deskView.deals(NETWORK, 12)]);
-      return { makers, stats, config, recent: [...recent].sort((a, b) => Number(b.id) - Number(a.id)) };
+      // the records read the desk's deals newest first (at least one page, older ones back to a week): the latest are the panel's list
+      const [makers, stats, config, { records, deals }] = await Promise.all([deskView.makers(NETWORK), deskView.stats(NETWORK), deskView.config(NETWORK), readMakerRecords(NETWORK)]);
+      return { makers, stats, config, records, recent: [...deals].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 12) };
     },
     30_000,
     "desk",

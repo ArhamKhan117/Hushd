@@ -4,7 +4,7 @@ import { intake, intakeAttestation, type IntakeAttestation, type IntakeResult, t
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
-import { AttestationLine, IntakeProof, Segmented, Steps, type Step } from "@/components/app/desk";
+import { AttestationCheck, AttestationLine, IntakeOff, IntakeProof, Segmented, Steps, type Step } from "@/components/app/desk";
 import { AmountCard, ErrorLine, Field, TokenSelect, TxLine } from "@/components/app/forms";
 import { SignInPanel } from "@/components/app/SignInPanel";
 import { HedgedNote } from "@/components/app/trade/Ticket";
@@ -56,7 +56,10 @@ export default function DeskPage() {
         setAtt(a);
         if (!a.enabled) setMode("form");
       },
-      (e: Error) => setAttError(e.message),
+      (e: Error) => {
+        setAttError(e.message);
+        setMode("form");
+      },
     );
   }, []);
 
@@ -141,6 +144,7 @@ export default function DeskPage() {
             </div>
           )}
           {run.matchTx && <TxLine hash={run.matchTx}>The enclave&apos;s match is on chain.</TxLine>}
+          {run.moveTx && <TxLine hash={run.moveTx}>The private send into your balance is on chain.</TxLine>}
           <ErrorLine error={error ?? run.error ?? null} />
           {(run.phase === "settled" || run.failed) && (
             <button type="button" className="btn btn-ink btn-lg" onClick={reset}>
@@ -160,7 +164,9 @@ export default function DeskPage() {
             ]}
           />
 
-          {mode === "words" ? (
+          {mode === "words" && attError ? (
+            <IntakeOff reason={attError} onForm={() => setMode("form")} />
+          ) : mode === "words" ? (
             <div className="grid gap-3">
               <div className="hd-inputcard p-4 sm:p-5">
                 <label className="t-label" htmlFor="intake">
@@ -176,13 +182,7 @@ export default function DeskPage() {
                   onChange={(e) => setText(e.target.value)}
                 />
               </div>
-              {attError ? (
-                <p className="text-[12.5px] text-mute" title={attError}>
-                  The intake is off for now: the model&apos;s attestation could not be checked. The form works without it.
-                </p>
-              ) : (
-                <AttestationLine att={att} />
-              )}
+              <AttestationLine att={att} />
               <button type="button" className="btn btn-ink btn-lg btn-block" disabled={!att?.enabled || text.trim().length < 6 || drafting} onClick={draft} aria-busy={drafting}>
                 <BusyLabel busy={drafting} busyText="Drafting inside the TEE…">
                   Draft my request
@@ -196,6 +196,7 @@ export default function DeskPage() {
                 <div className="grid gap-2">
                   <p className="text-[13.5px] text-soft">Drafted from your words{drafted.draft.notes ? `: ${drafted.draft.notes}` : "."} Check it before you ask.</p>
                   <IntakeProof proof={drafted.proof} />
+                  {att && <AttestationCheck att={att} />}
                 </div>
               )}
               <Field label="Package" hint={hedged ? <HedgedNote /> : undefined}>

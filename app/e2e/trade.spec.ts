@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectBoughtInBalance, moveTxOf } from "./balance";
+import { deskWithRecords, stubDeskViews } from "./stubs";
 
 /**
  * The Trade screen. The first part stands in for the Hushd API's market routes, so it checks
@@ -81,6 +83,22 @@ test.describe("the Trade screen (market routes stubbed)", () => {
     await expect(page.getByText(/Open your private balance to see your requests/)).toBeVisible();
     await expect(page.getByRole("region", { name: "Network status" }).getByText(/^Block \d/)).toBeVisible();
   });
+
+  test("the makers panel shows each maker's record, and marks the one requests skip", async ({ page }) => {
+    await stubMarket(page);
+    await stubDeskViews(page, deskWithRecords());
+    await page.goto("/app/trade");
+    const panel = page.getByRole("region", { name: "Makers on the desk" });
+    const row = (acc: string) => panel.locator(`tr[data-maker="${acc}"]`);
+    await expect(row("steady.testnet")).toContainText("6 settled");
+    await expect(row("steady.testnet")).toContainText("0 lapsed, 0%");
+    await expect(row("lapser.testnet")).toContainText("3 lapsed, 50%");
+    await expect(row("lapser.testnet")).toContainText("Skipped: lapses too often");
+    await expect(row("fresh.testnet")).toContainText("1 lapsed, 100%");
+    await expect(row("fresh.testnet")).not.toContainText("Skipped");
+    await expect(panel).toContainText("Record: its last 20 deals that ended in the past week.");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), "horizontal scroll").toBeLessThanOrEqual(0);
+  });
 });
 
 test.describe("a trade on NEAR testnet", () => {
@@ -147,7 +165,7 @@ test.describe("a trade on NEAR testnet", () => {
     await expect(ticket.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 4 * 60_000 });
     await expect(ticket.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
     const dealId = (await ticket.getByRole("link", { name: /Open deal #\d+/ }).textContent())!.match(/#(\d+)/)![1]!;
-    console.log(`[${info.project.name}] deal #${dealId} settled`);
+    console.log(`[${info.project.name}] deal #${dealId} settled; ${await moveTxOf(ticket)}`);
 
     // 4. the workspace: the request settled, the deal with its private terms, then its receipt from the desk
     const work = page.getByRole("region", { name: "Your requests and deals" });
@@ -160,5 +178,9 @@ test.describe("a trade on NEAR testnet", () => {
     await work.getByRole("tab", { name: /^Receipts/ }).click();
     await expect(work.getByRole("row", { name: new RegExp(`#${dealId}`) })).toContainText("Settled", { timeout: 60_000 });
     await expect(work.getByRole("link", { name: /Prove it/ }).first()).toBeVisible();
+
+    // 5. the maker paid a one-time address made for this deal; a private send moved the tokens into the balance
+    await expectBoughtInBalance(page, go, coin, `[${info.project.name}] deal #${dealId}`);
   });
 });
+

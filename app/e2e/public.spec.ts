@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { deskWithRecords, signInWithPasskey, stubDeskViews, stubIntake } from "./stubs";
 
 const DOCS = ["quickstart", "desk", "packages", "makers", "agents", "sdk", "contracts", "proofs", "x402", "privacy-model", "threat-model"];
 
@@ -317,5 +318,61 @@ test.describe("NEAR Intents previews (Hushd API stubbed)", () => {
     await expect(section).toContainText("The direct trade");
     await expect(section.getByRole("link", { name: `Transaction ${hash} on NearBlocks` })).toHaveAttribute("href", `https://nearblocks.io/txns/${hash}`);
     await noOverflow(page);
+  });
+});
+
+test("the makers page shows each maker's record from the desk's deals, and which ones requests skip", async ({ page }) => {
+  await stubDeskViews(page, deskWithRecords());
+  await page.goto("/app/makers");
+  const card = (name: string) => page.getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
+  const steady = card("Steady").locator("[data-record]");
+  await expect(steady).toContainText("Settled6");
+  await expect(steady).toContainText("Lapsed0");
+  await expect(steady).toContainText("Lapse rate0%");
+  await expect(steady).toContainText("Last 6 ended deals. Requests ask it.");
+  const lapser = card("Lapser").locator("[data-record]");
+  await expect(lapser).toContainText("Lapse rate50%");
+  await expect(lapser).toContainText("Requests skip it: more than 25% of its recent deals lapsed.");
+  // one lapse on its only deal: too few to judge
+  await expect(card("Fresh").locator("[data-record]")).toContainText("Requests ask it; judged once 5 of its deals have ended.");
+  await expect(page.getByText(/^Each maker's record counts its last 20 deals that ended in the past week/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), "horizontal scroll").toBeLessThanOrEqual(0);
+});
+
+test.describe("NEAR AI intake (Hushd API stubbed)", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "the virtual authenticator is Chromium only");
+
+  test("a drafted request shows what the API verified about the model, and how to check it yourself", async ({ page, context }) => {
+    const { modelPub } = await stubIntake(page);
+    await page.goto("/app");
+    await signInWithPasskey(page, context);
+    await page.locator("#intake").fill("Sell 200 USDC for BTC at the best price.");
+    await page.getByRole("button", { name: "Draft my request" }).click();
+    await expect(page.getByText("Answer signed inside the TEE by the attested key, checked in this browser")).toBeVisible({ timeout: 60_000 });
+    const att = page.getByRole("region", { name: "The model's attestation" });
+    await expect(att).toContainText("stand-in/model");
+    await expect(att).toContainText(modelPub);
+    await expect(att).toContainText("Intel TDXup to date");
+    await expect(att).toContainText("NVIDIA GPU evidenceverified");
+    await expect(att.locator("time")).toHaveAttribute("datetime", "2026-11-10T09:30:00.000Z");
+    await expect(att).toContainText("This part is checked by the Hushd API, not by your browser");
+    await expect(att.getByRole("link", { name: "Check it yourself on NEAR AI" })).toHaveAttribute("href", "https://cloud.near.ai/verify");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), "horizontal scroll").toBeLessThanOrEqual(0);
+  });
+
+  test("with NEAR AI down the intake says it is off and opens the form", async ({ page, context }) => {
+    await stubIntake(page, () => ({ model: "stand-in/model", enabled: false, unavailable: "NEAR AI Cloud answered HTTP 500" }));
+    await page.goto("/app");
+    await signInWithPasskey(page, context);
+    // the form is open from the start; the words say why they are off
+    await expect(page.getByRole("button", { name: "Fill the form" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("You sell", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Describe it" }).click();
+    const off = page.getByRole("status", { name: "The intake is off" });
+    await expect(off).toContainText("nothing you type here is sent anywhere");
+    await expect(off).toContainText("The Hushd API said: NEAR AI Cloud answered HTTP 500");
+    await expect(page.locator("#intake")).toHaveCount(0);
+    await off.getByRole("button", { name: "Fill the form" }).click();
+    await expect(page.getByRole("button", { name: "Fill the form" }).first()).toHaveAttribute("aria-pressed", "true");
   });
 });

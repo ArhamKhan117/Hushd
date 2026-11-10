@@ -5,8 +5,9 @@
  * (`app/src/app/app/page.tsx`), step for step, kept in one place so a screen that asks for
  * quotes does not carry its own copy. `packageRequest` seals the request, `openRfq` commits it
  * through the relayer, `awaitMatch` waits for the enclave, `checkMatchedTerms` refuses a
- * match below the request, and `settleAsTrader` settles both legs in the pool. The wallet
- * remembers the deal (and the bond note it may be owed) in its encrypted store.
+ * match below the request, and `settleAsTrader` settles both legs in the pool and moves the
+ * note the maker paid to this deal's one-time address into the balance. The wallet remembers
+ * the deal (and the bond note it may be owed) in its encrypted store.
  */
 import { awaitMatch, checkMatchedTerms, DeskApi, deskView, makeNote, MarketApi, marketFloor, openRfq, packageRequest, settleAsTrader, tokenInfo, type AgreedTerms, type PackageDraft } from "@hushd/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +36,12 @@ export interface Run {
   terms?: AgreedTerms;
   makerName?: string;
   settleStep?: string;
+  /** Whether the deal's tokens reached the balance ("waiting": the next sync moves them). */
+  moved?: "moved" | "waiting" | "unsettled";
+  /** Why the move did not go out yet, when it did not. */
+  moveReason?: string;
+  /** The private send that moved the deal's tokens from its one-time address into the balance. */
+  moveTx?: string;
 }
 
 const SETTLE_WORDS: Record<string, string> = {
@@ -42,6 +49,7 @@ const SETTLE_WORDS: Record<string, string> = {
   waiting_plan: "Swapping sealed note openings with the maker",
   proving: "Proving your leg in this browser",
   waiting_settlement: "The maker submits both legs in one call",
+  moving: "Moving the tokens into your balance",
   settled: "Settled",
 };
 
@@ -83,10 +91,10 @@ export function useDeskRun() {
           draft = { ...draft, buy: { ...draft.buy, minAmount: marketFloor(mids, tokenInfo(NETWORK, draft.sell.token), draft.sell.amount, tokenInfo(NETWORK, draft.buy.token)) } };
           set({ draft });
         }
-        const { request, ask: makerAsk, refundBlinding } = packageRequest(identity, NETWORK, draft);
+        const { request, ask: makerAsk, refundBlinding, dealIdentity } = packageRequest(identity, NETWORK, draft);
         const opened = await openRfq({ net: NETWORK, api, relayer: s.relayer, request, ask: makerAsk, windowMs });
         set({ phase: "quoting", rfqId: opened.rfqId, closesAtMs: opened.closesAtMs, quotes: 0 });
-        const match = await awaitMatch(api, identity, opened.rfqId, windowMs + 120_000, (t) => set({ quotes: t.quotes }));
+        const match = await awaitMatch(api, dealIdentity, opened.rfqId, windowMs + 120_000, (t) => set({ quotes: t.quotes }));
         checkMatchedTerms(match.terms, draft);
         const makers = await deskView.makers(NETWORK).catch(() => []);
         const makerName = makers.find(([acc]) => acc === match.terms.maker)?.[1].name ?? match.terms.maker;
@@ -110,7 +118,7 @@ export function useDeskRun() {
         };
         await wallet.rememberDeal(record);
         set({ phase: "settling", settleStep: "planning" });
-        await settleAsTrader({
+        const { moved } = await settleAsTrader({
           net: NETWORK,
           api,
           wallet,
@@ -121,7 +129,7 @@ export function useDeskRun() {
           onStep: (step) => set({ settleStep: step }),
         });
         await wallet.rememberDeal({ ...record, settledAtMs: Date.now() });
-        set({ phase: "settled" });
+        set({ phase: "settled", moved: moved.state, ...(moved.state === "moved" && moved.txHash ? { moveTx: moved.txHash } : {}), ...(moved.state === "waiting" && moved.reason ? { moveReason: moved.reason } : {}) });
         void s.sync();
       } catch (e) {
         set({ failed: r.phase, error: (e as Error).message });
@@ -176,7 +184,12 @@ export function runSteps(run: Run, now: number): Step[] {
       state: state("settling"),
       detail: run.phase === "settling" && run.settleStep ? SETTLE_WORDS[run.settleStep] : "Both legs go through the pool in one call: both happen or neither does.",
     },
-    { key: "settled", label: hedged ? "Spot settled; the hedge leg is next" : "Settled", state: state("settled") },
+    {
+      key: "settled",
+      label: hedged ? "Spot settled; the hedge leg is next" : "Settled",
+      state: state("settled"),
+      ...(run.moved === "moved" ? { detail: "The tokens are in your private balance." } : run.moved === "waiting" ? { detail: `The tokens are on their way into your balance: the next sync moves them.${run.moveReason ? ` Last try: ${run.moveReason}` : ""}` } : {}),
+    },
   ];
 }
 

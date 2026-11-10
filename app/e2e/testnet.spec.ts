@@ -2,6 +2,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { expect, test, type Page } from "@playwright/test";
 import { encryptForModel } from "../../packages/sdk/src/intake";
+import { expectBoughtInBalance, moveTxOf } from "./balance";
 
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET, POST, OPTIONS" };
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
@@ -15,11 +16,16 @@ async function intakeRoutes(page: Page) {
   const model = ed25519.utils.randomSecretKey();
   const other = ed25519.utils.randomSecretKey();
   const modelPub = hex(ed25519.getPublicKey(model));
-  const state = { live: false, signer: "attested" as "attested" | "other" };
+  let answered = () => {};
+  // the page asks for the attestation as it loads: whether the model is live is known only once that answer is in
+  const attested = new Promise<void>((done) => (answered = done));
+  const state = { live: false, signer: "attested" as "attested" | "other", attested };
   await page.route("**/v1/intake/attestation", async (route) => {
-    const real = await route.fetch().catch(() => null);
+    // HUSHD_E2E_INTAKE=stand-in skips the live model (when NEAR AI says it is unavailable)
+    const real = process.env.HUSHD_E2E_INTAKE === "stand-in" ? null : await route.fetch().catch(() => null);
     const att = real ? ((await real.json().catch(() => ({}))) as { enabled?: boolean; signing_public_key?: string }) : {};
     state.live = Boolean(att.enabled && att.signing_public_key);
+    answered();
     if (state.live && real) return route.fulfill({ response: real });
     await route.fulfill({ json: { model: "stand-in/model", signing_public_key: modelPub, signing_address: modelPub, tcb_status: "UpToDate", gpu_evidence: "verified", verified_at_ms: Date.now(), enabled: true, verify_url: "https://cloud.near.ai/verify" }, headers: CORS });
   });
@@ -82,6 +88,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   const intake = await intakeRoutes(page);
   await go("/app");
   const words = page.locator("#intake");
+  await intake.attested;
   if (!intake.live) {
     // the stand-in: an answer signed by any key but the attested one is shown as not verified
     intake.signer = "other";
@@ -102,7 +109,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
   const dealLink = page.getByRole("link", { name: /Open deal #\d+/ });
   const dealId = (await dealLink.textContent())!.match(/#(\d+)/)![1]!;
-  console.log(`[${test.info().project.name}] deal #${dealId} settled`);
+  console.log(`[${test.info().project.name}] deal #${dealId} settled; ${await moveTxOf(page)}`);
 
   // 4. the deal page: the public record says settled; the private side shows our terms
   await dealLink.click();
@@ -118,4 +125,7 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   const href = await check.getAttribute("href");
   await page.goto(href!);
   await expect(page.getByText("Holds")).toBeVisible({ timeout: 60_000 });
+
+  // 6. the maker paid a one-time address made for this deal; a private send moved the BTC into the balance
+  await expectBoughtInBalance(page, go, "BTC", `[${test.info().project.name}] deal #${dealId}`);
 });

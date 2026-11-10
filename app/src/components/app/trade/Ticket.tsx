@@ -156,6 +156,7 @@ export function Ticket({
               </div>
             )}
             {run.matchTx && <TxLine hash={run.matchTx}>The enclave&apos;s match is on chain.</TxLine>}
+            {run.moveTx && <TxLine hash={run.moveTx}>The private send into your balance is on chain.</TxLine>}
             <ErrorLine error={run.error ?? null} />
             {(run.phase === "settled" || run.failed) && (
               <button type="button" className="btn btn-ink btn-lg btn-block" onClick={onReset}>

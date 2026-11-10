@@ -410,6 +410,15 @@
   .tt-deal-extra {
     display: none;
   }
+  /* A phone's panel has room for the maker, its bond and its record: slashed amounts are on the makers page. */
+  .tt-col-slashed {
+    display: none;
+  }
+  @container (min-width: 440px) {
+    .tt-col-slashed {
+      display: table-cell;
+    }
+  }
   @container (min-width: 680px) {
     .tt-makers-grid {
       grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
