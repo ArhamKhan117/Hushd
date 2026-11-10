@@ -16,6 +16,7 @@ export * from "./poseidon.js";
 export * from "./proofs.js";
 export * from "./prove.js";
 export * from "./relayer.js";
+export * from "./reputation.js";
 export * from "./rpc.js";
 export * from "./screening.js";
 export * from "./tree.js";

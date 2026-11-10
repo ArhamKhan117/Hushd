@@ -5,6 +5,10 @@
  * through the relayer, send each registered maker the ask (no limit price) sealed to
  * that maker, wait for the enclave's match, then settle.
  *
+ * The trader receives at an address made for this deal alone (`dealIdentityFor`), never its
+ * hushd1 address: the enclave seals the match to it and the winning maker pays the trader's
+ * leg to it, so a maker that wins two deals from one trader sees two unrelated addresses.
+ *
  * Settlement (the same for both sides, through the API's sealed deal room):
  *   0. the trader's side of the room is a key made for this deal alone (`roomKeyFor`), named
  *      inside its sealed plan, so the API never files a message under its hushd1 address
@@ -14,6 +18,8 @@
  *      and its own receive key
  *   3. each proves its leg bound to the deal and all four outputs
  *   4. the maker (always online) submits both legs to `desk.settle` in one call
+ *   5. the trader's wallet moves the note it got into its own balance, a private send
+ *      through the relayer (`PrivateWallet.moveDealNote`)
  */
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -22,15 +28,16 @@ import { openJson, sealJson } from "./box.js";
 import { bytesToHex as bytesHex, fromB64, hexToBytes, toB64 } from "./bytes.js";
 import { noteMessage, type NoteMessage } from "./board.js";
 import type { Identity } from "./keys.js";
-import { decodeAddress } from "./keys.js";
+import { decodeAddress, identityFromSeed } from "./keys.js";
 import { TESTNET, type HushdNetwork } from "./network.js";
 import { be32, randomField } from "./field.js";
 import { makeNote, noteInner, type Note } from "./note.js";
 import { swapLeg } from "./pool.js";
 import type { JoinsplitArgs } from "./prove.js";
 import type { RelayerClient } from "./relayer.js";
+import { LAPSE_MAX_RATE, makersToAsk, readMakerRecords, type MakerRecord } from "./reputation.js";
 import { view } from "./rpc.js";
-import type { LegPlan, PrivateWallet } from "./wallet.js";
+import type { DealNoteMove, LegPlan, PrivateWallet } from "./wallet.js";
 
 
 export interface MakerView {
@@ -199,6 +206,19 @@ export interface PackageDraft {
   text?: string;
 }
 
+/**
+ * The trader's receive identity for one deal: a whole Hushd identity whose seed comes from
+ * the spending key and the refund blinding, as `ownerKeyFor` and `roomKeyFor` do. Its address
+ * goes in the sealed request: the enclave seals the match to it and the winning maker pays
+ * the trader's leg to it, so nothing links two deals with one maker to one trader. The
+ * wallet moves the note into its own balance once the deal settles; the same seed and
+ * blinding re-derive it, so a note not moved yet is never lost.
+ */
+export function dealIdentityFor(id: Identity, refundBlinding: bigint): Identity {
+  const tag = new TextEncoder().encode("hushd.deal.v1");
+  return identityFromSeed(sha256(new Uint8Array([...tag, ...be32(id.sk), ...be32(refundBlinding)])));
+}
+
 /** The per-deal key that alone can close a hedge: derived from the spending key and the refund blinding. */
 export function ownerKeyFor(id: Identity, refundBlinding: bigint): { secret: Uint8Array; publicKey: string } {
   const tag = new TextEncoder().encode("hushd.owner.v1");
@@ -231,7 +251,8 @@ export function closeHedgeSignature(id: Identity, refundBlinding: bigint, dealId
  * Turn a draft into the sealed request's body (enclave only: it holds the limit) and
  * the ask each maker sees (pair, side and size only). The refund blinding is kept by
  * the caller: a slashed bond pays a note to `noteInner(pk, refundBlinding)`, and the
- * same blinding re-derives the owner key.
+ * same blinding re-derives the owner key and the deal's receive identity (`dealIdentity`,
+ * whose address the request names, and which opens the match: pass it to `awaitMatch`).
  */
 export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft) {
   if (d.sell.amount <= 0n) throw new Error("Sell a positive amount");
@@ -243,6 +264,7 @@ export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft)
   if (hedged && !coin) throw new Error(`${buy.symbol} has no Hyperliquid perp to hedge with`);
   const refundBlinding = randomField();
   const owner = ownerKeyFor(id, refundBlinding);
+  const dealIdentity = dealIdentityFor(id, refundBlinding);
   const hedge = hedged ? { coin: coin!, testnet: net.id !== "mainnet" } : undefined;
   // the salt hides the amounts in the public terms hash; the enclave and the makers both get it
   const salt = net.termsSalt ? bytesHex(crypto.getRandomValues(new Uint8Array(32))) : undefined;
@@ -253,18 +275,21 @@ export function packageRequest(id: Identity, net: HushdNetwork, d: PackageDraft)
     buy: { token: d.buy.token, minAmount: d.buy.minAmount.toString() },
     ...(hedge ? { hedge: { ...hedge, maxSlippageBps: 50 } } : {}),
     expiresInMs: d.expiresInMs ?? 10 * 60_000,
-    trader: { address: id.address, refundInner: bytesHex(be32(noteInner(id.pk, refundBlinding))), ownerKey: owner.publicKey },
+    trader: { address: dealIdentity.address, refundInner: bytesHex(be32(noteInner(id.pk, refundBlinding))), ownerKey: owner.publicKey },
     ...(d.text ? { text: d.text } : {}),
     ...(salt ? { salt } : {}),
   };
   const ask: Omit<MakerAsk, "rfqId" | "closesAtMs"> = { v: 1, kind: d.kind, sell: request.sell, buyToken: d.buy.token, ...(hedge ? { hedge } : {}), ...(salt ? { salt } : {}) };
-  return { request, ask, refundBlinding };
+  return { request, ask, refundBlinding, dealIdentity };
 }
 
 /** How many makers one RFQ asks: the API keeps at most this many sealed asks per request. */
 export const MAX_ASKED_MAKERS = 32;
 
-/** Seal the trader's request to the enclave and its ask to each maker, and commit it on chain. */
+/**
+ * Seal the trader's request to the enclave and its ask to each maker, and commit it on chain.
+ * `skipped` names the makers left out for letting too many recent deals lapse (`makersToAsk`).
+ */
 export async function openRfq(p: {
   net: HushdNetwork;
   api: DeskApi;
@@ -272,21 +297,27 @@ export async function openRfq(p: {
   request: object;
   ask: Omit<MakerAsk, "rfqId" | "closesAtMs">;
   windowMs: number;
-}): Promise<{ rfqId: number; closesAtMs: number }> {
-  const enclave = await deskView.enclave(p.net);
+}): Promise<{ rfqId: number; closesAtMs: number; skipped: string[] }> {
+  // read everything before committing, so a failed read leaves nothing on chain
+  // the makers' records only filter who is asked: when they cannot be read (a free RPC rate-limits),
+  // every usable maker is asked rather than the trade failing
+  const [enclave, listed, { records }] = await Promise.all([
+    deskView.enclave(p.net),
+    deskView.makers(p.net),
+    readMakerRecords(p.net).catch(() => ({ records: new Map<string, MakerRecord>() })),
+  ]);
   if (!enclave.enc_key) throw new Error("The desk has no enclave key yet");
+  // anyone may register as a maker: ask only active ones with a usable key that do not let deals lapse
+  // too often, the best bonded first, as many as the API takes
+  const { ask: makers, skipped } = makersToAsk(listed, records, MAX_ASKED_MAKERS);
+  if (makers.length === 0 && skipped.length > 0) throw new Error(`Every maker taking requests let more than ${LAPSE_MAX_RATE * 100}% of its recent deals lapse, so none was asked`);
   const rfqBox = sealJson(hexToBytes(enclave.enc_key), p.request);
   const commitment = bytesHex(sha256(rfqBox));
   const { rfqId } = await p.relayer.openRfq(commitment, p.windowMs);
   const closesAtMs = Date.now() + p.windowMs;
-  // anyone may register as a maker: ask only active ones with a usable key, the best bonded first, as many as the API takes
-  const makers = (await deskView.makers(p.net))
-    .filter(([, m]) => m.active && /^0x[0-9a-fA-F]{64}$/.test(m.enc_key))
-    .sort(([, a], [, b]) => (BigInt(b.bond) > BigInt(a.bond) ? 1 : BigInt(b.bond) < BigInt(a.bond) ? -1 : 0))
-    .slice(0, MAX_ASKED_MAKERS);
   const makerBoxes = Object.fromEntries(makers.map(([acc, m]) => [acc, toB64(sealJson(hexToBytes(m.enc_key), { ...p.ask, v: 1, rfqId, closesAtMs }))]));
   await p.api.postRfq(rfqId, toB64(rfqBox), makerBoxes);
-  return { rfqId, closesAtMs };
+  return { rfqId, closesAtMs, skipped };
 }
 
 /**
@@ -327,15 +358,19 @@ export function checkMatchedTerms(terms: AgreedTerms, d: PackageDraft): void {
   }
 }
 
-/** Wait for the enclave's answer to an RFQ (the matcher runs when the window closes). */
-export async function awaitMatch(api: DeskApi, me: Identity, rfqId: number, timeoutMs = 180_000, onTick?: (s: { status: string; quotes: number }) => void) {
+/**
+ * Wait for the enclave's answer to an RFQ (the matcher runs when the window closes). `me` is
+ * the deal identity `packageRequest` returned: the enclave seals the match to the address
+ * the request names.
+ */
+export async function awaitMatch(api: DeskApi, me: Pick<Identity, "encSecret">, rfqId: number, timeoutMs = 180_000, onTick?: (s: { status: string; quotes: number }) => void) {
   const start = Date.now();
   for (;;) {
     const r = await api.result(rfqId);
     onTick?.({ status: r.status, quotes: r.quotes });
     if (r.status === "matched" && r.dealId != null && r.for_trader) {
       const opened = openJson<{ terms: AgreedTerms; maker_address: string; terms_hash: string }>(me.encSecret, fromB64(r.for_trader));
-      if (!opened) throw new Error("The match was not sealed to this identity");
+      if (!opened) throw new Error("The match was not sealed to this deal's key");
       return { dealId: r.dealId, txHash: r.txHash ?? "", ...opened };
     }
     if (["no_quotes", "no_match", "failed"].includes(r.status)) throw new Error(r.reason ?? `No deal: ${r.status}`);
@@ -344,8 +379,8 @@ export async function awaitMatch(api: DeskApi, me: Identity, rfqId: number, time
   }
 }
 
-/** Check a note the other side made for you opens to what was agreed. */
-export function checkNoteForMe(me: Identity, m: NoteMessage, expected: { token: string; amount: string }, commitment: string): Note {
+/** Check a note the other side made for you (a trader: for its deal identity) opens to what was agreed. */
+export function checkNoteForMe(me: Pick<Identity, "pk">, m: NoteMessage, expected: { token: string; amount: string }, commitment: string): Note {
   const note = makeNote(me.pk, m.token, BigInt(m.amount), BigInt(m.blinding));
   if (m.token !== expected.token || m.amount !== expected.amount) throw new Error("The other side's note is not the agreed amount or token");
   if (note.commitment.toString() !== BigInt(commitment).toString()) throw new Error("The other side's note does not match the output it committed to");
@@ -388,15 +423,29 @@ async function waitFor<T extends RoomMsg>(api: DeskApi, dealId: number, me: Room
 }
 
 export interface SettleProgress {
-  (step: "planning" | "waiting_plan" | "proving" | "waiting_settlement" | "settled", detail?: string): void;
+  (step: "planning" | "waiting_plan" | "proving" | "waiting_settlement" | "moving" | "settled", detail?: string): void;
 }
+
+/** How long a trader waits, once its deal settled, for the maker's note to show in the pool before leaving the move to the wallet's next sync. */
+const MOVE_WAIT_MS = 90_000;
 
 /**
  * Trader side of settlement (leg A). `refundBlinding` is the one `packageRequest` returned:
- * it re-derives the deal's owner key, which approves the four outputs. Returns the note
- * received from the maker.
+ * it re-derives the deal's owner key, which approves the four outputs, and the deal identity
+ * the maker pays. Once the deal settles the note is moved into the wallet's own balance;
+ * `moved` is that private send, or `waiting` (with the last failure's `reason`) when it did
+ * not go out yet: the wallet's next sync tries again. Returns the note received from the maker (owned by the deal identity).
  */
-export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; wallet: PrivateWallet; dealId: number; terms: AgreedTerms; makerAddress: string; refundBlinding: bigint; onStep?: SettleProgress }): Promise<{ received: Note; plan: LegPlan }> {
+export async function settleAsTrader(p: {
+  net: HushdNetwork;
+  api: DeskApi;
+  wallet: PrivateWallet;
+  dealId: number;
+  terms: AgreedTerms;
+  makerAddress: string;
+  refundBlinding: bigint;
+  onStep?: SettleProgress;
+}): Promise<{ received: Note; plan: LegPlan; moved: DealNoteMove }> {
   const me = p.wallet.id;
   const maker = decodeAddress(p.makerAddress);
   p.onStep?.("planning");
@@ -410,15 +459,26 @@ export async function settleAsTrader(p: { net: HushdNetwork; api: DeskApi; walle
   }
 }
 
-async function traderLeg(p: Parameters<typeof settleAsTrader>[0], plan: LegPlan, maker: ReturnType<typeof decodeAddress>): Promise<{ received: Note; plan: LegPlan }> {
+async function traderLeg(p: Parameters<typeof settleAsTrader>[0], plan: LegPlan, maker: ReturnType<typeof decodeAddress>): Promise<{ received: Note; plan: LegPlan; moved: DealNoteMove }> {
   const me = p.wallet.id;
+  // the maker pays this deal's own identity, never the key in this wallet's address
+  const deal = dealIdentityFor(me, p.refundBlinding);
   // this deal's own room key: the maker answers to it, never to the key in this wallet's address
   const room = roomKeyFor(me, p.refundBlinding);
   const aOut = plan.outputs.map((o) => o.commitment.toString()) as [string, string];
   await sendPatiently(p.api, p.dealId, maker.encPublic, { t: "plan", outputs: aOut, noteForYou: noteMessage(plan.outputs[0], { dealId: BigInt(p.dealId) }), replyTo: bytesHex(room.encPublic) });
   p.onStep?.("waiting_plan");
   const theirs = await waitFor<Extract<RoomMsg, { t: "plan" }>>(p.api, p.dealId, room, "plan", 120_000);
-  const received = checkNoteForMe(me, theirs.noteForYou, p.terms.makerGives, theirs.outputs[0]);
+  const received = checkNoteForMe(deal, theirs.noteForYou, p.terms.makerGives, theirs.outputs[0]);
+  // on record before this leg goes out: the deal may settle while this side is gone, and the room's copy is deleted after
+  await p.wallet.rememberDealNote({
+    dealId: String(p.dealId),
+    refundBlinding: p.refundBlinding.toString(),
+    token: received.token,
+    amount: received.amount.toString(),
+    blinding: received.blinding.toString(),
+    atMs: Date.now(),
+  });
   // the note for me checked out: approve exactly these four outputs with the deal's owner key
   const message = new TextEncoder().encode(settleMessage(p.net, p.dealId, [...aOut, ...theirs.outputs]));
   const approval = toB64(ed25519.sign(message, ownerKeyFor(me, p.refundBlinding).secret));
@@ -443,9 +503,12 @@ async function traderLeg(p: Parameters<typeof settleAsTrader>[0], plan: LegPlan,
     if (Date.now() - start > 180_000) throw new Error(`The deal did not settle in time${lastWords(failed)}`);
     await pause(2_000);
   }
-  await p.wallet.settled(plan, received);
+  await p.wallet.settled(plan);
+  p.onStep?.("moving");
+  // a move that fails here is not the deal failing: the note stays on record and the next sync moves it
+  const moved = await p.wallet.moveDealNote(p.dealId, { waitMs: MOVE_WAIT_MS });
   p.onStep?.("settled");
-  return { received, plan };
+  return { received, plan, moved };
 }
 
 /**

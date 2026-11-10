@@ -5,10 +5,16 @@
  * Every note this wallet creates for itself (change, a shield, a refund note) is also
  * posted to the board encrypted to its own key, so the seed alone recovers the wallet
  * on a new device.
+ *
+ * A desk deal pays the trader at a one-time deal identity (`dealIdentityFor`): the wallet
+ * keeps that note's opening in its store from the moment it checks out, and moves it into
+ * its own balance once the deal settles (`moveDealNote`), trying again on every sync until
+ * the move lands.
  */
 import { sealNote } from "./board.js";
 import { scanBoard } from "./board.js";
-import { swapExtHash, type ExtData } from "./field.js";
+import { dealIdentityFor, deskView } from "./desk.js";
+import { randomField, swapExtHash, type ExtData } from "./field.js";
 import type { Identity, ReceiveAddress } from "./keys.js";
 import { decodeAddress } from "./keys.js";
 import type { HushdNetwork } from "./network.js";
@@ -87,6 +93,30 @@ export interface StoredLink {
   ended?: "claimed" | "taken back";
 }
 
+/**
+ * A note a maker paid to one deal's one-time identity, kept until this wallet moved it into
+ * its own balance. Its opening is saved before the trader's leg goes out, so a settlement
+ * that lands while this device is gone is still found and moved.
+ */
+export interface StoredDealNote {
+  dealId: string;
+  /** Re-derives the deal identity that owns the note (`dealIdentityFor`). */
+  refundBlinding: string;
+  token: string;
+  amount: string;
+  blinding: string;
+  atMs: number;
+  /** Blinding of the note the move makes for this wallet, kept before the move is sent. */
+  moveBlinding?: string;
+  /** The private send that moved it, once the relayer sent it. */
+  movedTx?: string;
+  /** "moved": the note is in this wallet's balance; "unsettled": the deal expired unsettled, so it never existed. */
+  ended?: "moved" | "unsettled";
+}
+
+/** Where a deal's note stands: moved into the balance, not in the pool yet, or never made (the deal expired). */
+export type DealNoteMove = { state: "moved"; txHash?: string } | { state: "waiting"; reason?: string } | { state: "unsettled" };
+
 export interface WalletState {
   notes: StoredNote[];
   boardCursor: number;
@@ -95,6 +125,7 @@ export interface WalletState {
   expected?: StoredNote[];
   deals?: DealRecord[];
   links?: StoredLink[];
+  dealNotes?: StoredDealNote[];
 }
 
 /** Where notes are kept between sessions (memory, an encrypted browser store, a file). */
@@ -148,6 +179,9 @@ export class PrivateWallet {
   private expected: StoredNote[] = [];
   private dealLog: DealRecord[] = [];
   private linkLog: StoredLink[] = [];
+  private dealNoteLog: StoredDealNote[] = [];
+  /** Moves in flight, by deal id: a sync and a settlement never move one note twice at once. */
+  private moving = new Map<string, Promise<DealNoteMove>>();
 
   constructor(
     readonly net: HushdNetwork,
@@ -170,6 +204,7 @@ export class PrivateWallet {
     this.expected = s.expected ?? [];
     this.dealLog = s.deals ?? [];
     this.linkLog = s.links ?? [];
+    this.dealNoteLog = s.dealNotes ?? [];
     for (const n of s.notes) {
       const note = own(makeNote(this.id.pk, n.token, BigInt(n.amount), BigInt(n.blinding)), this.id);
       this.notes.set(note.commitment, { ...note, ...(n.leafIndex !== undefined ? { leafIndex: n.leafIndex } : {}), spent: n.spent, memo: n.memo, dealId: n.dealId });
@@ -183,6 +218,7 @@ export class PrivateWallet {
       expected: this.expected,
       deals: this.dealLog,
       links: this.linkLog,
+      dealNotes: this.dealNoteLog,
       notes: [...this.notes.values()].map((n) => ({
         token: n.token,
         amount: n.amount.toString(),
@@ -203,10 +239,11 @@ export class PrivateWallet {
   }
 
   /**
-   * Pull new leaves and board posts, place notes in the tree, mark spent ones. `board: false`
-   * skips the board, for a wallet that already knows its notes (a claim link's).
+   * Pull new leaves and board posts, place notes in the tree, mark spent ones, then move any
+   * deal's note that landed into this wallet. `board: false` skips the board, for a wallet
+   * that already knows its notes (a claim link's); `moves: false` skips the moves.
    */
-  async sync(opts: { board?: boolean } = {}): Promise<void> {
+  async sync(opts: { board?: boolean; moves?: boolean } = {}): Promise<void> {
     await this.refreshTree();
     if (this.net.board && opts.board !== false) {
       const { notes, next } = await scanBoard(this.net, this.id, this.boardCursor);
@@ -236,6 +273,7 @@ export class PrivateWallet {
         }),
     );
     await this.persist();
+    if (opts.moves !== false) await this.moveDealNotes();
   }
 
   /** Pull the pool's new leaves into the tree, after any load already in flight. */
@@ -374,6 +412,8 @@ export class PrivateWallet {
   /** Watch for a note that has no board post (it becomes spendable if it ever lands in the pool). */
   async expect(note: Note, extra: { memo?: string; dealId?: string } = {}): Promise<void> {
     if (note.pk !== this.id.pk || note.amount === 0n) return;
+    // a retried move expects the same note again
+    if (this.expected.some((e) => e.token === note.token && e.amount === note.amount.toString() && e.blinding === note.blinding.toString())) return;
     this.expected.push({ token: note.token, amount: note.amount.toString(), blinding: note.blinding.toString(), ...extra });
     await this.persist();
   }
@@ -404,6 +444,119 @@ export class PrivateWallet {
   /** Claim links this wallet paid, newest first. */
   links(): StoredLink[] {
     return this.linkLog.map((l) => ({ ...l }));
+  }
+
+  /** Remember (or update) the note a deal paid to its one-time identity, by deal id. */
+  async rememberDealNote(n: StoredDealNote): Promise<void> {
+    const i = this.dealNoteLog.findIndex((x) => x.dealId === n.dealId);
+    if (i >= 0) this.dealNoteLog[i] = n;
+    else this.dealNoteLog.unshift(n);
+    await this.persist();
+  }
+
+  /** Notes deals paid to their one-time identities, newest first; those not `ended` are still on their way into the balance. */
+  dealNotes(): StoredDealNote[] {
+    return this.dealNoteLog.map((n) => ({ ...n }));
+  }
+
+  /**
+   * Move the note deal `dealId` paid to its one-time identity into this wallet: a throwaway
+   * wallet for the deal identity spends it into a note for this wallet's receive key, through
+   * the relayer (no gas, no fee), the way a claim link is claimed. The new note's blinding is
+   * made here and kept, with the note expected, before the move goes out. Waits up to
+   * `waitMs` for the note to show in the pool, and tries a failed move again within that
+   * time; past it, a failure is `waiting` with its `reason`. Safe to call again: a note
+   * already spent was moved (only this wallet's key spends it), and one move per deal runs
+   * at a time (a call during another joins it, then goes on waiting if it has longer).
+   */
+  async moveDealNote(dealId: number, o: { waitMs?: number } = {}): Promise<DealNoteMove> {
+    const key = String(dealId);
+    const deadline = Date.now() + (o.waitMs ?? 0);
+    for (;;) {
+      let run = this.moving.get(key);
+      if (!run) {
+        const started = this.moveOnce(key, deadline).finally(() => {
+          if (this.moving.get(key) === started) this.moving.delete(key);
+        });
+        this.moving.set(key, started);
+        run = started;
+      }
+      let out: DealNoteMove;
+      try {
+        out = await run;
+      } catch (e) {
+        out = { state: "waiting", reason: (e as Error).message ?? String(e) };
+      }
+      if (out.state !== "waiting" || Date.now() >= deadline) return out;
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+  }
+
+  /** Try every deal note not moved yet; one that fails or has not landed stays on record for the next try. */
+  async moveDealNotes(): Promise<DealNoteMove[]> {
+    if (!this.opts.relayer) return [];
+    const open = this.dealNoteLog.filter((n) => !n.ended && !this.moving.has(n.dealId));
+    const out: DealNoteMove[] = [];
+    for (const n of open) out.push(await this.moveDealNote(Number(n.dealId)));
+    return out;
+  }
+
+  private async moveOnce(key: string, deadline: number): Promise<DealNoteMove> {
+    for (;;) {
+      const rec = this.dealNoteLog.find((x) => x.dealId === key);
+      if (!rec) throw new Error(`This wallet has no note from deal ${key}`);
+      if (rec.ended === "moved") return { state: "moved", ...(rec.movedTx ? { txHash: rec.movedTx } : {}) };
+      if (rec.ended === "unsettled") return { state: "unsettled" };
+      const deal = dealIdentityFor(this.id, BigInt(rec.refundBlinding));
+      const note = own(makeNote(deal.pk, rec.token, BigInt(rec.amount), BigInt(rec.blinding)), deal);
+      await this.refreshTree();
+      if (this.tree.indexOf(note.commitment) >= 0) return this.moveLanded(rec, deal, note);
+      // not in the pool: the deal is still settling, or expired and never made it
+      const d = await deskView.deal(this.net, Number(key)).catch(() => undefined);
+      if (d?.status === "closed" && d.receipt?.outcome === "failed") {
+        await this.rememberDealNote({ ...rec, ended: "unsettled" });
+        return { state: "unsettled" };
+      }
+      if (Date.now() >= deadline) return { state: "waiting" };
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+  }
+
+  private async moveLanded(rec: StoredDealNote, deal: Identity, note: Note): Promise<DealNoteMove> {
+    const moved = async (txHash?: string): Promise<DealNoteMove> => {
+      const latest = this.dealNoteLog.find((x) => x.dealId === rec.dealId) ?? rec;
+      await this.rememberDealNote({ ...latest, ...(txHash ? { movedTx: txHash } : {}), ended: "moved" });
+      return { state: "moved", ...((txHash ?? latest.movedTx) ? { txHash: txHash ?? latest.movedTx } : {}) };
+    };
+    // its own copy of the tree: this wallet's tree only ever grows under its own loads
+    const w = new PrivateWallet(this.net, deal, { artifacts: this.opts.artifacts, relayer: this.relayer(), tree: this.tree.clone() });
+    w.track(note);
+    // the deal record carries the note's opening: no board scan
+    await w.sync({ board: false });
+    if (w.spendable(rec.token).length === 0) return moved();
+    // the same blinding on every try: a retry makes the very note an earlier try may have sent
+    const blinding = rec.moveBlinding ? BigInt(rec.moveBlinding) : randomField();
+    const payment = makeNote(this.id.pk, rec.token, BigInt(rec.amount), blinding);
+    const memo = `From deal #${rec.dealId}`;
+    let r: SendResult;
+    try {
+      r = await w.pay(payment, {
+        word: { to: this.id, memo },
+        beforeSend: async () => {
+          // on record before the move goes out: if it lands while this device is gone, a sync still finds it
+          await this.rememberDealNote({ ...rec, moveBlinding: blinding.toString() });
+          await this.expect(payment, { memo, dealId: rec.dealId });
+        },
+      });
+    } catch (e) {
+      // an earlier try reached the pool first
+      if (/already spent/i.test((e as Error).message)) return moved();
+      throw e;
+    }
+    this.track(payment);
+    const kept = this.notes.get(payment.commitment);
+    if (kept) Object.assign(kept, { memo, dealId: rec.dealId });
+    return moved(r.txHash);
   }
 
   /** Payments this wallet made, newest first (private sends and desk deal legs). */

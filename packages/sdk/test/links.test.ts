@@ -3,15 +3,12 @@
  * (behind a stubbed fetch), with real joinsplit proofs checked by the circuit's verifying key.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64urlnopad } from "@scure/base";
-import * as snarkjs from "snarkjs";
-import { openNote, type PostView } from "../src/board.ts";
-import { be32, concat, extHash, R, toHex } from "../src/field.ts";
-import { identityFromSeed, type Identity } from "../src/keys.ts";
+import { openNote } from "../src/board.ts";
+import { be32, concat, R } from "../src/field.ts";
+import { identityFromSeed } from "../src/keys.ts";
 import {
   ALREADY_CLAIMED,
   checkLink,
@@ -31,108 +28,16 @@ import {
   takeBackLink,
   type Link,
 } from "../src/links.ts";
-import { TESTNET, withOverrides } from "../src/network.ts";
 import { makeNote } from "../src/note.ts";
 import type { TransactRequest } from "../src/pool.ts";
 import { loadPoseidon } from "../src/poseidon.ts";
-import type { ArtifactSource } from "../src/prove.ts";
 import { RelayerError, type RelayerClient } from "../src/relayer.ts";
-import { MerkleTree } from "../src/tree.ts";
-import { PrivateWallet, type WalletState } from "../src/wallet.ts";
-
-const circuits = join(import.meta.dirname, "../../../app/public/circuits");
-const artifacts: ArtifactSource = { wasm: (n) => join(circuits, `${n}.wasm`), zkey: (n) => join(circuits, `${n}.zkey`) };
-const vkey = JSON.parse(readFileSync(join(circuits, "joinsplit.vkey.json"), "utf8"));
-const TOKEN = "usdc.hushd.testnet";
-const NET = withOverrides(TESTNET, { rpc: ["http://rpc.test"], rpcSend: ["http://rpc.test"], pool: "pool.test", board: "board.test" });
+import type { WalletState } from "../src/wallet.ts";
+import { artifacts, Chain, NET, relayerFor, TOKEN, useChain, walletOf } from "./chain.ts";
 
 before(loadPoseidon);
 after(async () => {
   await (globalThis as { curve_bn128?: { terminate(): Promise<void> } }).curve_bn128?.terminate();
-});
-
-/** The pool and board contracts' views, in memory, behind a stubbed fetch. */
-class Chain {
-  tree = new MerkleTree();
-  roots = new Set<bigint>([this.tree.root()]);
-  spends = new Map<bigint, [bigint, bigint]>();
-  posts: string[] = [];
-
-  insert(c: bigint) {
-    this.tree.insert(c);
-    this.roots.add(this.tree.root());
-  }
-
-  view(contract: string, method: string, args: Record<string, string>): unknown {
-    const leaves = Array.from({ length: this.tree.size }, (_, i) => toHex(this.tree.leaf(i)!));
-    if (contract === "pool.test") {
-      if (method === "next_leaf_index") return String(this.tree.size);
-      if (method === "leaves") return leaves.slice(Number(args.from_index), Number(args.from_index) + Number(args.limit));
-      if (method === "is_spent") return this.spends.has(BigInt(args.nullifier!));
-      if (method === "spend_of") {
-        const s = this.spends.get(BigInt(args.nullifier!));
-        return s ? { outputs: s.map(toHex), deal_id: null, block_height: "1" } : null;
-      }
-    }
-    if (contract === "board.test") {
-      if (method === "count") return String(this.posts.length);
-      if (method === "posts") {
-        const from = Number(args.from_index);
-        return this.posts.slice(from, from + Number(args.limit)).map((data, i): PostView => ({ index: String(from + i), data, tag: "note", block_height: "1", timestamp_ns: "0" }));
-      }
-    }
-    throw new Error(`no view ${contract}.${method}`);
-  }
-
-  fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body)) as { params: { account_id: string; method_name: string; args_base64: string } };
-    const p = body.params;
-    const args = JSON.parse(Buffer.from(p.args_base64, "base64").toString("utf8")) as Record<string, string>;
-    const out = new TextEncoder().encode(JSON.stringify(this.view(p.account_id, p.method_name, args)));
-    return new Response(JSON.stringify({ jsonrpc: "2.0", id: "hushd", result: { result: [...out], logs: [] } }));
-  }) as typeof fetch;
-}
-
-/** The relayer: checks each proof as the real one does, then applies it to the chain. */
-function relayerFor(chain: Chain, hooks: { onTransact?: (r: TransactRequest) => void; refuse?: RelayerError } = {}) {
-  const seen: TransactRequest[] = [];
-  let n = 0;
-  const relayer = {
-    info: async () => ({ account: "relayer.test", network: "testnet", cashOutFeeBps: 0, allow: {}, lanes: 1 }),
-    post: async (data: string) => {
-      chain.posts.push(data);
-      return { txHash: `post-${chain.posts.length}` };
-    },
-    transact: async (r: TransactRequest) => {
-      hooks.onTransact?.(r);
-      if (hooks.refuse) throw hooks.refuse;
-      const a = r.args;
-      const signals = [a.root, ...a.nullifiers, ...a.commitments, a.public_amount, "0", extHash().toString()];
-      if (!(await snarkjs.groth16.verify(vkey, signals, r.proof))) throw new RelayerError("The proof does not verify for these arguments", 400);
-      if (!chain.roots.has(BigInt(a.root))) throw new RelayerError("The proof names a root the pool does not know (sync and prove again)", 400);
-      for (const x of a.nullifiers) if (chain.spends.has(BigInt(x))) throw new RelayerError("A note in this proof is already spent", 400);
-      for (const x of a.nullifiers) chain.spends.set(BigInt(x), [BigInt(a.commitments[0]), BigInt(a.commitments[1])]);
-      for (const c of a.commitments) chain.insert(BigInt(c));
-      seen.push(r);
-      return { txHash: `tx-${++n}` };
-    },
-  };
-  return { relayer: relayer as unknown as RelayerClient, seen };
-}
-
-function walletOf(id: Identity, relayer: RelayerClient, saved: WalletState[] = []) {
-  return new PrivateWallet(NET, id, { artifacts, relayer, store: { load: async () => saved.at(-1) ?? null, save: async (s) => void saved.push(structuredClone(s)) } });
-}
-
-let realFetch: typeof fetch;
-function useChain(): Chain {
-  const chain = new Chain();
-  realFetch ??= globalThis.fetch;
-  globalThis.fetch = chain.fetch;
-  return chain;
-}
-after(() => {
-  if (realFetch) globalThis.fetch = realFetch;
 });
 
 /** A wallet with `amount` of TOKEN already in the pool. */

@@ -68,6 +68,14 @@ export class MerkleTree {
     return { pathElements, pathIndices };
   }
 
+  /** A copy that grows on its own: a second wallet can load new leaves into it without touching this one. */
+  clone(): MerkleTree {
+    const t = new MerkleTree();
+    t.layers = this.layers.map((l) => [...l]);
+    t.index = new Map(this.index);
+    return t;
+  }
+
   static zeroPath(): MerklePath {
     return { pathElements: Array(LEVELS).fill(0n), pathIndices: Array(LEVELS).fill(0) };
   }
