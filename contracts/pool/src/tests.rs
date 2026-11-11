@@ -371,7 +371,7 @@ fn a_funds_proof_against_a_root_that_left_the_recent_ring_still_checks() {
         let mut h = Hasher::new();
         pool.tree.insert(field::from_u128(1_000_000 + i), &mut h);
     }
-    assert!(!pool.is_known_root(inputs[0].clone()));
+    assert!(!pool.is_known_root(inputs[0]));
     let check = pool.verify_disclosure("funds".into(), proof(fu), inputs, None, label(&f));
     assert!(check.chain_valid, "{:?}", check.problems);
 }

@@ -386,11 +386,11 @@ pub struct Desk {
 /// deal's size falls in, never the size itself.
 pub fn is_bond_step(bond: u128, min_bond: u128) -> bool {
     let unit = min_bond.max(1);
-    if bond == 0 || bond % unit != 0 {
+    if bond == 0 || !bond.is_multiple_of(unit) {
         return false;
     }
     let mut q = bond / unit;
-    while q % 10 == 0 {
+    while q.is_multiple_of(10) {
         q /= 10;
     }
     matches!(q, 1 | 2 | 5)

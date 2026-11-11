@@ -24,6 +24,7 @@ lossy-cast | pool | negate | Byte subtraction with borrow: each value is in -256
 lossy-cast | pool | parse_decimal | Digits are checked ASCII (0..9); the accumulator byte is masked with 0xff before the cast.
 lossy-cast | pool | parse_u256 | Digits are checked ASCII (0..9); the accumulator byte is masked with 0xff before the cast.
 lossy-cast | pool | push_root | `(current + 1) % ROOT_HISTORY` is below 100.
+lossy-cast | pool | proof_context | Each string is the proof kind (a fixed word), the network ("testnet" or "mainnet"), or the pool or reader account id (at most 64 bytes), so every length is below 256; the verifier passes its own label, so a proof made for one reader cannot match another reader's label.
 
 # ---------- desk ----------
 owner-check | desk | refresh_enclave_key | Open: the caller pays OutLayer. The key is what the attested worker returns to the private on_enclave_key, from the build pinned in matcher_project ("owner/project@<wasm hash>"); changing the build waits out the 24 h config timelock.
