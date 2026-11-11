@@ -63,17 +63,18 @@ Everything runs on NEAR testnet with test tokens.
 
 ## Contracts
 
-| Contract | Account | Does |
-| --- | --- | --- |
-| Pool | [`pool.hushd.testnet`](https://testnet.nearblocks.io/address/pool.hushd.testnet) | Notes, nullifiers, a depth-20 Poseidon tree, deposit limits behind a timelock, `transact`, `settle_swap`, `verify_disclosure` |
-| Desk | [`desk.hushd.testnet`](https://testnet.nearblocks.io/address/desk.hushd.testnet) | Makers and bonds, RFQ commitments, enclave matches, settlement, receipts, hedges, slashing |
-| Board | [`board.hushd.testnet`](https://testnet.nearblocks.io/address/board.hushd.testnet) | Sealed note posts, so a seed alone recovers a wallet |
-| Tokens | [`usdc`](https://testnet.nearblocks.io/address/usdc.hushd.testnet), [`wnear`](https://testnet.nearblocks.io/address/wnear.hushd.testnet), [`btc`](https://testnet.nearblocks.io/address/btc.hushd.testnet)`.hushd.testnet` | Test NEP-141 tokens with a faucet |
+| Contract | Account | Does | Source |
+| --- | --- | --- | --- |
+| Pool | [`pool.hushd.testnet`](https://testnet.nearblocks.io/address/pool.hushd.testnet) | Notes, nullifiers, a depth-20 Poseidon tree, deposit limits behind a timelock, `transact`, `settle_swap`, `verify_disclosure` | [Verified on NearBlocks](https://testnet.nearblocks.io/address/pool.hushd.testnet/contract/code) |
+| Desk | [`desk.hushd.testnet`](https://testnet.nearblocks.io/address/desk.hushd.testnet) | Makers and bonds, RFQ commitments, enclave matches, settlement, receipts, hedges, slashing | [Verified on NearBlocks](https://testnet.nearblocks.io/address/desk.hushd.testnet/contract/code) |
+| Board | [`board.hushd.testnet`](https://testnet.nearblocks.io/address/board.hushd.testnet) | Sealed note posts, so a seed alone recovers a wallet | [Verified on NearBlocks](https://testnet.nearblocks.io/address/board.hushd.testnet/contract/code) |
+| Tokens | [`usdc`](https://testnet.nearblocks.io/address/usdc.hushd.testnet), [`wnear`](https://testnet.nearblocks.io/address/wnear.hushd.testnet), [`btc`](https://testnet.nearblocks.io/address/btc.hushd.testnet)`.hushd.testnet` | Test NEP-141 tokens with a faucet | Verified on NearBlocks: [usdc](https://testnet.nearblocks.io/address/usdc.hushd.testnet/contract/code), [wnear](https://testnet.nearblocks.io/address/wnear.hushd.testnet/contract/code), [btc](https://testnet.nearblocks.io/address/btc.hushd.testnet/contract/code) |
 
-Every contract on testnet is a reproducible build.
-It names the commit and the pinned `sourcescan/cargo-near` Docker image it was built from (NEP-330 `contract_source_metadata`), so anyone can rebuild it byte for byte: `near contract verify deployed-at pool.hushd.testnet network-config testnet now` does that rebuild and compares the hash, as NearBlocks' Verify and Publish does.
-All six are verified on NearBlocks: each one's Contract Code tab shows the source it was rebuilt from.
-`deployments/testnet.json` records each contract's code hash and deploy transaction; `pnpm verify` checks the deployed code against it.
+Every contract on testnet is a reproducible build, and its source is verified three ways:
+
+- **On NearBlocks:** Verify and Publish rebuilt each contract from this repository through SourceScan's verifier, and each one's Contract Code tab shows "Contract Source Code Verified" with the source it was built from.
+- **By you:** each contract names the commit and the pinned `sourcescan/cargo-near` Docker image it was built from (NEP-330 `contract_source_metadata`), so `near contract verify deployed-at pool.hushd.testnet network-config testnet now` rebuilds it byte for byte and compares the hash.
+- **By `pnpm verify`:** it checks that each account runs the code hash recorded in `deployments/testnet.json`, names a commit of this repository and a pinned image, and matches your own reproducible build.
 
 ## Privacy and security model
 

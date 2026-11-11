@@ -40,7 +40,7 @@ const STANDING: { title: string; body: string; icon: ReactNode }[] = [
   },
   {
     title: "Not audited",
-    body: "The contracts, circuits and services have tests and automated security scans, and every contract on testnet is a reproducible build anyone can rebuild from its commit. No external audit has been done.",
+    body: "The contracts, circuits and services have tests and automated security scans, and every contract on testnet is a reproducible build anyone can rebuild from its commit, source-verified on NearBlocks. No external audit has been done.",
     icon: (
       <svg {...icon}>
         <path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3l7-2.8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />

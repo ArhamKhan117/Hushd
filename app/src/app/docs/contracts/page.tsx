@@ -230,7 +230,11 @@ export default function ContractsPage() {
 
       <h2 id="check-them-yourself">Check them yourself</h2>
       <ul>
-        <li>Open each account on NearBlocks from the table above: its code hash, transactions and logs.</li>
+        <li>
+          Open each account on NearBlocks from the table above: its code hash, transactions and logs. All six are
+          source-verified there: the Contract Code tab shows &quot;Contract Source Code Verified&quot; and the source each
+          one was rebuilt from.
+        </li>
         <li>
           Rebuild them. Each contract is a reproducible build: <code>contract_source_metadata</code> names the commit
           and the pinned Docker image it was built from, and{" "}
