@@ -68,6 +68,7 @@ Solidity projects publish verified source on a block explorer; on NEAR the same 
 - `near contract verify deployed-at <account> network-config testnet now` does exactly that: it reads the metadata, rebuilds the commit in the image and compares the hash with the code on chain.
   Run from a clean clone of the commit, it matches for every contract.
 - NearBlocks' **Verify and Publish** (Contract Code tab) runs the same rebuild through SourceScan's testnet verifier and then shows the source next to the contract.
+  All six contracts are verified there, from the commit they name.
 - `pnpm verify` checks that each contract account runs the code hash recorded in [`deployments/testnet.json`](deployments/testnet.json), that it names a commit of this repository and a pinned image, and that your own reproducible build hashes the same.
 
 ## Contract review, 6 November 2026

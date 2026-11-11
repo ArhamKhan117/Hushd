@@ -72,6 +72,7 @@ Everything runs on NEAR testnet with test tokens.
 
 Every contract on testnet is a reproducible build.
 It names the commit and the pinned `sourcescan/cargo-near` Docker image it was built from (NEP-330 `contract_source_metadata`), so anyone can rebuild it byte for byte: `near contract verify deployed-at pool.hushd.testnet network-config testnet now` does that rebuild and compares the hash, as NearBlocks' Verify and Publish does.
+All six are verified on NearBlocks: each one's Contract Code tab shows the source it was rebuilt from.
 `deployments/testnet.json` records each contract's code hash and deploy transaction; `pnpm verify` checks the deployed code against it.
 
 ## Privacy and security model
