@@ -89,8 +89,28 @@ export function readLimit(max: number): <T>(read: () => Promise<T>) => Promise<T
   };
 }
 
+/** Rounds a server makes over its endpoints while every one of them is rate-limited, pausing between them. */
+const SERVER_ROUNDS = 3;
+
 async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): Promise<T> {
+  // a browser falls back to an endpoint whose 429s it cannot read; a server can wait out a burst
+  const rounds = net.retryRateLimited ? 1 : SERVER_ROUNDS;
   let last: unknown;
+  for (let round = 1; ; round++) {
+    const r = await rpcRound<T>(net, method, params);
+    if (r.ok) return r.result;
+    last = r.error;
+    if (!r.allLimited || round >= rounds) break;
+    await new Promise((go) => setTimeout(go, r.pauseMs));
+  }
+  throw last instanceof Error ? last : new RpcError("every RPC endpoint failed", last);
+}
+
+/** One pass over the endpoints: the answer, or the last error and whether every endpoint was rate-limited. */
+async function rpcRound<T>(net: HushdNetwork, method: string, params: unknown): Promise<{ ok: true; result: T } | { ok: false; error: unknown; allLimited: boolean; pauseMs: number }> {
+  let last: unknown;
+  let allLimited = true;
+  let roundPause = 1_000;
   const first = rpcOrder(net.rpc);
   const fallback = net.rpcFallback ?? [];
   for (const [i, url] of [...first, ...fallback].entries()) {
@@ -119,20 +139,23 @@ async function rpcCall<T>(net: HushdNetwork, method: string, params: unknown): P
           const words = c?.name === "UNKNOWN_ACCOUNT" ? `${c.info?.requested_account_id ?? "That account"} does not exist on NEAR ${net.id} (UNKNOWN_ACCOUNT)` : c?.name ?? body.error.message ?? "RPC error";
           throw new RpcError(words, body.error);
         }
-        return body.result as T;
+        return { ok: true, result: body.result as T };
       } catch (e) {
         last = e;
         // contract errors are answers, not outages: no point asking another endpoint
         if (e instanceof RpcError && e.cause && !String(e.message).includes("answered")) throw e;
         restEndpoint(url);
+        const limited = e instanceof RpcError && /answered 429/.test(e.message);
+        if (limited) roundPause = pauseMs;
+        else if (attempt === 1) allLimited = false;
         // a rate limit will not lift at once: ask the next first endpoint rather than this one again,
         // and only the last of them, once, after a pause, before turning to a fallback
-        if (e instanceof RpcError && /answered 429/.test(e.message) && !(beforeFallback && attempt === 0)) break;
+        if (limited && !(beforeFallback && attempt === 0)) break;
         await new Promise((r) => setTimeout(r, pauseMs));
       }
     }
   }
-  throw last instanceof Error ? last : new RpcError("every RPC endpoint failed", last);
+  return { ok: false, error: last, allLimited, pauseMs: roundPause };
 }
 
 /** Call a view method; returns its JSON result. */

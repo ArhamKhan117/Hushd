@@ -275,6 +275,16 @@ test("in a browser, a rate-limited first endpoint is asked once more after a pau
     script = { "https://server-first.example": limited, "https://server-fallback.example": ok };
     assert.equal(await view<string>(withOverrides(TESTNET, { rpc: ["https://server-first.example"], rpcFallback: ["https://server-fallback.example"] }), "pool.hushd.testnet", "anything"), "ok");
     assert.deepEqual(asked, ["https://server-first.example", "https://server-fallback.example"]);
+    // every endpoint rate-limited at once: a server pauses and goes round again, so a burst does not end a deal
+    asked.length = 0;
+    script = { "https://busy-a.example": (n) => (n === 1 ? limited() : ok()), "https://busy-b.example": limited };
+    assert.equal(await view<string>(withOverrides(TESTNET, { rpc: ["https://busy-a.example"], rpcFallback: ["https://busy-b.example"] }), "pool.hushd.testnet", "anything"), "ok");
+    assert.deepEqual(asked, ["https://busy-a.example", "https://busy-b.example", "https://busy-a.example"]);
+    // and gives up after its rounds when the limit holds
+    asked.length = 0;
+    script = { "https://held-a.example": limited, "https://held-b.example": limited };
+    await assert.rejects(view(withOverrides(TESTNET, { rpc: ["https://held-a.example"], rpcFallback: ["https://held-b.example"] }), "pool.hushd.testnet", "anything"), /answered 429/);
+    assert.equal(asked.length, 6);
     assert.equal(forBrowser(TESTNET).retryRateLimited, true);
     assert.equal(TESTNET.retryRateLimited, undefined);
   } finally {
