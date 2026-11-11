@@ -67,8 +67,8 @@ export const TESTNET: HushdNetwork = {
   rpcSend: ["https://test.rpc.fastnear.com", "https://rpc.testnet.fastnear.com"],
   rpcFallback: ["https://near-testnet.drpc.org"],
   browserRpc: ["https://near-testnet.drpc.org"],
-  // on once the desk's pin to the enclave build 95cba282... applies (after 2026-11-11 00:35 UTC)
-  termsSalt: false,
+  // the desk pins the enclave build 95cba282..., which hashes salted terms (since 2026-11-11)
+  termsSalt: true,
   pool: "pool.hushd.testnet",
   desk: "desk.hushd.testnet",
   board: "board.hushd.testnet",

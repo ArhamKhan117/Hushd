@@ -19,5 +19,6 @@ test("a request is salted when the network says so, and the makers' ask carries 
   assert.match(salt, /^0x[0-9a-f]{64}$/);
   assert.equal(salted.ask.salt, salt);
   assert.notEqual(salt, (packageRequest(id, withOverrides(TESTNET, { termsSalt: true }), draft).request as { salt?: string }).salt, "a fresh salt per request");
-  assert.equal(MAINNET.termsSalt, true, "mainnet starts salted");
+  assert.equal(MAINNET.termsSalt, true, "mainnet is salted");
+  assert.equal(TESTNET.termsSalt, true, "testnet is salted since the desk pins the enclave build 95cba282...");
 });

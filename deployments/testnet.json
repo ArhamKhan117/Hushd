@@ -288,7 +288,7 @@
   ],
   "matcher": {
     "project": "hushd.testnet/matcher",
-    "wasmSha256": "7521d46a6a79a26f31fe94d70f4c84b9ba6bf825090ec8f18b9ecdb14bf363ae",
+    "wasmSha256": "95cba282e110f209a8a2a9722dfa8b1e9be777a45ab5a9fcaf78a74a4bbcd876",
     "secret": "PROTECTED_MATCHER_KEY (generated in the TEE, locked to this build)"
   },
   "policyWallets": {

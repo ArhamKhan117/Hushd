@@ -85,7 +85,7 @@ export function deskWithRecords() {
       receipt: { outcome, evidence: outcome === "failed" ? [{ kind: "expired", reference: `not settled by ${matched + 240_000}` }] : [], recorded_at_ms: String(matched + 30_000) },
     };
   });
-  const project = "hushd.testnet/matcher@7521d46a6a79a26f31fe94d70f4c84b9ba6bf825090ec8f18b9ecdb14bf363ae";
+  const project = "hushd.testnet/matcher@95cba282e110f209a8a2a9722dfa8b1e9be777a45ab5a9fcaf78a74a4bbcd876";
   return {
     makers: [["steady.testnet", maker("Steady", "20000000000")], ["lapser.testnet", maker("Lapser", "40000000000")], ["fresh.testnet", maker("Fresh", "20000000000")]],
     deals,
