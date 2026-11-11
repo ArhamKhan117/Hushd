@@ -7,6 +7,7 @@ import { accountBalance, keepRpcErrorBodies, restEndpoint, rpcOrder, sendEndpoin
 import { settings } from "./config.js";
 import { Db } from "./db.js";
 import { eventsInOutcome, watchedContracts, type OutcomeLike } from "./indexer.js";
+import { base58 } from "@scure/base";
 import { Near } from "near-kit";
 import type { AccountConfig } from "./config.js";
 
@@ -89,6 +90,15 @@ async function rpcBlock(net: HushdNetwork, hash: string): Promise<{ header: { he
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error("no RPC answered for the block");
+}
+
+/**
+ * How much to move into a gas key: nothing while it holds at least `floor`, else up to
+ * `target`. Every transaction sent through the key reserves its full prepaid gas from
+ * this balance, so a drained key refuses sends even while the account holds NEAR.
+ */
+export function gasKeyTopUp(balance: bigint, floor: bigint, target: bigint): bigint {
+  return balance >= floor ? 0n : target - balance;
 }
 
 /** A refusal before broadcast (rate limit, or a gateway that does not take the call): safe to send again elsewhere. */
@@ -181,6 +191,42 @@ export class Signer {
     }
     void recordEvents(this.net, outcome).catch((e) => console.error(`events of ${txHash}: ${(e as Error).message}`));
     return { txHash, result: decodeResult(outcome), gasBurnt, lane };
+  }
+
+  /** The gas key's public key, derived from its private key (ed25519: seed ‖ public). */
+  get gasKeyPublic(): string | null {
+    const sk = this.cfg.gasKey?.privateKey;
+    return sk ? `ed25519:${base58.encode(base58.decode(sk.slice(8)).slice(32))}` : null;
+  }
+
+  /** The gas key's prepaid balance in yoctoNEAR; null without a gas key, or when no endpoint answers. */
+  async gasKeyBalance(): Promise<bigint | null> {
+    const pub = this.gasKeyPublic;
+    if (!pub) return null;
+    for (const url of [...rpcOrder(this.net.rpc), ...(this.net.rpcFallback ?? [])]) {
+      const j = (await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "view_access_key", finality: "final", account_id: this.cfg.accountId, public_key: pub } }),
+      })
+        .then((r) => r.json())
+        .catch(() => ({}))) as { result?: { permission?: { GasKeyFullAccess?: { balance?: string }; GasKeyFunctionCall?: { balance?: string } } } };
+      const p = j.result?.permission;
+      const bal = p?.GasKeyFullAccess?.balance ?? p?.GasKeyFunctionCall?.balance;
+      if (bal !== undefined) return BigInt(bal);
+      restEndpoint(url);
+    }
+    return null;
+  }
+
+  /** Refill the gas key from the account (signed with the account's own key) when it runs below `floor`. */
+  async keepGasKeyFunded(floor: bigint, target: bigint): Promise<{ balance: bigint; added: bigint } | null> {
+    const pub = this.gasKeyPublic;
+    const balance = await this.gasKeyBalance();
+    if (!pub || balance === null) return null;
+    const added = gasKeyTopUp(balance, floor, target);
+    if (added > 0n) await this.send((c) => c.transaction(this.cfg.accountId).transferToGasKey(pub, added).send({ waitUntil: "EXECUTED_OPTIMISTIC" }));
+    return { balance: balance + added, added };
   }
 
   /** The account's balance in yoctoNEAR. */

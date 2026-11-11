@@ -276,4 +276,15 @@ export async function startRelayer() {
   a.post("/v1/relay/activate", async (c) => c.json(await relayer.activate(await c.req.json())));
   a.post("/v1/relay/meta", async (c) => c.json(await relayer.meta(await c.req.json())));
   listen(a, settings.port("relayer", 8787), "relayer");
+  // every send through the gas key reserves its prepaid gas from the key's own balance (about
+  // 0.3 NEAR for a settle), so keep the key funded from the account; top-up funds the account
+  const floor = BigInt(settings.str("RELAYER_GAS_KEY_FLOOR", "1000000000000000000000000"));
+  const target = BigInt(settings.str("RELAYER_GAS_KEY_TARGET", "3000000000000000000000000"));
+  for (;;) {
+    await signer
+      .keepGasKeyFunded(floor, target)
+      .then((r) => r && r.added > 0n && console.log(`relayer: gas key funded with ${r.added} yocto`))
+      .catch((e) => console.error("relayer gas key:", (e as Error).message));
+    await new Promise((r) => setTimeout(r, settings.num("RELAYER_GAS_KEY_EVERY_MS", 60_000)));
+  }
 }

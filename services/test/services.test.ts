@@ -18,6 +18,7 @@ import { bondFor, hedgeMargin, priceAsk, spreadBps } from "../src/makers.js";
 import { checkDelegate, Relayer } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
 import { parseTargets } from "../src/topup.js";
+import { gasKeyTopUp } from "../src/chain.js";
 import { parseAsk, report } from "../src/market-agent.js";
 
 describe("indexer", () => {
@@ -517,3 +518,12 @@ test("background reads and makers draw on their own rate budgets, not on a trade
   assert.equal(limitFor("/v1/deals", budgets), "rest");
   assert.equal(limitFor("/v1/stats", budgets), "rest");
 });
+
+test("the relayer's gas key is refilled to the target only once it drops below the floor", () => {
+  const NEAR = 10n ** 24n;
+  assert.equal(gasKeyTopUp(2n * NEAR, NEAR, 3n * NEAR), 0n);
+  assert.equal(gasKeyTopUp(NEAR, NEAR, 3n * NEAR), 0n);
+  // the drained key that refused settles on 2026-11-11: 0.2967 NEAR against a 0.3009 NEAR reservation
+  assert.equal(gasKeyTopUp(296_732_802_132_938_600_000_000n, NEAR, 3n * NEAR), 3n * NEAR - 296_732_802_132_938_600_000_000n);
+});
+

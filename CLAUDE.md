@@ -4,6 +4,7 @@
 
 - Proving keys are development keys: `app/public/circuits/*` and the verifying keys compiled into `contracts/pool` must come from the same `circuits/scripts/setup-dev-keys.mjs` run (`gen-vk-rs.mjs` writes the Rust side).
 - The pool needs explicit gas from callers: a cash out takes at least 143 Tgas, `settle` about 200, `request_match` about 105. The relayer sets them.
+  The relayer sends through a gas key with its own prepaid balance (each send reserves its full gas, about 0.3 NEAR for a settle); the relayer refills it from its account (`RELAYER_GAS_KEY_FLOOR`/`_TARGET`), and top-up refills the account. A drained key fails sends with `NotEnoughGasKeyBalance` while the account still holds NEAR.
 - Calls that change standing state take exactly 1 yoctoNEAR: pool rule changes, pause and `claim`; desk `propose_config`/`apply_config`/`cancel_config`, `withdraw_bond`, `set_maker_active`; board `set_max_post_bytes`; token `set_operator`.
   The desk's pool, bond token and MPC are fixed at init; other desk settings wait out `config_timelock_ns`.
 - snarkjs keeps worker threads alive: scripts call `process.exit`, tests terminate `globalThis.curve_bn128`.
