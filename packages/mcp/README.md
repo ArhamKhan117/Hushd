@@ -1,8 +1,14 @@
 # @hushd/mcp
 
-The Hushd MCP server: a private balance, private payments, private x402 and the Hushd OTC desk for AI agents on NEAR testnet, inside spending limits the owner sets.
+The Hushd MCP server: a private balance, private payments, private x402 and the Hushd OTC desk for AI agents on NEAR, inside spending limits the owner sets.
 
-## Use it
+Hushd runs on NEAR testnet, with test tokens that have no value.
+
+## Quick start
+
+Node 22 or newer.
+
+No install needed: `npx` fetches it.
 
 ```bash
 npx -y @hushd/mcp init        # a new agent seed in ~/.hushd/seed (mode 600)
@@ -48,4 +54,9 @@ A policy wallet guards the agent's NEAR account in a TEE, but not the private ba
 | `HUSHD_APP_URL` | The app claim links open in (default `https://hushd.net`) |
 | `HUSHD_CIRCUITS_DIR`, `HUSHD_CIRCUITS_URL` | Where the proving artifacts come from (default `https://hushd.net/circuits`, cached in `~/.hushd/circuits`) |
 
-Docs: https://hushd.net/docs. Source: https://github.com/ArhamKhan117/Hushd.
+## Links
+
+- Docs: https://hushd.net/docs/agents
+- App: https://hushd.net
+- Source: https://github.com/ArhamKhan117/Hushd (packages/mcp)
+- License: MIT
