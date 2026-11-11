@@ -5,39 +5,39 @@
   "contracts": {
     "usdc": {
       "account": "usdc.hushd.testnet",
-      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "codeHash": "AoR5BTUsne17XGqGUFcEGkvqKBMDgbjim7MdNoHxSAYz",
       "tx": "CyQLoPKkC72QtEs2AEAkbcW4GAdcYP8LgQ7PhqvmLhvV",
-      "redeployed": "4vFaeMF4YskNwcstTikVmaa8ShFbN1hJ3bqG5kajzpCF"
+      "redeployed": "B9qmCGjvQVcCT1hrvJmsSugQSEPJoXv9Ru8Jbovzouvb"
     },
     "wnear": {
       "account": "wnear.hushd.testnet",
-      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "codeHash": "AoR5BTUsne17XGqGUFcEGkvqKBMDgbjim7MdNoHxSAYz",
       "tx": "BFGCSYqhbNkzRyUPTPUkaSYq3P1juexadEpZSH5hSqPx",
-      "redeployed": "GvvSaUttdBGm5wLjYTp1TM6KbRycszHHrgFSMmkLXxBw"
+      "redeployed": "951s4T7bhAW1GzbZyJT3oTE9GKQyjCV9h9DZjwHVKLyX"
     },
     "btc": {
       "account": "btc.hushd.testnet",
-      "codeHash": "29MdX65ryEkYSTQNzxRq98Uyk4ewaaBASmR9LtAE4H1m",
+      "codeHash": "AoR5BTUsne17XGqGUFcEGkvqKBMDgbjim7MdNoHxSAYz",
       "tx": "3oVfnMH7HKih8AFrWsFM5KE4HXvTsRQXjhd91aXQVqA8",
-      "redeployed": "5wqLRkEdJBft8YLxPeM1xxvRUmmp6Bj6W8spyv6Sezj5"
+      "redeployed": "CX4Wv5NHPgqFrEjG5LH952Dtg4qqMvnnW5R9abSe5omm"
     },
     "pool": {
       "account": "pool.hushd.testnet",
-      "codeHash": "DbJjSmqwTLZfbxc6Qc93y86MQBigJJxYwf85MeA7pKN9",
+      "codeHash": "F7qjtLqRMH6WdrYhfMcounvRA2d4NU6r7o14L9bHuWqr",
       "tx": "9wTpkYhWTCB1YRjgFb65tAUsAAnVATyYZ4P1WoJguP8b",
-      "redeployed": "524pPvtoQNsvCZMvthqvUYzrdWFiqUE1a14BT1oCAfF7"
+      "redeployed": "GVeRjFSPfXJXyzjKYosZJeAYn2A12i4sSEL9pYQ9C7Dj"
     },
     "board": {
       "account": "board.hushd.testnet",
-      "codeHash": "Ag1XkH5QwZBCBcdKnjTLzauwphoz2LGTMyG51VYeEpA6",
+      "codeHash": "8dsiJd6bqwB1M3q5o2iZqwLRHKsPWBD2Nqq3Aq3pX73z",
       "tx": "GiBFw3p5QSb5uYPHCiL6xuKtM4wfJ9TkAHgWv4hykRzv",
-      "redeployed": "CSY3NLXPPESJua4V2Nmv39vR8K8QSiXQuzCAAY8Q9yhJ"
+      "redeployed": "8q9PzdaRzsUV7Qy7LEMAhafgk1Ss3NeHrVforEpKzfhD"
     },
     "desk": {
       "account": "desk.hushd.testnet",
-      "codeHash": "5wDjp4nd8gBmkWtkjMmeNqmFBZmMx79UAVqEAbp3PeHX",
+      "codeHash": "7dPy6BAW2BX8cCDziAAU33cWgJfKPABtbJZHDps8VFGu",
       "tx": "AvYDNkhrmchr5KcEiUWEfhXKJYCMHm5crxHVQC3pGX4G",
-      "redeployed": "BFEMZPKaYe7ocR5JmSxYQgWgg2zu1QpsWkPdwevd4qc7"
+      "redeployed": "CwFMdJ4gjx7Lr1CcBQGUXNnDLg4KMZdnjskyFxAgBZKZ"
     }
   },
   "services": {
