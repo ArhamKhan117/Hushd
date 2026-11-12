@@ -54,12 +54,14 @@ The run found two mainnet bugs, both fixed:
 1. **Proving keys.** Run a multi-party ceremony with `circuits/scripts/ceremony.mjs` (start, each contributor in turn, verify, a beacon from a NEAR mainnet block announced in advance).
    The development keys must never hold real value: whoever made them could forge proofs.
    Then `npm run publish-artifacts` and `npm run vk` in circuits/, and rebuild the pool reproducibly.
-2. **The account.** Claim `hushd.near` and fund it with about 30 NEAR.
-3. **Deploy.** `pnpm --filter @hushd/services deploy:mainnet` prints the plan; with the owner's yes, `HUSHD_MAINNET_GO=hushd.near` sends it.
+2. **External audit.** An outside review of the four contracts, the circuits and the matcher, with its findings fixed before any real value goes in.
+   The desk also gets a recovery call for a deal whose settle callback runs out of gas (a note from the internal review, [SECURITY.md](SECURITY.md)).
+3. **The account.** Claim `hushd.near` and fund it with about 30 NEAR.
+4. **Deploy.** `pnpm --filter @hushd/services deploy:mainnet` prints the plan; with the owner's yes, `HUSHD_MAINNET_GO=hushd.near` sends it.
    The pool starts with small caps (10,000 USDC per deposit and 100,000 in all, and the like for wNEAR and BTC), raised later through its one-day timelock.
-4. **The matcher.** Create the OutLayer project `hushd.near/matcher` from the same build, generate its protected key in the TEE, pin the build in the desk's config, and call `refresh_enclave_key`.
-5. **Makers.** Each maker account brings its inventory and 1,000 USDC of bond, then the deploy runs again to shield and post them; for hedged deals, margin on Hyperliquid mainnet.
-6. **Services and app.** The same Docker images and app with `HUSHD_NETWORK=mainnet` and `NEXT_PUBLIC_HUSHD_NETWORK=mainnet`; set `deployed: true` in the SDK's `MAINNET`.
-7. **Lock it.** Verify each contract on NearBlocks, then remove the deployer's full-access keys from the contract accounts.
+5. **The matcher.** Create the OutLayer project `hushd.near/matcher` from the same build, generate its protected key in the TEE, pin the build in the desk's config, and call `refresh_enclave_key`.
+6. **Makers.** Each maker account brings its inventory and 1,000 USDC of bond, then the deploy runs again to shield and post them; for hedged deals, margin on Hyperliquid mainnet.
+7. **Services and app.** The same Docker images and app with `HUSHD_NETWORK=mainnet` and `NEXT_PUBLIC_HUSHD_NETWORK=mainnet`; set `deployed: true` in the SDK's `MAINNET`.
+8. **Lock it.** Verify each contract on NearBlocks, then remove the deployer's full-access keys from the contract accounts.
 
-Before step 3, run `mainnet:sandbox` again on the final commit.
+Before the deploy, run `mainnet:sandbox` again on the final commit.

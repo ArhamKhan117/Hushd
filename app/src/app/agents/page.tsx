@@ -372,8 +372,8 @@ export default function AgentsPage() {
               <span aria-hidden className="tnum text-[12px] font-medium text-faint">02</span>
               <p className="mt-6 text-[18px] leading-snug tracking-[-0.01em]">Testnet, with test tokens</p>
               <p className="mt-3 text-[14px] leading-relaxed text-mute">
-                Every contract runs on NEAR testnet with development proving keys, and nothing has been audited. The
-                tokens have no value.
+                Every contract runs on NEAR testnet with test tokens and development proving keys, and the same code
+                runs on mainnet after a proving-key ceremony, an external audit and a deploy.
               </p>
             </div>
             <div data-reveal-item className="flex flex-col p-6 sm:p-8">

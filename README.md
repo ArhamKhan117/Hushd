@@ -36,7 +36,7 @@ Hushd seals the request instead: maker agents quote blind, a TEE enclave picks t
 The makers are autonomous agents that quote and settle the deals they win, and any AI agent can trade, pay over private x402 and prove through MCP, acting on NEAR through a policy wallet.
 Afterwards the trader, a person or an agent, can prove exactly one fact, such as "I paid this deal" or "I hold at least 10,000 USDC", to one named NEAR account until a date they choose.
 
-Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on mainnet after a proving-key ceremony and a deploy ([MAINNET.md](MAINNET.md)).
+Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on mainnet after a proving-key ceremony, an external audit and a deploy ([MAINNET.md](MAINNET.md)).
 
 ## At a glance
 
@@ -65,7 +65,7 @@ Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on 
 - **Send, receive and cash out privately.** A relayer sends every proven action from its own account, so your NEAR account never appears next to your payments. Payment request links fill in the amount for the payer.
 - **Pay anyone as a link.** The payment waits in a one-time note, and whoever opens the link claims it into their own private balance with a passkey or a NEAR wallet, with no gas and no seed phrase (the Send page, or `hushd_pay_link` for agents). An unclaimed link can be taken back.
 - **Ask for a price without showing your hand.** Your request, including the least you accept, is sealed to the matcher enclave. Makers see the pair, the side and the size, never your limit.
-- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry are experimental: you receive the same spot leg, and the maker commits, with its bond at stake, to place a Hyperliquid testnet hedge order signed by NEAR Chain Signatures from a per-deal address that trades for the maker's own account. If the order misses, the bond is paid to you privately. The hedge is the maker's position, not yours, and none has filled on testnet yet. A bond is at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC.
+- **Trade three packages.** Spot settles atomically in the pool. Spot plus hedge and cash and carry are experimental: you receive the same spot leg, and the maker commits, with its bond at stake, to place a Hyperliquid testnet hedge order signed by NEAR Chain Signatures from a per-deal address that trades for the maker's own account. If the order misses, the bond is paid to you privately. The hedge is the maker's position, not yours. A bond is at least the desk's 1,000 USDC minimum, so hedged packages suit trades from about 10,000 USDC.
 - **Describe the trade in plain words.** A NEAR AI Cloud model inside a TEE drafts the request. Your words are encrypted to the model's attested key in the browser, and the answer's TEE signature is checked in the browser too. You confirm every number.
 - **Prove one fact to one reader.** An exact payment, a payment of at least an amount, funds held above a threshold, or your total desk volume. Each proof names its reader and expires, and the pool contract checks it again on chain.
 - **Let agents do all of it** through MCP, inside per-payment and per-day limits, including paying x402 resources privately.
@@ -139,7 +139,8 @@ Who you trust, and for what:
 | **The maker** | It sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse. |
 | **NEAR AI Cloud** | It decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext. |
 
-Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review and automated scans ([SECURITY.md](SECURITY.md)), not an external audit.
+Status: NEAR testnet with test tokens and development proving keys, and mainnet-ready on the same code path; going live is a proving-key ceremony, an external audit and a deploy ([MAINNET.md](MAINNET.md)).
+The contracts have had an internal review and automated scans, with every finding fixed or accepted with its reason ([SECURITY.md](SECURITY.md)).
 
 ## Agents
 
@@ -229,7 +230,7 @@ That finding, the three Medium and six Low, and what changed for each are in [SE
 
 Hushd runs on testnet, and every part is built to run on mainnet too: going live is a deploy and environment switches, with no code changes.
 `pnpm --filter @hushd/services mainnet:sandbox` runs the mainnet build end to end on a local node holding the real mainnet USDC, `wrap.near` and nBTC code: a deploy as `hushd.near`, the services on mainnet settings, and an agent that shields, sends, trades two pairs, cashes out, proves and pays over x402 (17 of 17 checks pass).
-Mainnet still needs a multi-party proving-key ceremony first (`circuits/scripts/ceremony.mjs`); [MAINNET.md](MAINNET.md) has what is ready, how it was tested and the steps to go live.
+Going live takes a multi-party proving-key ceremony (`circuits/scripts/ceremony.mjs`) and an external audit; [MAINNET.md](MAINNET.md) has what is ready, how it was tested and the steps to go live.
 
 ## Repository
 

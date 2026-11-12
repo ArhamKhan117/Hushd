@@ -86,11 +86,12 @@ export default function DocsOverviewPage() {
         </li>
       </ul>
 
-      <h2 id="what-it-is-not">What it is not</h2>
+      <h2 id="status">Status and scope</h2>
       <p>
-        Hushd runs on testnet only. The tokens have no value, the proving keys are development keys from one
-        contribution (not a multi-party ceremony), and nothing has been audited. Hedged packages are experimental:
-        their hedge leg trades on Hyperliquid testnet for the maker&apos;s own account, and none has filled yet. Read <Link href="/docs/threat-model">the threat model</Link> before you rely on any part of it.
+        Hushd runs on NEAR testnet with test tokens, and it is mainnet-ready on the same code: going live is a
+        multi-party proving-key ceremony, an external audit and a deploy. Hedged packages are experimental: their
+        hedge leg trades on Hyperliquid testnet for the maker&apos;s own account. Read{" "}
+        <Link href="/docs/threat-model">the threat model</Link> for what each part relies on.
       </p>
       <Callout tone="caveat" title="Some things stay public">
         Deposits into the pool and cash outs from it are public, with their amounts. So is the fact that a desk deal

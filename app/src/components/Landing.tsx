@@ -166,24 +166,24 @@ const NEAR_ONLY = [
 
 const LIMITS = [
   {
-    title: "Testnet only",
-    body: "Every contract runs on NEAR testnet. Tokens come from a faucet and have no value, and the experimental hedge leg trades on Hyperliquid testnet.",
+    title: "Testnet now, mainnet‑ready",
+    body: "Every contract runs on NEAR testnet with faucet tokens. The same code runs on mainnet after a proving-key ceremony, an external audit and a deploy.",
   },
   {
     title: "Development keys",
-    body: "Proofs use keys from one contribution plus a public beacon, not a multi-party ceremony. Fine for practice, not for real money.",
+    body: "Testnet proofs use keys from one contribution plus a public beacon. The mainnet keys come from a multi-party ceremony.",
   },
   {
-    title: "Not audited",
-    body: "The contracts, circuits and services have tests, not an external audit.",
+    title: "Reviewed and scanned",
+    body: "The contracts, circuits and services have unit, circuit and sandbox tests, an internal review and automated scans. An external audit comes before mainnet.",
   },
   {
-    title: "What the chain still shows",
+    title: "What the chain shows",
     body: "Deposits, cash outs and their amounts are public, and so is each desk deal and its outcome. Timing can link them.",
   },
   {
     title: "Who you trust",
-    body: "The relayer can refuse an action, never change what you proved. Keeping quotes and limits private rests on the matcher's TEE. Hushd's API sees timing and IP addresses, its matcher client could leave a quote out, and its keeper's report decides a hedge's bond.",
+    body: "The relayer can refuse an action, never change what you proved. Quotes and limits stay private inside the matcher's TEE. Hushd's API sees timing and IP addresses, and its matcher client could leave a quote out.",
   },
   {
     title: "The model only drafts",
@@ -574,10 +574,10 @@ export function Landing() {
             <Reveal>
               <span className="hd-index" data-n="06" data-reveal-item>
                 <i />
-                Limits
+                Status
               </span>
               <h2 id="limits" className="t-display-l mt-5 max-w-[11ch]" data-reveal-item>
-                Honest about where it is
+                Where it stands
               </h2>
               <div className="mt-6 flex flex-col items-start gap-3" data-reveal-item>
                 <Link href="/docs/privacy-model" className="hd-arrowlink">

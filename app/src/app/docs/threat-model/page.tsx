@@ -203,7 +203,7 @@ export default function ThreatModelPage() {
 
       <h2 id="not-audited">Not audited</h2>
       <p>
-        The contracts, circuits and services have unit, circuit and sandbox tests. No external audit has been done.
+        The contracts, circuits and services have unit, circuit and sandbox tests, an internal review and automated scans. An external audit comes before mainnet.
       </p>
 
       <h2 id="not-covered">Not covered</h2>

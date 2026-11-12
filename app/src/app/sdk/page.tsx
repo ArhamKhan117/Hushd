@@ -530,7 +530,7 @@ export default function SdkPage() {
                 Status
               </span>
               <h2 id="status" className="t-display-l mt-5 max-w-[11ch]">
-                Honest about where it is
+                Where it stands
               </h2>
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
                 <a href={GITHUB} target="_blank" rel="noreferrer" className="hd-arrowlink">
@@ -544,12 +544,12 @@ export default function SdkPage() {
             <Reveal className="pg-bento hd-grid-lines grid grid-cols-1 self-start sm:grid-cols-3" stagger={80}>
               {[
                 {
-                  title: "Testnet only",
-                  body: "Every contract runs on NEAR testnet, with test tokens that have no value. No Hushd contract is on mainnet.",
+                  title: "Testnet now, mainnet‑ready",
+                  body: "Every contract runs on NEAR testnet with test tokens, and the same code runs on mainnet after a proving-key ceremony, an external audit and a deploy.",
                 },
                 {
                   title: "Development keys",
-                  body: "The circuits' keys come from one phase-2 contribution and a public beacon, not a multi-party ceremony. Nothing is audited yet.",
+                  body: "The testnet keys come from one phase-2 contribution and a public beacon; the mainnet keys come from a multi-party ceremony.",
                 },
                 {
                   title: "Nothing faked",

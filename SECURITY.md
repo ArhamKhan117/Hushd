@@ -1,14 +1,13 @@
 # Security
 
 Hushd runs on NEAR testnet, with test tokens and development proving keys.
-No outside firm has audited it.
+It has had an internal contract review and automated scans, and an external audit comes before mainnet ([MAINNET.md](MAINNET.md)).
 This page lists what is checked, how to run every check yourself, what the last contract review found and what changed because of it.
 
 ## Report a problem
 
 Please report privately through GitHub's **Report a vulnerability** (the Security tab of [ArhamKhan117/Hushd](https://github.com/ArhamKhan117/Hushd/security)).
 Do not open a public issue for anything that could move funds, break privacy or fake a receipt.
-It is testnet software, so there is no paid bug bounty.
 
 ## Run every check
 
@@ -89,10 +88,10 @@ It found 1 High, 3 Medium and 6 Low, plus 11 notes.
 | L-5 | The pool pays the storage of shields and refund notes. | Accepted: an attacker spends more on gas than the pool loses. |
 | L-6 | The test token's faucet registration can be refunded by unregistering. | Accepted for the test token. |
 
-Two of the notes matter for anyone judging the trust model:
+Before mainnet, from the review's notes (both are steps in [MAINNET.md](MAINNET.md)):
 
-- The contract accounts still hold the deployer's full-access key, so the owner could replace the code; the timelocks bind the owner's settings, not a redeploy. The keys come off after the last redeploy.
-- A deal whose settle callback runs out of gas would stay in `settling`; the callback has fixed gas measured in the sandbox tests, but there is no recovery path yet.
+- The deployer's full-access keys come off the contract accounts once the contracts are verified, so the code can no longer be replaced; on testnet they stay so the contracts can be upgraded, and the timelocks bind the owner's settings.
+- The desk gets a recovery call for a deal whose settle callback runs out of gas; the callback's fixed gas is measured in the sandbox tests, with a margin.
 
 What held up, with the evidence in the review:
 
@@ -106,16 +105,13 @@ What held up, with the evidence in the review:
 
 - 153 unit tests with real Groth16 proofs: pool 51, desk 71, board 24, token 7.
 - 6 sandbox tests on a local nearcore with the real wasm: shield, send, cash out, a refund note, a settled swap through the desk, a bonded hedge signed by the MPC double, and a refused slash payout retried.
-- The matcher's 7 tests, including byte vectors shared with the desk and the TypeScript protocol package.
+- The matcher's 8 tests, including byte vectors shared with the desk and the TypeScript protocol package.
 
-## Trust and limits
+## Trust model
 
-- The proving keys are development keys from one machine, not a multi-party ceremony; mainnet waits for one (`circuits/scripts/ceremony.mjs`, see [MAINNET.md](MAINNET.md)).
 - The matcher enclave sees requests and quotes in the clear; you trust OutLayer's attestation that it runs this repository's `matcher/` code.
 - The relayer can refuse to send a proof, but it cannot change a recipient, an amount or a fee.
 - Hushd's API stores and passes on sealed requests, quotes and deal-room messages; it cannot open them, but it sees IP addresses, timing and deal-room traffic.
 - The matcher client builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`), so it could leave a quote out and the enclave could not tell.
-- The keeper alone reports whether a hedge order filled, and the desk releases or slashes the maker's bond on that report.
-- A hedged deal's order trades for the maker's own Hyperliquid account (the per-deal Chain Signatures address is approved as the maker's agent), so it does not hedge the trader; hedged packages are experimental and none has filled on testnet.
-- The maker submits both legs after the trader hands over its proven one, so it has a last look until the deal expires; that costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse.
-- The full trust model is on [hushd.net/docs/threat-model](https://hushd.net/docs/threat-model).
+
+What each party sees and can do, including the makers and the keeper, is in the README's [privacy and security model](README.md#privacy-and-security-model), and the full trust model is on [hushd.net/docs/threat-model](https://hushd.net/docs/threat-model).

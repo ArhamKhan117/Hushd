@@ -26,7 +26,7 @@ export const PAGE_META: Record<string, PageMeta> = {
   "/docs": {
     description: "What Hushd is, what works today on testnet, and where to start.",
     keywords: ["intro", "what is hushd", "otc", "desk", "overview", "testnet"],
-    headings: ["What Hushd is", "What works today", "What it is not", "Where to start"],
+    headings: ["What Hushd is", "What works today", "Status and scope", "Where to start"],
   },
   "/docs/quickstart": {
     description: "Sign in, get test tokens, add them privately and ask the desk, in a few minutes.",

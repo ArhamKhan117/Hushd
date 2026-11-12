@@ -8,7 +8,7 @@ import { Spotlight } from "@/components/ui/Spotlight";
 export const metadata: Metadata = {
   title: "Security",
   description:
-    "Where Hushd's security stands: testnet only, development proving keys, not audited, no custody. What protects your notes, what each part is trusted with, and how to report a problem.",
+    "Where Hushd's security stands: testnet and mainnet-ready, an internal review and scans, reproducible builds, no custody. What protects your notes, what each part is trusted with, and how to report a problem.",
   alternates: { canonical: "/security" },
 };
 
@@ -19,8 +19,8 @@ const icon = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", "aria-
 /** Where it stands, as three cells on one hairline grid. */
 const STANDING: { title: string; body: string; icon: ReactNode }[] = [
   {
-    title: "Testnet only",
-    body: "Every contract runs on NEAR testnet, with test tokens that have no value.",
+    title: "Testnet now, mainnet‑ready",
+    body: "Every contract runs on NEAR testnet with test tokens, and the same code runs on mainnet after a proving-key ceremony, an external audit and a deploy.",
     icon: (
       <svg {...icon}>
         <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.3" />
@@ -39,8 +39,8 @@ const STANDING: { title: string; body: string; icon: ReactNode }[] = [
     ),
   },
   {
-    title: "Not audited",
-    body: "The contracts, circuits and services have tests and automated security scans, and every contract on testnet is a reproducible build anyone can rebuild from its commit, source-verified on NearBlocks. No external audit has been done.",
+    title: "Reviewed and scanned",
+    body: "The contracts, circuits and services have tests, an internal review and automated security scans, and every contract on testnet is a reproducible build anyone can rebuild from its commit, source-verified on NearBlocks. An external audit comes before mainnet.",
     icon: (
       <svg {...icon}>
         <path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3l7-2.8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -115,7 +115,7 @@ export default function SecurityPage() {
           GitHub
         </a>
         . If the problem could put someone at risk, write only that you found one and ask for a private way to share
-        it. Please do not post details until a fix is out. There is no paid bug bounty.
+        it. Please do not post details until a fix is out.
       </p>
 
       <h2>Testing rules</h2>
