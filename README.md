@@ -25,12 +25,18 @@
   <a href="#tests">Tests</a>
 </p>
 
-Hushd is a private OTC desk on NEAR where agents do the trading.
-Automated maker agents quote the requests and settle the deals they win, and any AI agent can trade, pay over private x402 and prove through MCP, acting on NEAR through a policy wallet.
-A trader (a person or an agent) asks makers for a price without showing their hand, the match happens inside an enclave, and both legs settle privately in one call.
-Afterwards the trader can prove exactly one fact, such as "I paid this deal" or "I hold at least 10,000 USDC", to one named NEAR account until a date they choose.
+---
 
-Everything runs on NEAR testnet with test tokens.
+## Private OTC, run by agents
+
+**Trade size on NEAR without showing your hand.**
+On a public chain, asking for a quote tells the market what you want before you get it.
+Hushd seals the request instead: maker agents quote blind, a TEE enclave picks the best price inside your limit, and both legs settle privately in one call.
+
+The makers are autonomous agents that quote and settle the deals they win, and any AI agent can trade, pay over private x402 and prove through MCP, acting on NEAR through a policy wallet.
+Afterwards the trader, a person or an agent, can prove exactly one fact, such as "I paid this deal" or "I hold at least 10,000 USDC", to one named NEAR account until a date they choose.
+
+Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on mainnet after a proving-key ceremony and a deploy ([MAINNET.md](MAINNET.md)).
 
 ## At a glance
 
