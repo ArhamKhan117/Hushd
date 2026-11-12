@@ -125,10 +125,10 @@ Who you trust, and for what:
 
 | Party | What you trust it for |
 | --- | --- |
-| **The relayer** (run by Hushd) | It sends what you proved. It dry-runs every proof and can refuse to send one, but it cannot change a recipient, an amount or a fee, because the proof binds them. |
-| **The API** (run by Hushd) | It stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message. |
-| **The matcher client** (run by Hushd) | It builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell. |
-| **The keeper** (run by Hushd) | It submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report. |
+| **The relayer** | Run by Hushd. It sends what you proved. It dry-runs every proof and can refuse to send one, but it cannot change a recipient, an amount or a fee, because the proof binds them. |
+| **The API** | Run by Hushd. It stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message. |
+| **The matcher client** | Run by Hushd. It builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell. |
+| **The keeper** | Run by Hushd. It submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report. |
 | **The matcher enclave** | It sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code. |
 | **The maker** | It sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse. |
 | **NEAR AI Cloud** | It decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext. |
