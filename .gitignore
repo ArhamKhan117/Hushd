@@ -59,3 +59,6 @@ next-env.d.ts
 
 # service runtime data (makers' encrypted notes, x402 replay lists)
 services/data/
+
+# Demo video studio (local only)
+/tools/demo-studio/

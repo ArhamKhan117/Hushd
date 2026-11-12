@@ -197,8 +197,8 @@ const MCP_TOOLS = [
 const MCP_CONFIG = `{
   "mcpServers": {
     "hushd": {
-      "command": "pnpm",
-      "args": ["--silent", "--dir", "/path/to/hushd", "mcp"],
+      "command": "npx",
+      "args": ["-y", "@hushd/mcp"],
       "env": {
         "HUSHD_LIMIT_PER_PAYMENT": "USDC=100,wNEAR=50",
         "HUSHD_LIMIT_PER_DAY": "USDC=500,wNEAR=250"
@@ -309,7 +309,11 @@ export default function SdkPage() {
 
                 <div style={rise(4)} className="hd-glass hd-sheen pg-rise relative z-10 w-full p-2 lg:max-w-[460px] lg:justify-self-end">
                   <div className="rounded-[12px] bg-panel p-4 sm:p-5">
-                    <p className="text-[13px] text-mute">Get the code</p>
+                    <p className="text-[13px] text-mute">Install it from npm</p>
+                    <div className="mt-2.5">
+                      <CopyCommand command="npm install @hushd/sdk" />
+                    </div>
+                    <p className="mt-5 text-[13px] text-mute">Or get the code</p>
                     <a
                       href={GITHUB}
                       target="_blank"
@@ -319,10 +323,6 @@ export default function SdkPage() {
                       <span className="min-w-0 [overflow-wrap:anywhere]">github.com/ArhamKhan117/Hushd</span>
                       <ArrowUpRight className="text-mute" />
                     </a>
-                    <p className="mt-5 text-[13px] text-mute">Then, in a clone of it</p>
-                    <div className="mt-2.5">
-                      <CopyCommand command="pnpm install" />
-                    </div>
                     <div className="mt-5 flex flex-wrap gap-1.5">
                       {["TypeScript", "Browser and Node", "Open source, MIT"].map((t) => (
                         <span key={t} className="pg-tag">

@@ -130,10 +130,14 @@ export default function SdkDocsPage() {
       ]}
     >
       <h2 id="install">Install</h2>
+      <pre>
+        <code className="language-bash">{`npm install @hushd/sdk`}</code>
+      </pre>
       <p>
-        The SDK lives in the repo as <code>packages/sdk</code> and ships as TypeScript source (ES modules). Inside the
-        monorepo, depend on it with <code>&quot;@hushd/sdk&quot;: &quot;workspace:*&quot;</code>. Node-only helpers,
-        an encrypted note file and cached proving artifacts, are in <code>@hushd/sdk/node</code>.
+        <a href="https://www.npmjs.com/package/@hushd/sdk">@hushd/sdk</a> on npm is compiled ES modules with types; its
+        source is <code>packages/sdk</code> in the repo, and inside the monorepo you depend on it with{" "}
+        <code>&quot;@hushd/sdk&quot;: &quot;workspace:*&quot;</code>. Node-only helpers, an encrypted note file and
+        cached proving artifacts, are in <code>@hushd/sdk/node</code>.
       </p>
       <p>
         Call <code>loadPoseidon()</code> once before anything that hashes: identities, notes and proofs all use it.

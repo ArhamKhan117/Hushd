@@ -55,14 +55,13 @@ const FOUR = [
   },
 ];
 
-const ENV = `# from a checkout of the repo
-pnpm install
-pnpm mcp init   # a new agent seed in ~/.hushd/seed (mode 600)
+const ENV = `# @hushd/mcp from npm, nothing to clone
+npx -y @hushd/mcp init   # a new agent seed in ~/.hushd/seed (mode 600)
 
 claude mcp add hushd \\
   -e HUSHD_LIMIT_PER_PAYMENT="USDC=100,wNEAR=50" \\
   -e HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250" \\
-  -- pnpm --silent --dir "$PWD" mcp`;
+  -- npx -y @hushd/mcp`;
 
 const TRADE = `{
   "name": "hushd_trade",

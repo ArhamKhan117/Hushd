@@ -79,24 +79,25 @@ export default function AgentsDocsPage() {
       </ul>
 
       <h2 id="local-server">Run it locally</h2>
-      <p>From a checkout of the repo:</p>
+      <p>
+        The server is <a href="https://www.npmjs.com/package/@hushd/mcp">@hushd/mcp</a> on npm (Node 22 or newer); <code>npx</code> fetches it:
+      </p>
       <pre>
-        <code className="language-bash">{`pnpm install
-pnpm mcp init   # writes a new agent seed to ~/.hushd/seed (mode 600)
+        <code className="language-bash">{`npx -y @hushd/mcp init   # a new agent seed in ~/.hushd/seed (mode 600)
 
-# Claude Code: the agent's own wallet, inside its limits
+# the agent's own wallet, inside its limits
 claude mcp add hushd \\
   -e HUSHD_LIMIT_PER_PAYMENT="USDC=100,wNEAR=50" \\
   -e HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250" \\
-  -- pnpm --silent --dir "$PWD" mcp`}</code>
+  -- npx -y @hushd/mcp`}</code>
       </pre>
       <p>Any other MCP client takes the same command:</p>
       <pre>
         <code className="language-json">{`{
   "mcpServers": {
     "hushd": {
-      "command": "pnpm",
-      "args": ["--silent", "--dir", "/path/to/hushd", "mcp"],
+      "command": "npx",
+      "args": ["-y", "@hushd/mcp"],
       "env": {
         "HUSHD_LIMIT_PER_PAYMENT": "USDC=100,wNEAR=50",
         "HUSHD_LIMIT_PER_DAY": "USDC=500,wNEAR=250"
@@ -106,8 +107,7 @@ claude mcp add hushd \\
 }`}</code>
       </pre>
       <p>
-        The server is the <code>@hushd/mcp</code> package in the repo (<code>packages/mcp</code>), which is not
-        published on npm, so it runs from a checkout of the repo. With no seed it starts anyway
+        Its source is <code>packages/mcp</code> in the repo, and <code>pnpm --silent mcp</code> runs it from a checkout. With no seed it starts anyway
         and serves the read tools only. To fund the agent, give it a <a href="#policy-wallets">policy wallet</a> (or a NEAR
         account with its own key) and use <code>hushd_faucet</code> then <code>hushd_shield</code>, or pay its{" "}
         <code>hushd1</code> address from your own private balance.

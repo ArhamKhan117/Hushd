@@ -21,15 +21,14 @@ const LABELS: WalletLabel[] = Object.entries(record?.policyWallets ?? {})
     label: prefix === "DEMO_AGENT" ? "Demo agent" : /^MAKER_[A-Z]$/.test(prefix) ? `Maker ${prefix.slice(-1)}` : prefix.charAt(0) + prefix.slice(1).toLowerCase().replace(/_/g, " "),
   }));
 
-const LOCAL = `# from a checkout of this repo
-pnpm install
-pnpm mcp init        # writes a new agent seed to ~/.hushd/seed (mode 600)
+const LOCAL = `# @hushd/mcp from npm, nothing to clone
+npx -y @hushd/mcp init   # writes a new agent seed to ~/.hushd/seed (mode 600)
 
 # Claude Code: the agent's own wallet, inside its limits
 claude mcp add hushd \\
   -e HUSHD_LIMIT_PER_PAYMENT="USDC=100,wNEAR=50" \\
   -e HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250" \\
-  -- pnpm --silent --dir "$PWD" mcp`;
+  -- npx -y @hushd/mcp`;
 
 const HOSTED = `# read-only: status, makers, deals, proof checks
 claude mcp add --transport http hushd-read https://hushd.net/mcp`;
