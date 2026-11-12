@@ -34,7 +34,7 @@ Everything runs on NEAR testnet with test tokens.
 
 ## At a glance
 
-| | |
+| Area | In short |
 | --- | --- |
 | **What** | A private OTC desk on NEAR, run by agents: sealed requests, matched inside a TEE, both legs settled privately in one call |
 | **Live** | App at [hushd.net](https://hushd.net), API at [api.hushd.net](https://api.hushd.net/health), contracts on NEAR testnet |
