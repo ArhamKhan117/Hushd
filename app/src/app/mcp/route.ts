@@ -1,7 +1,7 @@
 /**
  * The hosted Hushd MCP server (Streamable HTTP, stateless): read tools only. It holds
- * no keys; an agent that pays or trades runs the MCP server from a checkout of the repo
- * (`pnpm mcp`) with its own seed. Its instructions name only the tools it serves, and a
+ * no keys; an agent that pays or trades runs @hushd/mcp from npm (`npx -y @hushd/mcp`)
+ * with its own seed. Its instructions name only the tools it serves, and a
  * plain GET (a browser, curl) gets a short note on how to connect instead of a 406.
  */
 import { registerReadTools } from "@hushd/mcp";
@@ -19,7 +19,7 @@ const READ_TOOLS = ["hushd_status", "hushd_makers", "hushd_desk_deals", "hushd_d
 const INSTRUCTIONS = `Hushd is a private OTC desk on NEAR ${NETWORK.id}: money sits in a shielded pool as notes only their owner can spend, maker agents quote sealed requests, and both legs of a deal settle privately in one call.
 This hosted server holds no keys and serves read tools only: ${READ_TOOLS.join(", ")}.
 Use them to read the pool and the desk, list the makers, read deals and their receipts, and check a hushdproof1 proof.
-To pay, trade, cash out or prove for an agent, run the Hushd MCP server next to it with its own seed and spending limits (pnpm mcp, from a checkout of https://github.com/ArhamKhan117/Hushd); see https://hushd.net/docs/agents.`;
+To pay, trade, cash out or prove for an agent, run the Hushd MCP server next to it with its own seed and spending limits: it is @hushd/mcp on npm ("npx -y @hushd/mcp init", then "npx -y @hushd/mcp" as a stdio server), 22 tools in all; see https://hushd.net/docs/agents.`;
 
 const vkeys = new Map<string, unknown>();
 
@@ -69,7 +69,10 @@ a { color: var(--fg); text-underline-offset: 3px; }
 <ul>${READ_TOOLS.map((t) => `<li><code>${t}</code></li>`).join("")}</ul>
 <p>Add it to an MCP client as a Streamable HTTP server at this URL. In Claude Code:</p>
 <pre>claude mcp add --transport http <span class="nw">hushd-read</span> <span class="nw">${u}</span></pre>
-<p>To pay, trade and prove for an agent, run the Hushd MCP server next to it with its own seed and spending limits. <a href="/docs/agents">Agents and MCP</a> shows how.</p>
+<p>To pay, trade and prove for an agent, run the full server next to it with its own seed and spending limits. It is <a href="https://www.npmjs.com/package/@hushd/mcp">@hushd/mcp</a> on npm, with 22 tools:</p>
+<pre>npx -y @hushd/mcp init
+claude mcp add hushd -- npx -y @hushd/mcp</pre>
+<p><a href="/docs/agents">Agents and MCP</a> covers spending limits and every tool.</p>
 </main>
 </body>
 </html>`;

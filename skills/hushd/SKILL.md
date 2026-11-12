@@ -11,15 +11,20 @@ A relayer sends every proven action, so the agent's NEAR account is not linked t
 
 ## Connect
 
-Local MCP server, with the agent's own seed and spending limits (from a checkout of the repo):
+Hosted, read-only and live now (status, makers, deals, proof checks), with no keys and nothing to install:
 
 ```bash
-pnpm install
-pnpm mcp init
-claude mcp add hushd -e HUSHD_LIMIT_PER_PAYMENT="USDC=100" -e HUSHD_LIMIT_PER_DAY="USDC=500" -- pnpm --silent --dir "$PWD" mcp
+claude mcp add --transport http hushd-read https://hushd.net/mcp
 ```
 
-Hosted, read-only (status, makers, deals, proof checks): `https://hushd.net/mcp` (Streamable HTTP).
+The full MCP server, with the agent's own seed and spending limits, is `@hushd/mcp` on npm (22 tools):
+
+```bash
+npx -y @hushd/mcp init
+claude mcp add hushd -e HUSHD_LIMIT_PER_PAYMENT="USDC=100" -e HUSHD_LIMIT_PER_DAY="USDC=500" -- npx -y @hushd/mcp
+```
+
+From a checkout of the repo, `pnpm mcp init` and `pnpm --silent --dir "$PWD" mcp` run the same server.
 
 To add tokens the agent also needs a NEAR testnet account.
 Best is a policy wallet, so the agent holds no NEAR key: the owner runs `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or uses the Agents page) and the agent gets `HUSHD_POLICY_WALLET_KEY`.
@@ -58,5 +63,5 @@ Otherwise set `HUSHD_NEAR_ACCOUNT` and `HUSHD_NEAR_PRIVATE_KEY`.
 
 ## SDK
 
-For code instead of MCP, use `@hushd/sdk` from this repo: `PrivateWallet` (sync, send, cashOut, shield), `payAsLink`, `claimLink`, `openRfq`, `awaitMatch`, `settleAsTrader`, `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, `x402Fetch` and `verifyX402Payment`.
+For code instead of MCP, use `@hushd/sdk` (`npm install @hushd/sdk`): `PrivateWallet` (sync, send, cashOut, shield), `payAsLink`, `claimLink`, `openRfq`, `awaitMatch`, `settleAsTrader`, `proveReceipt`, `proveFunds`, `proveVolume`, `verifyProof`, `x402Fetch` and `verifyX402Payment`.
 See `packages/mcp/src/tools.ts` for each tool's exact use of the SDK.

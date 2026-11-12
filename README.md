@@ -43,11 +43,11 @@ Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on 
 | Area | In short |
 | --- | --- |
 | **What** | A private OTC desk on NEAR, run by agents: sealed requests, matched inside a TEE, both legs settled privately in one call |
-| **Live** | App at [hushd.net](https://hushd.net), API at [api.hushd.net](https://api.hushd.net/health), contracts on NEAR testnet |
+| **Live** | App at [hushd.net](https://hushd.net), API at [api.hushd.net](https://api.hushd.net/health), MCP server at [`https://hushd.net/mcp`](https://hushd.net/mcp), contracts on NEAR testnet |
 | **Contracts** | `pool`, `desk`, `board` and three test tokens: reproducible builds, [source-verified on NearBlocks](#contracts) |
 | **Privacy** | Notes in a shielded pool, Groth16 proofs checked on chain with `alt_bn128`, and proofs of one fact for one named reader until an expiry |
 | **Matching** | An OutLayer TEE enclave, pinned by the desk to one build behind a 24-hour timelock; deal amounts stay out of the public terms hash |
-| **Agents** | Three maker agents acting through OutLayer policy wallets; an MCP server with 22 tools and spending limits; private x402; NEAR Intents trades |
+| **Agents** | Three maker agents acting through OutLayer policy wallets; an MCP server with 22 tools and spending limits (`npx -y @hushd/mcp`), plus a hosted read-only one live at `hushd.net/mcp`; private x402; NEAR Intents trades |
 | **Packages** | [`@hushd/sdk`](https://www.npmjs.com/package/@hushd/sdk), [`@hushd/protocol`](https://www.npmjs.com/package/@hushd/protocol) and [`@hushd/mcp`](https://www.npmjs.com/package/@hushd/mcp) on npm |
 | **Check it** | `pnpm verify` checks every claim in this README against the live deployment and prints PASS or FAIL |
 
@@ -56,7 +56,7 @@ Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on 
 - **The desk:** [hushd.net/app](https://hushd.net/app). Sign in with a NEAR wallet or a passkey, take test tokens from the faucet, add them privately, then ask the desk in your own words or with the form.
 - **The trading screen:** [hushd.net/app/trade](https://hushd.net/app/trade). Live Hyperliquid prices for each pair the desk trades, a ticket that seals the request, the makers and their bonds, a payoff chart of what you hold, and your requests, deals, hedge legs and receipts below.
 - **Check a proof:** [hushd.net/verify](https://hushd.net/verify). Two real ones made for `judge.testnet` are in `deployments/` (a payment that settled desk deal #2, and funds held).
-- **Agents:** connect the hosted, read-only MCP server at `https://hushd.net/mcp`, or run your own with a seed and spending limits (see [Agents](#agents)).
+- **Agents, live now:** the hosted MCP server at `https://hushd.net/mcp` answers any MCP client, with no keys and no sign-up: `claude mcp add --transport http hushd-read https://hushd.net/mcp`. Its five read tools read the pool, the desk, the makers and deals, and check proofs. For all 22 tools (a private balance, payments, trades and proofs, inside spending limits), run `npx -y @hushd/mcp` with the agent's own seed (see [Agents](#agents)).
 - **The live claims, checked:** `pnpm verify` checks the deployment against this README (contracts, their code and the commit each was built from, the enclave key, bonded makers, settled deals, the services and the indexer, the agents' policy wallets, a two-agent trade's signatures, keys and nonces checked by `intents.near`'s simulation on mainnet, the intake attestation and a signed intake answer, private x402, the hosted MCP and an on-chain proof check) and prints PASS or FAIL for each.
 
 ## What you can do
@@ -144,7 +144,16 @@ The contracts have had an internal review and automated scans, with every findin
 
 ## Agents
 
-From npm, with no clone:
+**Live, hosted, read-only:** `https://hushd.net/mcp` (Streamable HTTP, stateless, no keys). Connect it with nothing installed:
+
+```bash
+claude mcp add --transport http hushd-read https://hushd.net/mcp
+curl https://hushd.net/mcp          # what it is and its tools, as JSON
+```
+
+It serves `hushd_status`, `hushd_makers`, `hushd_desk_deals`, `hushd_deal` and `hushd_verify_proof` against the live testnet contracts, and `pnpm verify` calls it on every run.
+
+**The full server, with the agent's own seed and spending limits,** is [`@hushd/mcp`](https://www.npmjs.com/package/@hushd/mcp) on npm, with no clone:
 
 ```bash
 npx -y @hushd/mcp init              # a new agent seed in ~/.hushd/seed (mode 600)
@@ -174,7 +183,6 @@ claude mcp add hushd \
 - 22 tools: balance and address, faucet and shield, send and cash out, claim links (pay, claim, list, take back), `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
 - The limits run in the local MCP process beside the seed and are the only guard on the private balance; the relayer does not enforce them. `hushd_pay_x402` obeys the payee list and expiry, and `hushd_trade` requires `min_receive`.
 - A policy wallet instead of a NEAR key: `pnpm --filter @hushd/services policy-wallet create MY_AGENT` (or the Agents page) stores the policy from the owner's account, then the agent gets `HUSHD_POLICY_WALLET_KEY`. The TEE enforces which contracts it may call and the NEAR it may attach; this server adds token limits, `HUSHD_LIMITS_EXPIRE` and `HUSHD_ALLOW_TO` (payees), and refuses to spend while the wallet is frozen.
-- Read-only, hosted: `claude mcp add --transport http hushd-read https://hushd.net/mcp`.
 - Private x402: a resource answers 402 with scheme `hushd`; the agent pays a private note to the resource's `hushd1...` address and sends the note's opening sealed to it; the server checks the pool created exactly that note. The reference makers sell indicative quotes this way.
 - NEAR's Agent Market: [`deploy/agent-market/`](deploy/agent-market/) holds Hushd's listing, a "price check" agent (`services/src/market-agent.ts`) that answers a hire with the live NEAR Intents quote, the Hyperliquid mid and the quotes of Hushd's makers, paying each maker over private x402. `pnpm --filter @hushd/services exec tsx scripts/market-listing.ts --try "sell 2500 USDC for NEAR"` runs one check. The listing is live as [`hushd` on the Agent Market](https://hushd.market.near.ai/.well-known/agent-card.json), answered by the `market` service.
 - An agent skill for coding agents lives at [`skills/hushd/SKILL.md`](skills/hushd/SKILL.md), and [`llms.txt`](https://hushd.net/llms.txt) maps the site.

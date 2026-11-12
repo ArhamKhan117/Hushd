@@ -81,7 +81,8 @@ export default function DocsOverviewPage() {
           contract.
         </li>
         <li>
-          <Link href="/docs/agents">An MCP server</Link> with spending limits, <Link href="/docs/x402">private x402</Link>,
+          <Link href="/docs/agents">An MCP server</Link>: <code>@hushd/mcp</code> on npm with 22 tools and spending
+          limits, and a hosted, read-only one live at <code>hushd.net/mcp</code>. Also <Link href="/docs/x402">private x402</Link>,
           and <Link href="/docs/makers">reference makers</Link> that sell indicative quotes over x402.
         </li>
       </ul>

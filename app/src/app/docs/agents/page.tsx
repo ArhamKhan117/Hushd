@@ -36,7 +36,7 @@ const TOOLS: [string, string, string][] = [
 ];
 
 const ENV: [string, string][] = [
-  ["HUSHD_SEED", "The agent's seed, 64 hex. Without it, the file `pnpm mcp init` wrote"],
+  ["HUSHD_SEED", "The agent's seed, 64 hex. Without it, the file `npx -y @hushd/mcp init` wrote"],
   ["HUSHD_HOME", "Where the seed, notes and spending ledger live (default ~/.hushd)"],
   ["HUSHD_LIMIT_PER_PAYMENT", "Caps per payment, per token, e.g. USDC=100,wNEAR=50"],
   ["HUSHD_LIMIT_PER_DAY", "Caps per UTC day, per token, e.g. USDC=500,wNEAR=250"],
@@ -61,7 +61,7 @@ export default function AgentsDocsPage() {
       lede="Give an agent a private balance and a seat at the desk. It pays, trades and proves through MCP, and never spends past the limits you set."
       glance={[
         { label: "Local", value: "Own seed, all tools" },
-        { label: "Hosted", value: "hushd.net/mcp, read-only" },
+        { label: "Hosted", value: "hushd.net/mcp, live" },
         { label: "Transport", value: "stdio, Streamable HTTP" },
       ]}
     >
@@ -73,8 +73,9 @@ export default function AgentsDocsPage() {
           This is how an agent pays, trades and proves.
         </li>
         <li>
-          <strong>Hosted, read-only.</strong> <code>https://hushd.net/mcp</code> speaks Streamable HTTP and runs only
-          the read tools. It holds no keys and cannot move anything.
+          <strong>Hosted, read-only, live now.</strong> <code>https://hushd.net/mcp</code> speaks Streamable HTTP and
+          runs only the read tools, against the live testnet contracts. It holds no keys, cannot move anything and
+          needs no sign-up, so any agent can connect to it in one line.
         </li>
       </ul>
 
@@ -114,12 +115,27 @@ claude mcp add hushd \\
       </p>
 
       <h2 id="hosted-server">The hosted, read-only server</h2>
+      <p>
+        It is live at <code>https://hushd.net/mcp</code>, served by the same deployment as this site. Connect it with
+        nothing installed:
+      </p>
       <pre>
         <code className="language-bash">{`claude mcp add --transport http hushd-read https://hushd.net/mcp`}</code>
       </pre>
+      <p>In a client that takes a URL, add it as a Streamable HTTP server:</p>
+      <pre>
+        <code className="language-json">{`{
+  "mcpServers": {
+    "hushd-read": { "type": "http", "url": "https://hushd.net/mcp" }
+  }
+}`}</code>
+      </pre>
       <p>
-        In a client that takes a URL, add <code>https://hushd.net/mcp</code> as a Streamable HTTP server. It is
-        stateless and answers the five read tools below, against NEAR testnet.
+        It is stateless and answers the five read tools below, against NEAR testnet: the pool and the desk, the
+        makers, deals and their receipts, and proof checks (<code>hushd_verify_proof</code> checks a{" "}
+        <code>hushdproof1</code> string in full, including in the pool contract). A plain <code>GET</code>, from{" "}
+        <code>curl</code> or a browser, describes the server and its tools. <code>pnpm verify</code> calls it on
+        every run.
       </p>
 
       <h2 id="tools">Tools</h2>

@@ -33,15 +33,15 @@ Sanctions screening: public addresses only (the NEAR account a deposit comes fro
 - [Agents and MCP](https://hushd.net/docs/agents): tools, local and hosted setup, spending limits (HUSHD_LIMIT_PER_PAYMENT, HUSHD_LIMIT_PER_DAY)
 - [Private x402](https://hushd.net/docs/x402): scheme "hushd", the X-PAYMENT header, server-side checks
 - [Makers](https://hushd.net/docs/makers): reference makers, pricing, quoting, bonds, running one
-- [SDK](https://hushd.net/docs/sdk): @hushd/sdk exports and examples, including claim links (payAsLink, checkLink, claimLink, takeBackLink)
+- [SDK](https://hushd.net/docs/sdk): @hushd/sdk on npm (`npm install @hushd/sdk`), its exports and examples, including claim links (payAsLink, checkLink, claimLink, takeBackLink)
 - [Privacy model](https://hushd.net/docs/privacy-model): who sees what, what can leak, who you trust
 - [Security and threat model](https://hushd.net/docs/threat-model)
 - [Contracts](https://hushd.net/docs/contracts): accounts, methods and NEP-297 events
 
 ## MCP
 
-- Hosted, read-only: https://hushd.net/mcp (Streamable HTTP, stateless). 5 read tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
-- Local, with an agent's own seed and spending limits: the @hushd/mcp package (packages/mcp). From a checkout: `pnpm install`, `pnpm mcp init`, then run `pnpm --silent --dir <repo> mcp` as a stdio MCP server. 22 tools in all: the 5 read tools and 17 wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_policy, hushd_faucet, hushd_shield, hushd_send, hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
+- Hosted, read-only, live: https://hushd.net/mcp (Streamable HTTP, stateless, no sign-up; `claude mcp add --transport http hushd-read https://hushd.net/mcp`). 5 read tools: hushd_status, hushd_makers, hushd_desk_deals, hushd_deal, hushd_verify_proof. Holds no keys.
+- Local, with an agent's own seed and spending limits: the @hushd/mcp package on npm (https://www.npmjs.com/package/@hushd/mcp). Run `npx -y @hushd/mcp init`, then `npx -y @hushd/mcp` as a stdio MCP server (from a checkout: `pnpm mcp init`, `pnpm --silent --dir <repo> mcp`). 22 tools in all: the 5 read tools and 17 wallet tools: hushd_address, hushd_balance, hushd_limits, hushd_policy, hushd_faucet, hushd_shield, hushd_send, hushd_pay_link, hushd_claim_link, hushd_my_links, hushd_take_back_link, hushd_cash_out, hushd_trade, hushd_my_deals, hushd_my_payments, hushd_prove, hushd_pay_x402.
 
 ## Contracts (NEAR testnet)
 
