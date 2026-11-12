@@ -4,12 +4,46 @@
   <img src="assets/readme/hero-dark.png" alt="Hushd: private OTC on NEAR, run by agents" width="960">
 </picture>
 
+<p align="center">
+  <a href="https://hushd.net"><img alt="Live at hushd.net" src="https://img.shields.io/badge/live-hushd.net-4a5260?style=flat-square&labelColor=131316"></a>
+  <a href="https://testnet.nearblocks.io/address/desk.hushd.testnet"><img alt="Network: NEAR testnet" src="https://img.shields.io/badge/NEAR-testnet-4a5260?style=flat-square&labelColor=131316"></a>
+  <a href="#contracts"><img alt="Contracts: source verified on NearBlocks" src="https://img.shields.io/badge/contracts-source%20verified-4a5260?style=flat-square&labelColor=131316"></a>
+  <a href="https://www.npmjs.com/package/@hushd/sdk"><img alt="@hushd/sdk on npm" src="https://img.shields.io/npm/v/%40hushd%2Fsdk?label=%40hushd%2Fsdk&style=flat-square&color=4a5260&labelColor=131316"></a>
+  <a href="https://www.npmjs.com/package/@hushd/mcp"><img alt="@hushd/mcp on npm" src="https://img.shields.io/npm/v/%40hushd%2Fmcp?label=%40hushd%2Fmcp&style=flat-square&color=4a5260&labelColor=131316"></a>
+  <a href="https://github.com/ArhamKhan117/Hushd/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/ArhamKhan117/Hushd?style=flat-square&color=4a5260&labelColor=131316"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-4a5260?style=flat-square&labelColor=131316"></a>
+</p>
+
+<p align="center">
+  <a href="#try-it">Try it</a> ·
+  <a href="#how-a-deal-works">How a deal works</a> ·
+  <a href="#only-on-near">Only on NEAR</a> ·
+  <a href="#contracts">Contracts</a> ·
+  <a href="#privacy-and-security-model">Privacy and security</a> ·
+  <a href="#agents">Agents</a> ·
+  <a href="#run-it">Run it</a> ·
+  <a href="#tests">Tests</a>
+</p>
+
 Hushd is a private OTC desk on NEAR where agents do the trading.
 Automated maker agents quote the requests and settle the deals they win, and any AI agent can trade, pay over private x402 and prove through MCP, acting on NEAR through a policy wallet.
 A trader (a person or an agent) asks makers for a price without showing their hand, the match happens inside an enclave, and both legs settle privately in one call.
 Afterwards the trader can prove exactly one fact, such as "I paid this deal" or "I hold at least 10,000 USDC", to one named NEAR account until a date they choose.
 
 Everything runs on NEAR testnet with test tokens.
+
+## At a glance
+
+| | |
+| --- | --- |
+| **What** | A private OTC desk on NEAR, run by agents: sealed requests, matched inside a TEE, both legs settled privately in one call |
+| **Live** | App at [hushd.net](https://hushd.net), API at [api.hushd.net](https://api.hushd.net/health), contracts on NEAR testnet |
+| **Contracts** | `pool`, `desk`, `board` and three test tokens: reproducible builds, [source-verified on NearBlocks](#contracts) |
+| **Privacy** | Notes in a shielded pool, Groth16 proofs checked on chain with `alt_bn128`, and proofs of one fact for one named reader until an expiry |
+| **Matching** | An OutLayer TEE enclave, pinned by the desk to one build behind a 24-hour timelock; deal amounts stay out of the public terms hash |
+| **Agents** | Three maker agents acting through OutLayer policy wallets; an MCP server with 22 tools and spending limits; private x402; NEAR Intents trades |
+| **Packages** | [`@hushd/sdk`](https://www.npmjs.com/package/@hushd/sdk), [`@hushd/protocol`](https://www.npmjs.com/package/@hushd/protocol) and [`@hushd/mcp`](https://www.npmjs.com/package/@hushd/mcp) on npm |
+| **Check it** | `pnpm verify` checks every claim in this README against the live deployment and prints PASS or FAIL |
 
 ## Try it
 
@@ -89,17 +123,31 @@ Sanctions screening covers public addresses only: the NEAR account a deposit com
 
 Who you trust, and for what:
 
-- **The relayer** (run by Hushd) sends what you proved. It dry-runs every proof and can refuse to send one, but it cannot change a recipient, an amount or a fee, because the proof binds them.
-- **The API** (run by Hushd) stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message.
-- **The matcher client** (run by Hushd) builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell.
-- **The keeper** (run by Hushd) submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report.
-- **The matcher enclave** sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code.
-- **The maker** sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse.
-- **NEAR AI Cloud** decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext.
+| Party | What you trust it for |
+| --- | --- |
+| **The relayer** (run by Hushd) | It sends what you proved. It dry-runs every proof and can refuse to send one, but it cannot change a recipient, an amount or a fee, because the proof binds them. |
+| **The API** (run by Hushd) | It stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message. |
+| **The matcher client** (run by Hushd) | It builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell. |
+| **The keeper** (run by Hushd) | It submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report. |
+| **The matcher enclave** | It sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code. |
+| **The maker** | It sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse. |
+| **NEAR AI Cloud** | It decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext. |
 
 Limits: testnet only; the proving keys are development keys from one machine, not a multi-party ceremony; the contracts have had an internal review and automated scans ([SECURITY.md](SECURITY.md)), not an external audit.
 
 ## Agents
+
+From npm, with no clone:
+
+```bash
+npx -y @hushd/mcp init              # a new agent seed in ~/.hushd/seed (mode 600)
+claude mcp add hushd \
+  -e HUSHD_LIMIT_PER_PAYMENT="USDC=100,wNEAR=50" \
+  -e HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250" \
+  -- npx -y @hushd/mcp
+```
+
+Or from this repository:
 
 ```bash
 pnpm install
@@ -109,6 +157,12 @@ claude mcp add hushd \
   -e HUSHD_LIMIT_PER_DAY="USDC=500,wNEAR=250" \
   -- pnpm --silent --dir "$PWD" mcp
 ```
+
+| Package | What it is |
+| --- | --- |
+| [`@hushd/mcp`](https://www.npmjs.com/package/@hushd/mcp) | The MCP server: a private balance, payments, claim links, private x402, the desk and proofs, inside spending limits |
+| [`@hushd/sdk`](https://www.npmjs.com/package/@hushd/sdk) | The TypeScript SDK the app, the MCP server and the makers use: the private wallet, desk flows, proofs, NEAR Intents and policy wallets |
+| [`@hushd/protocol`](https://www.npmjs.com/package/@hushd/protocol) | Package terms, exact integer math and the canonical bytes makers and the enclave sign |
 
 - 22 tools: balance and address, faucet and shield, send and cash out, claim links (pay, claim, list, take back), `hushd_trade`, `hushd_prove`, `hushd_pay_x402`, limits, `hushd_policy`, deals and payments, and the read tools.
 - The limits run in the local MCP process beside the seed and are the only guard on the private balance; the relayer does not enforce them. `hushd_pay_x402` obeys the payee list and expiry, and `hushd_trade` requires `min_receive`.
@@ -154,7 +208,7 @@ The contract sandbox tests run the whole flow on a local nearcore: build the was
 
 | Check | What it looks at |
 | --- | --- |
-| [near-scan](contracts/tools/near-scan) | 22 NEAR detector classes (the checklist BlockSec's Rustle reports) on the parsed contract source; each of its 70 hits has a written reason, listed in [security/near-scan.md](security/near-scan.md) |
+| [near-scan](contracts/tools/near-scan) | 22 NEAR detector classes (the checklist BlockSec's Rustle reports) on the parsed contract source; each of its 71 hits has a written reason, listed in [security/near-scan.md](security/near-scan.md) |
 | cargo audit, cargo deny | RustSec advisories, licenses and crate sources for the contracts and the matcher enclave |
 | Clippy | Rust lints, warnings as errors |
 | pnpm audit | npm advisories in the production JavaScript dependencies |
