@@ -1,6 +1,6 @@
 {
   "name": "@hushd/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hushd MCP server: a private balance, private payments, private x402 and the OTC desk for AI agents on NEAR, with spending limits.",
   "author": "Arham Khan",
   "license": "MIT",

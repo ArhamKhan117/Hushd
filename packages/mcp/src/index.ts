@@ -16,7 +16,7 @@ Pay someone not on Hushd yet with hushd_pay_link (a claim link they open), and c
 Trade with hushd_trade, always with a min_receive worked out from a fair price; prove a payment, funds or volume to one named reader with hushd_prove.`;
 
 export function createServer(opts: { net: HushdNetwork; vkey: (kind: ProofKind) => Promise<unknown>; agent?: Agent; verifyBase?: string; appUrl?: string }) {
-  const server = new McpServer({ name: "hushd", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "hushd", version: "0.1.1" }, { instructions: INSTRUCTIONS });
   registerReadTools(server, opts.net, opts.vkey);
   if (opts.agent) registerWalletTools(server, opts.agent, { verifyBase: opts.verifyBase ?? "https://hushd.net/verify", appUrl: opts.appUrl ?? "https://hushd.net" });
   return server;

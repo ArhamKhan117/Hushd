@@ -1,6 +1,6 @@
 {
   "name": "@hushd/protocol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hushd package protocol: typed OTC packages, quotes and receipts, exact integer math and the canonical bytes makers and the matcher enclave sign.",
   "author": "Arham Khan",
   "license": "MIT",
