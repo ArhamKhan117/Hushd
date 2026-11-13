@@ -89,7 +89,7 @@ Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on 
 | What | Where you see it |
 | --- | --- |
 | Groth16 proofs verified on chain with NEAR's `alt_bn128` host functions (a proof check is about 36 Tgas; a private send's pool call about 90, a two-leg settlement about 125) | Every private send, cash out and settlement; `/verify` asks the pool to check a proof again |
-| Chain Signatures sign each deal's Hyperliquid order from its own derivation path | A deal page's hedge row |
+| Chain Signatures sign each deal's Hyperliquid order from its own derivation path | A deal page's hedge row: [deal 122](https://hushd.net/app/deals/122), whose order filled on Hyperliquid testnet |
 | OutLayer runs the matcher in a TEE, with on-chain yield and resume for the desk's enclave key | Makers page, "The matcher" |
 | NEAR AI Cloud verifiable private inference, attestation checked with `@nearai/inference-sdk` | Desk, "Describe it" |
 | Named accounts as proof readers: a proof is for `auditor.testnet`, not for a key | Prove page, "Who may read it" |

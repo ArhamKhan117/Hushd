@@ -87,7 +87,8 @@ export default function MakersDocsPage() {
         their own Hyperliquid account, as an immediate-or-cancel order with a limit of 99% of the mid, a ten-minute
         deadline, and a bond of a tenth of the trade&apos;s value, rounded up to the desk&apos;s next bond step
         (<code>min_bond</code>, 1,000 USDC, times 1, 2, 5, 10, 20 and so on). They quote a hedged package only when
-        their Hyperliquid testnet account holds the margin for it; none does yet, so no hedge has filled on testnet.
+        their Hyperliquid testnet account holds the margin for it. All three hold some, and hedges fill on testnet:
+        see <AppLink href="/app/deals/122">deal 122</AppLink>, a 562.7 NEAR short filled on Hyperliquid testnet.
       </p>
 
       <h2 id="quoting">Quoting</h2>
