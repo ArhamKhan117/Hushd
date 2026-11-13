@@ -15,15 +15,15 @@ export interface EnclaveCall {
   (input: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
-/** How long the matcher waits for OutLayer's enclave; traders wait MATCH_WAIT_MS past the window. */
-export const ENCLAVE_WAIT_MS = 240_000;
+/** How long the matcher waits for OutLayer's enclave (quotes hold 10 minutes); traders wait MATCH_WAIT_MS past the window. */
+export const ENCLAVE_WAIT_MS = 420_000;
 
 type OutLayerCall = { call_id?: string; status?: string; output?: unknown; result?: unknown; error?: string; attestation_url?: string };
 
 /**
  * OutLayer's HTTPS API: POST {api}/call/{owner}/{project} in async mode, then poll
  * {api}/calls/{id}. A synchronous call goes through a proxy that gives up after about
- * 100 s (HTTP 524), and a busy testnet worker has taken more than two minutes.
+ * 100 s (HTTP 524), and a busy testnet worker has taken several minutes.
  */
 export function outlayerHttps(net: HushdNetwork, fetchImpl: typeof fetch = (input, init) => fetch(input, init), pollMs = 2_000): EnclaveCall {
   const api = settings.str("OUTLAYER_API", CUSTODY[net.id].api);

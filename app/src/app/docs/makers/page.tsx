@@ -82,10 +82,10 @@ export default function MakersDocsPage() {
         that market less their spread. A maker you run can price from anything you like.
       </p>
       <p>
-        They quote only what they can fill from their own private balance, and each quote holds for five minutes. For
+        They quote only what they can fill from their own private balance, and each quote holds for ten minutes. For
         a hedged package (experimental) they add the hedge: a short of the perp for the size they give, placed for
-        their own Hyperliquid account, as an immediate-or-cancel order with a limit of 99% of the mid, a ten-minute
-        deadline, and a bond of a tenth of the trade&apos;s value, rounded up to the desk&apos;s next bond step
+        their own Hyperliquid account, as an immediate-or-cancel order with a limit of 99% of the mid, a deadline five
+        minutes after the quote expires, and a bond of a tenth of the trade&apos;s value, rounded up to the desk&apos;s next bond step
         (<code>min_bond</code>, 1,000 USDC, times 1, 2, 5, 10, 20 and so on). They quote a hedged package only when
         their Hyperliquid testnet account holds the margin for it. All three hold some, and hedges fill on testnet:
         see <AppLink href="/app/deals/122">deal 122</AppLink>, a 562.7 NEAR short filled on Hyperliquid testnet.

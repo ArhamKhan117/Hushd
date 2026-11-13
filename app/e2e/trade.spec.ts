@@ -103,7 +103,7 @@ test.describe("the Trade screen (market routes stubbed)", () => {
 
 test.describe("a trade on NEAR testnet", () => {
   test.skip(!process.env.HUSHD_E2E_TESTNET, "set HUSHD_E2E_TESTNET=1 to run against testnet");
-  test.describe.configure({ mode: "serial", timeout: 12 * 60_000 });
+  test.describe.configure({ mode: "serial", timeout: 17 * 60_000 });
 
   test("a new passkey user trades on the Trade screen and sees the deal settle below", async ({ page, context, browserName }, info) => {
     test.skip(browserName !== "chromium", "the virtual authenticator is Chromium only");
@@ -162,7 +162,8 @@ test.describe("a trade on NEAR testnet", () => {
     await expect(page.getByRole("region", { name: "Payoff" }).getByRole("img", { name: new RegExp(`Value of the package against the ${coin} price`) })).toBeVisible();
     await ticket.getByRole("button", { name: `Ask to buy ${coin}` }).click();
     await expect(ticket.getByText(/committed on the desk/)).toBeVisible({ timeout: 60_000 });
-    await expect(ticket.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 4 * 60_000 });
+    // the enclave can take minutes when OutLayer's testnet workers are busy
+    await expect(ticket.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 9 * 60_000 });
     await expect(ticket.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
     const dealId = (await ticket.getByRole("link", { name: /Open deal #\d+/ }).textContent())!.match(/#(\d+)/)![1]!;
     console.log(`[${info.project.name}] deal #${dealId} settled; ${await moveTxOf(ticket)}`);

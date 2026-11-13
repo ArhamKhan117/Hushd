@@ -54,6 +54,12 @@ export type Style = "fixed" | "volatility" | "inventory";
 const hexBytes = (h: string) => new Uint8Array(Buffer.from(h.replace(/^0x/, ""), "hex"));
 const toHexStr = (b: Uint8Array) => `0x${Buffer.from(b).toString("hex")}`;
 
+/**
+ * How long a quote holds. The enclave takes a quote only while it holds for another minute,
+ * and a busy OutLayer worker has taken several minutes to run the match.
+ */
+export const QUOTE_LIFE_MS = 10 * 60_000;
+
 /** USDC of margin a hedge of this notional needs: at half the coin's maximum leverage, so a move does not liquidate it at once. */
 export function hedgeMargin(notionalUsd: number, maxLeverage: number): number {
   return notionalUsd / Math.max(1, maxLeverage / 2);
@@ -171,7 +177,7 @@ export class Maker {
       give: { token: buy.id, amount: give },
       take: { token: sell.id, amount: sellAmount },
       bond: 0n,
-      expiresAtMs: now + 5 * 60_000,
+      expiresAtMs: now + QUOTE_LIFE_MS,
       makerAddress: this.wallet.address,
       quoteKey: this.quoteKey,
       signature: "",
@@ -186,7 +192,7 @@ export class Maker {
       if (!coin || !perp || !px) return null;
       if ((await this.hlMargin()) < hedgeMargin(notionalUsd, perp.maxLeverage)) return null;
       const size = Number(give) / 10 ** buy.decimals;
-      q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: now + 10 * 60_000, testnet: hedgeTestnet() };
+      q.hedge = { venue: "hyperliquid", coin, asset: perp.asset, isBuy: false, size: wireSize(size, perp.szDecimals), limitPx: wirePrice(px * 0.99, perp.szDecimals), deadlineMs: q.expiresAtMs + 5 * 60_000, testnet: hedgeTestnet() };
       // about a tenth of the trade's value in USDC, held by the desk until the hedge leg is done
       const usdc = this.net.tokens.find((t) => t.symbol === "USDC")!;
       const minBond = await this.minBond();

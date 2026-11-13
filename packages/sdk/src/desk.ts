@@ -360,9 +360,9 @@ export function checkMatchedTerms(terms: AgreedTerms, d: PackageDraft): void {
 
 /**
  * How long past an RFQ's window a trader waits for the match: the matcher gives OutLayer's
- * enclave up to 240 s (a busy testnet worker has taken more than 120), then sends the match.
+ * enclave up to 7 minutes (a busy testnet worker has taken several), then sends the match.
  */
-export const MATCH_WAIT_MS = 300_000;
+export const MATCH_WAIT_MS = 480_000;
 
 /**
  * Wait for the enclave's answer to an RFQ (the matcher runs when the window closes). `me` is

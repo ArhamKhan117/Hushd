@@ -48,7 +48,7 @@ async function intakeRoutes(page: Page) {
  * named reader checked on /verify. Needs the live contracts and services.
  */
 test.skip(!process.env.HUSHD_E2E_TESTNET, "set HUSHD_E2E_TESTNET=1 to run against testnet");
-test.describe.configure({ mode: "serial", timeout: 10 * 60_000 });
+test.describe.configure({ mode: "serial", timeout: 15 * 60_000 });
 
 test("a new passkey user trades privately and proves it", async ({ page, context, browserName }) => {
   test.skip(browserName !== "chromium", "the virtual authenticator is Chromium only");
@@ -105,7 +105,8 @@ test("a new passkey user trades privately and proves it", async ({ page, context
   await expect(page.locator("#amount")).toHaveValue("200");
   await page.getByRole("button", { name: "Ask for quotes" }).click();
   await expect(page.getByText(/committed on the desk/)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 4 * 60_000 });
+  // the enclave can take minutes when OutLayer's testnet workers are busy
+  await expect(page.getByText(/Matched in the enclave: deal #\d+/)).toBeVisible({ timeout: 9 * 60_000 });
   await expect(page.getByText("Receipt")).toBeVisible({ timeout: 4 * 60_000 });
   const dealLink = page.getByRole("link", { name: /Open deal #\d+/ });
   const dealId = (await dealLink.textContent())!.match(/#(\d+)/)![1]!;
