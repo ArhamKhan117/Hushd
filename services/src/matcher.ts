@@ -15,8 +15,17 @@ export interface EnclaveCall {
   (input: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
-/** OutLayer's HTTPS API: POST {api}/call/{owner}/{project}. */
-export function outlayerHttps(net: HushdNetwork): EnclaveCall {
+/** How long the matcher waits for OutLayer's enclave; traders wait MATCH_WAIT_MS past the window. */
+export const ENCLAVE_WAIT_MS = 240_000;
+
+type OutLayerCall = { call_id?: string; status?: string; output?: unknown; result?: unknown; error?: string; attestation_url?: string };
+
+/**
+ * OutLayer's HTTPS API: POST {api}/call/{owner}/{project} in async mode, then poll
+ * {api}/calls/{id}. A synchronous call goes through a proxy that gives up after about
+ * 100 s (HTTP 524), and a busy testnet worker has taken more than two minutes.
+ */
+export function outlayerHttps(net: HushdNetwork, fetchImpl: typeof fetch = (input, init) => fetch(input, init), pollMs = 2_000): EnclaveCall {
   const api = settings.str("OUTLAYER_API", CUSTODY[net.id].api);
   const project = settings.str("OUTLAYER_PROJECT", net.id === "mainnet" ? "hushd.near/matcher" : "hushd.testnet/matcher");
   const key = settings.str("OUTLAYER_KEY", "");
@@ -27,16 +36,25 @@ export function outlayerHttps(net: HushdNetwork): EnclaveCall {
     else headers["x-payment-key"] = key;
     // the matcher's key is a protected secret of the project owner, locked to the deployed build
     const secretsRef = { profile: "default", account_id: settings.str("OUTLAYER_SECRETS_OWNER", project.split("/")[0]!) };
-    // a busy OutLayer worker has taken more than 120 s; traders wait MATCH_WAIT_MS past the window
-    const res = await fetch(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: false, secrets_ref: secretsRef }), signal: AbortSignal.timeout(240_000) });
+    const deadline = Date.now() + ENCLAVE_WAIT_MS;
+    const res = await fetchImpl(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: true, secrets_ref: secretsRef }), signal: AbortSignal.timeout(30_000) });
     const text = await res.text();
     if (!res.ok) throw new Error(`OutLayer answered ${res.status}: ${text.slice(0, 300)}`);
-    const body = JSON.parse(text) as { output?: unknown; result?: unknown; error?: string; status?: string; attestation_url?: string };
-    if (body.error) throw new Error(`The matcher failed in OutLayer: ${body.error}`);
+    let body = JSON.parse(text) as OutLayerCall;
+    while (body.status !== "completed" && body.status !== "failed" && !body.error) {
+      if (!body.call_id) throw new Error(`OutLayer answered without a call id: ${text.slice(0, 300)}`);
+      if (Date.now() > deadline) throw new Error(`OutLayer did not finish call ${body.call_id} within ${ENCLAVE_WAIT_MS / 1000} s`);
+      await new Promise((r) => setTimeout(r, pollMs));
+      const poll = await fetchImpl(`${api}/calls/${body.call_id}`, { headers, signal: AbortSignal.timeout(20_000) }).catch(() => null);
+      // a dropped poll is not the call failing: ask again until the deadline
+      if (!poll?.ok) continue;
+      body = { call_id: body.call_id, ...((await poll.json()) as OutLayerCall) };
+    }
+    if (body.error || body.status === "failed") throw new Error(`The matcher failed in OutLayer: ${body.error ?? "call failed"}`);
     // The module's stdout comes back as `output` (a string or parsed JSON) or `result`.
     const out = body.output ?? body.result ?? body;
     const parsed = (typeof out === "string" ? JSON.parse(out) : out) as Record<string, unknown>;
-    return body.attestation_url ? { ...parsed, attestation_url: body.attestation_url } : parsed;
+    return body.attestation_url ? { ...parsed, attestation_url: new URL(body.attestation_url, api).toString() } : parsed;
   };
 }
 

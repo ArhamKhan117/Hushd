@@ -17,6 +17,7 @@ import { orderAction, toRsv } from "../src/keeper.js";
 import { bondFor, hedgeMargin, priceAsk, spreadBps } from "../src/makers.js";
 import { checkDelegate, Relayer } from "../src/relayer.js";
 import { capByMarket, wirePrice, wireSize } from "../src/market.js";
+import { outlayerHttps } from "../src/matcher.js";
 import { parseTargets } from "../src/topup.js";
 import { gasKeyTopUp } from "../src/chain.js";
 import { parseAsk, report } from "../src/market-agent.js";
@@ -527,3 +528,39 @@ test("the relayer's gas key is refilled to the target only once it drops below t
   assert.equal(gasKeyTopUp(296_732_802_132_938_600_000_000n, NEAR, 3n * NEAR), 3n * NEAR - 296_732_802_132_938_600_000_000n);
 });
 
+
+test("the matcher calls OutLayer in async mode and polls until the call completes", async () => {
+  process.env.OUTLAYER_KEY = "hushd.testnet:1:secret";
+  const seen: { url: string; body?: unknown }[] = [];
+  const answers = [
+    { call_id: "c1", status: "pending", poll_url: "/calls/c1" },
+    null, // a dropped poll is asked again
+    { call_id: "c1", status: "pending" },
+    { call_id: "c1", status: "completed", output: JSON.stringify({ matched: true }), attestation_url: "/attestations/by-call/c1" },
+  ];
+  const fake = (async (url: string | URL | Request, init?: RequestInit) => {
+    seen.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    const a = answers.shift();
+    return a === null ? new Response("", { status: 502 }) : Response.json(a);
+  }) as typeof fetch;
+  try {
+    const out = await outlayerHttps(TESTNET, fake, 1)({ batch: 1 });
+    assert.deepEqual(out, { matched: true, attestation_url: "https://testnet-api.outlayer.ai/attestations/by-call/c1" });
+    assert.equal(seen[0]!.url, "https://testnet-api.outlayer.ai/call/hushd.testnet/matcher");
+    assert.equal((seen[0]!.body as { async: boolean }).async, true);
+    assert.deepEqual(seen.slice(1).map((x) => x.url), Array(3).fill("https://testnet-api.outlayer.ai/calls/c1"));
+  } finally {
+    delete process.env.OUTLAYER_KEY;
+  }
+});
+
+test("a failed OutLayer call is an error", async () => {
+  process.env.OUTLAYER_KEY = "hushd.testnet:1:secret";
+  const answers = [{ call_id: "c2", status: "pending" }, { call_id: "c2", status: "failed", error: "out of fuel" }];
+  const fake = (async () => Response.json(answers.shift())) as typeof fetch;
+  try {
+    await assert.rejects(outlayerHttps(TESTNET, fake, 1)({}), /The matcher failed in OutLayer: out of fuel/);
+  } finally {
+    delete process.env.OUTLAYER_KEY;
+  }
+});
