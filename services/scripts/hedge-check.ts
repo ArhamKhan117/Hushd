@@ -9,13 +9,15 @@
  * Readiness: each maker's Hyperliquid key, address and margin; the margin one hedge of the
  * run's size needs; the coins the desk hedges are listed on Hyperliquid testnet; the desk's
  * MPC derives the next deal's address (Chain Signatures); and Hyperliquid takes the maker's
- * EIP-712 signature: an approveAgent for that address, signed by maker A, is either approved
- * or refused naming maker A itself (Hyperliquid recovers the signer, so a bad signature would
- * name some other address).
+ * EIP-712 signature: an approveAgent for a throwaway address, signed by maker A, is either
+ * approved or refused naming maker A itself (Hyperliquid recovers the signer, so a bad
+ * signature would name some other address). Never the next deal's address: once maker A
+ * approves it, that deal's hedge trades on maker A's margin whichever maker wins it.
  *
  * --run uses the demo agent (DEMO_AGENT_SEED, DEMO_AGENT_POLICY_WALLET_KEY in .env) and the
  * services on localhost:8080, and writes the result to deployments/testnet-hedge.json.
  */
+import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -80,9 +82,11 @@ async function readiness(): Promise<{ funded: string | null }> {
 
   const a = makers[0];
   if (a) {
+    // a throwaway agent: the next deal's own address would tie that deal's hedge to maker A
+    const probe = `0x${randomBytes(20).toString("hex")}`;
     try {
-      await approveDealAgent(a.key, agent, true);
-      ok(`Hyperliquid approved deal ${nextId}'s address as ${a.name}'s agent: the maker's EIP-712 signature checks out`);
+      await approveDealAgent(a.key, probe, true);
+      ok(`Hyperliquid approved a throwaway address (${probe}) as ${a.name}'s agent: the maker's EIP-712 signature checks out`);
     } catch (e) {
       const said = (e as Error).message;
       if (said.toLowerCase().includes(a.address.toLowerCase())) ok(`Hyperliquid read ${a.name}'s own address from its signature and refused only for the account's state: ${said}`);

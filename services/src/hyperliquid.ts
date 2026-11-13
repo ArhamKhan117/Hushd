@@ -37,14 +37,14 @@ export async function dealAddress(net: HushdNetwork, dealId: number | string): P
   return evmAddress(raw);
 }
 
-type Field = ["string", string, string] | ["address", string, string] | ["uint64", string, number | bigint];
+type Field = ["string", string, string] | ["address", string, string] | ["uint64", string, number | bigint] | ["bool", string, boolean];
 
 /** EIP-712 digest of a user-signed Hyperliquid action ("HyperliquidSignTransaction" domain, chain 0x66eee). */
 function userActionDigest(primaryType: string, fields: Field[]): Uint8Array {
   const domainType = k(enc.encode("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"));
   const domain = k(concat(domainType, k(enc.encode("HyperliquidSignTransaction")), k(enc.encode("1")), word(0x66eeen), word(0n)));
   const type = k(enc.encode(`HyperliquidTransaction:${primaryType}(${fields.map(([t, n]) => `${t} ${n}`).join(",")})`));
-  const values = fields.map(([t, , v]) => (t === "string" ? k(enc.encode(v as string)) : word(BigInt(v))));
+  const values = fields.map(([t, , v]) => (t === "string" ? k(enc.encode(v as string)) : t === "bool" ? word(v ? 1n : 0n) : word(BigInt(v as string | number | bigint))));
   return k(concat(Uint8Array.of(0x19, 0x01), domain, k(concat(type, ...values))));
 }
 
@@ -65,6 +65,16 @@ export function usdSendDigest(a: { destination: string; amount: string; time: nu
     ["string", "destination", a.destination],
     ["string", "amount", a.amount],
     ["uint64", "time", a.time],
+  ]);
+}
+
+/** EIP-712 digest of a user-signed `usdClassTransfer` (USDC between the account's spot and perps balances). */
+export function usdClassTransferDigest(a: { amount: string; toPerp: boolean; nonce: number; testnet: boolean }): Uint8Array {
+  return userActionDigest("UsdClassTransfer", [
+    ["string", "hyperliquidChain", a.testnet ? "Testnet" : "Mainnet"],
+    ["string", "amount", a.amount],
+    ["bool", "toPerp", a.toPerp],
+    ["uint64", "nonce", a.nonce],
   ]);
 }
 
@@ -95,4 +105,14 @@ export async function usdSend(keyHex: string, destination: string, amount: strin
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, nonce: now, signature }), signal: AbortSignal.timeout(15_000) });
   const body = (await res.json().catch(() => ({ status: "err", response: `HTTP ${res.status}` }))) as { status: string; response?: unknown };
   if (body.status !== "ok") throw new Error(`Hyperliquid refused usdSend: ${JSON.stringify(body.response)}`);
+}
+
+/** Move USDC (whole units as a decimal string) between the spot and perps balances of the account of `keyHex`: hedges use perps margin, and a transfer into an account lands in spot. */
+export async function usdClassTransfer(keyHex: string, amount: string, toPerp: boolean, testnet: boolean, now = Date.now()) {
+  const signature = signDigest(keyHex, usdClassTransferDigest({ amount, toPerp, nonce: now, testnet }));
+  const action = { type: "usdClassTransfer", signatureChainId: "0x66eee", hyperliquidChain: testnet ? "Testnet" : "Mainnet", amount, toPerp, nonce: now };
+  const url = settings.str(testnet ? "HYPERLIQUID_TESTNET_EXCHANGE_URL" : "HYPERLIQUID_EXCHANGE_URL", testnet ? "https://api.hyperliquid-testnet.xyz/exchange" : "https://api.hyperliquid.xyz/exchange");
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, nonce: now, signature }), signal: AbortSignal.timeout(15_000) });
+  const body = (await res.json().catch(() => ({ status: "err", response: `HTTP ${res.status}` }))) as { status: string; response?: unknown };
+  if (body.status !== "ok") throw new Error(`Hyperliquid refused usdClassTransfer: ${JSON.stringify(body.response)}`);
 }

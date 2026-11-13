@@ -82,6 +82,13 @@ export async function hedgeWithdrawable(address: string): Promise<number> {
   return Number(s.withdrawable ?? 0);
 }
 
+/** USDC in an account's spot balance, which a hedge cannot use until it moves to perps. */
+export async function hedgeSpotUsdc(address: string): Promise<number> {
+  const s = await info<{ balances?: { coin: string; total: string; hold: string }[] }>(HL_HEDGE(), { type: "spotClearinghouseState", user: address });
+  const usdc = s.balances?.find((b) => b.coin === "USDC");
+  return usdc ? Number(usdc.total) - Number(usdc.hold) : 0;
+}
+
 /** Hyperliquid wire format: no trailing zeros, no exponent. */
 function wire(x: number, decimals: number): string {
   const s = x.toFixed(decimals);
