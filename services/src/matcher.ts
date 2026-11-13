@@ -27,7 +27,8 @@ export function outlayerHttps(net: HushdNetwork): EnclaveCall {
     else headers["x-payment-key"] = key;
     // the matcher's key is a protected secret of the project owner, locked to the deployed build
     const secretsRef = { profile: "default", account_id: settings.str("OUTLAYER_SECRETS_OWNER", project.split("/")[0]!) };
-    const res = await fetch(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: false, secrets_ref: secretsRef }), signal: AbortSignal.timeout(120_000) });
+    // a busy OutLayer worker has taken more than 120 s; traders wait MATCH_WAIT_MS past the window
+    const res = await fetch(`${api}/call/${project}`, { method: "POST", headers, body: JSON.stringify({ input, async: false, secrets_ref: secretsRef }), signal: AbortSignal.timeout(240_000) });
     const text = await res.text();
     if (!res.ok) throw new Error(`OutLayer answered ${res.status}: ${text.slice(0, 300)}`);
     const body = JSON.parse(text) as { output?: unknown; result?: unknown; error?: string; status?: string; attestation_url?: string };

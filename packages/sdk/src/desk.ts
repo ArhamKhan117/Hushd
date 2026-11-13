@@ -359,11 +359,17 @@ export function checkMatchedTerms(terms: AgreedTerms, d: PackageDraft): void {
 }
 
 /**
+ * How long past an RFQ's window a trader waits for the match: the matcher gives OutLayer's
+ * enclave up to 240 s (a busy testnet worker has taken more than 120), then sends the match.
+ */
+export const MATCH_WAIT_MS = 300_000;
+
+/**
  * Wait for the enclave's answer to an RFQ (the matcher runs when the window closes). `me` is
  * the deal identity `packageRequest` returned: the enclave seals the match to the address
  * the request names.
  */
-export async function awaitMatch(api: DeskApi, me: Pick<Identity, "encSecret">, rfqId: number, timeoutMs = 180_000, onTick?: (s: { status: string; quotes: number }) => void) {
+export async function awaitMatch(api: DeskApi, me: Pick<Identity, "encSecret">, rfqId: number, timeoutMs = 30_000 + MATCH_WAIT_MS, onTick?: (s: { status: string; quotes: number }) => void) {
   const start = Date.now();
   for (;;) {
     const r = await api.result(rfqId);

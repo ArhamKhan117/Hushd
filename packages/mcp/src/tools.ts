@@ -20,6 +20,7 @@ import {
   linkUrl,
   makeNote,
   makersToAsk,
+  MATCH_WAIT_MS,
   MAX_ASKED_MAKERS,
   openRfq,
   packageRequest,
@@ -335,7 +336,7 @@ export function registerWalletTools(server: McpServer, a: Agent, opts: { verifyB
         // the request names a one-time address for this deal alone: the maker it goes to cannot link it to this agent's other deals
         const { request, ask, refundBlinding, dealIdentity } = packageRequest(a.id, net, draft);
         const opened = await openRfq({ net, api: a.api, relayer: a.relayer, request, ask, windowMs: window_seconds * 1000 });
-        const match = await awaitMatch(a.api, dealIdentity, opened.rfqId, window_seconds * 1000 + 120_000);
+        const match = await awaitMatch(a.api, dealIdentity, opened.rfqId, window_seconds * 1000 + MATCH_WAIT_MS);
         checkMatchedTerms(match.terms, draft);
         if (BigInt(match.terms.bond) > 0n && net.bondToken) await wallet.expect(makeNote(a.id.pk, net.bondToken, BigInt(match.terms.bond), refundBlinding), { memo: "Bond paid to you", dealId: String(match.dealId) });
         const record = { dealId: match.dealId, rfqId: opened.rfqId, role: "trader" as const, kind, maker: match.terms.maker, class: match.terms.class, gave: match.terms.traderGives, got: match.terms.makerGives, bond: match.terms.bond, refundBlinding: refundBlinding.toString(), atMs: Date.now() };

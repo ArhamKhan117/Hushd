@@ -9,7 +9,7 @@
  * note the maker paid to this deal's one-time address into the balance. The wallet remembers
  * the deal (and the bond note it may be owed) in its encrypted store.
  */
-import { awaitMatch, checkMatchedTerms, DeskApi, deskView, makeNote, MarketApi, marketFloor, openRfq, packageRequest, settleAsTrader, tokenInfo, type AgreedTerms, type PackageDraft } from "@hushd/sdk";
+import { awaitMatch, checkMatchedTerms, MATCH_WAIT_MS, DeskApi, deskView, makeNote, MarketApi, marketFloor, openRfq, packageRequest, settleAsTrader, tokenInfo, type AgreedTerms, type PackageDraft } from "@hushd/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Step, StepState } from "@/components/app/desk";
 import { NETWORK } from "@/lib/hushd/config";
@@ -94,7 +94,7 @@ export function useDeskRun() {
         const { request, ask: makerAsk, refundBlinding, dealIdentity } = packageRequest(identity, NETWORK, draft);
         const opened = await openRfq({ net: NETWORK, api, relayer: s.relayer, request, ask: makerAsk, windowMs });
         set({ phase: "quoting", rfqId: opened.rfqId, closesAtMs: opened.closesAtMs, quotes: 0 });
-        const match = await awaitMatch(api, dealIdentity, opened.rfqId, windowMs + 120_000, (t) => set({ quotes: t.quotes }));
+        const match = await awaitMatch(api, dealIdentity, opened.rfqId, windowMs + MATCH_WAIT_MS, (t) => set({ quotes: t.quotes }));
         checkMatchedTerms(match.terms, draft);
         const makers = await deskView.makers(NETWORK).catch(() => []);
         const makerName = makers.find(([acc]) => acc === match.terms.maker)?.[1].name ?? match.terms.maker;
