@@ -38,6 +38,8 @@ Afterwards the trader, a person or an agent, can prove exactly one fact, such as
 
 Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on mainnet after a proving-key ceremony, an external audit and a deploy ([MAINNET.md](MAINNET.md)).
 
+Demo video (four minutes): [on X](https://x.com/TryHushd/status/2121584341893386245).
+
 ## At a glance
 
 | Area | In short |
@@ -135,7 +137,7 @@ Who you trust, and for what:
 | **The API** | Run by Hushd. It stores the sealed requests, quotes and deal-room messages and passes them on. It cannot open them, but it sees IP addresses, timing and deal-room traffic, and it can refuse, delay or drop a message. |
 | **The matcher client** | Run by Hushd. It builds each batch for the enclave from the quotes in the API's database (`services/src/matcher.ts`). It cannot read them or forge a match, but it could leave a quote out, and the enclave could not tell. |
 | **The keeper** | Run by Hushd. It submits each hedge order and alone reports whether it filled; the desk releases or slashes the maker's bond on that report. |
-| **The matcher enclave** | It sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code. |
+| **The matcher enclave** | It sees requests and quotes in the clear inside the TEE. You trust OutLayer's attestation that it runs this repo's `matcher/` code: `cd matcher && cargo build --release --locked --target wasm32-wasip2` rebuilds the build the desk pins, sha256 `95cba282e110f209a8a2a9722dfa8b1e9be777a45ab5a9fcaf78a74a4bbcd876` (checked with Rust 1.98.1). |
 | **The maker** | It sees the pair, side and size of your ask and, after a match, the deal terms. It also has a last look: the trader proves its leg first and the maker submits both, so it can wait out the settlement window and settle only if the price still suits it. That costs it no bond on a spot deal, but the lapse is public and requests skip a maker that let more than 25% of its recent deals lapse. |
 | **NEAR AI Cloud** | It decrypts your words inside an attested TEE. The Hushd API only forwards ciphertext. |
 
@@ -248,9 +250,12 @@ Going live takes a multi-party proving-key ceremony (`circuits/scripts/ceremony.
 
 ## Hackathon
 
-Hushd is entered in the Privacy, DeFi, AI Swarms and Agent Economy tracks.
+Hushd is entered in the Privacy, DeFi, AI Swarms, Agent Economy and AI Security tracks.
 For the agent tracks, what runs is a market of independent agents: three automated makers, each with its own pricing formula (a fixed, a volatility or an inventory spread on Hyperliquid mids), bond, quote key and policy wallet, compete in every sealed auction and settle their own legs, and any agent can join as a trader through MCP and pay for quotes over private x402.
 No language model sets a price; the one model call in Hushd is the NEAR AI intake, which drafts a request from a person's words.
+For AI Security: an agent need never hold its NEAR key.
+It can act through an OutLayer policy wallet, whose TEE signs only calls to Hushd's contracts within caps the owner sets on chain, and the owner can freeze it in one transaction.
+The MCP server adds per-payment and per-day spending limits per token (`packages/mcp/src/limits.ts`), and the browser checks the intake model's TEE attestation and signature before it trusts a draft.
 
 ## License
 

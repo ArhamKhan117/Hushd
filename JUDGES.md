@@ -1,6 +1,7 @@
 # For judges
 
 A five-minute path through Hushd, then where to look in the code.
+The demo video (four minutes) is [on X](https://x.com/TryHushd/status/2121584341893386245).
 
 ## Five minutes
 
@@ -12,7 +13,7 @@ A five-minute path through Hushd, then where to look in the code.
 
 Already made for you: `deployments/judge-proof-payment.txt` (an exact payment that settled desk deal #2) and `deployments/judge-proof-funds.txt` (a balance of at least 1,000 USDC, from a wallet that only backs it), both for `judge.testnet`, until 6 and 10 December 2026. The pool checks each against its reader and expiry on chain. Paste one into [hushd.net/verify](https://hushd.net/verify) as `judge.testnet`, then as anyone else to see it refused.
 
-Watch an agent do all of it: `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools through the agent's policy wallet: a deposit signed in OutLayer's TEE, a call outside its policy refused by the TEE, the owner freezing it (and the agent refusing to spend) then unfreezing it, a private x402 payment, a cash out, a spot trade and proofs.
+Watch an agent do all of it, on your own deployment (it needs the service and agent keys in `.env` that `deploy:testnet` sets up): `pnpm stack` in one terminal, then `pnpm --filter @hushd/services exec tsx scripts/demo-agent.ts`. It drives the MCP server's tools through the agent's policy wallet: a deposit signed in OutLayer's TEE, a call outside its policy refused by the TEE, the owner freezing it (and the agent refusing to spend) then unfreezing it, a private x402 payment, a cash out, a spot trade and proofs.
 
 The NEAR Intents trade between two agents, end to end with no funds: `pnpm --filter @hushd/services intents:sandbox` deploys the exact code of `intents.near` (read from mainnet, hash checked) on a local node, and two agents deposit, trade with signed `token_diff`s, see a replay refused and withdraw. `intents:mainnet` prints the budgeted mainnet run and dry-runs it against `intents.near`.
 

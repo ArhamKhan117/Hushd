@@ -29,7 +29,7 @@ async function handle(req: Request): Promise<Response> {
     return vkeys.get(kind);
   };
   await singleThreadCurve();
-  const server = new McpServer({ name: "hushd", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "hushd", version: "0.1.2" }, { instructions: INSTRUCTIONS });
   registerReadTools(server, NETWORK, vkey);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
