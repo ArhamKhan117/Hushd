@@ -91,7 +91,7 @@ Demo video (four minutes): [on X](https://x.com/TryHushd/status/2121584341893386
 | What | Where you see it |
 | --- | --- |
 | Groth16 proofs verified on chain with NEAR's `alt_bn128` host functions (a proof check is about 36 Tgas; a private send's pool call about 90, a two-leg settlement about 125) | Every private send, cash out and settlement; `/verify` asks the pool to check a proof again |
-| Chain Signatures sign each deal's Hyperliquid order from its own derivation path | A deal page's hedge row: [deal 122](https://hushd.net/app/deals/122), whose order filled on Hyperliquid testnet |
+| Chain Signatures sign each deal's Hyperliquid order from its own derivation path | A deal page's hedge row: [deal 130](https://hushd.net/app/deals/130), whose order filled on the winning maker's own Hyperliquid testnet account ([check it yourself](#check-a-hedge-yourself)) |
 | OutLayer runs the matcher in a TEE, with on-chain yield and resume for the desk's enclave key | Makers page, "The matcher" |
 | NEAR AI Cloud verifiable private inference, attestation checked with `@nearai/inference-sdk` | Desk, "Describe it" |
 | Named accounts as proof readers: a proof is for `auditor.testnet`, not for a key | Prove page, "Who may read it" |
@@ -102,6 +102,23 @@ Demo video (four minutes): [on X](https://x.com/TryHushd/status/2121584341893386
 | NEAR Intents direct trades: complementary `token_diff` intents signed by two agents, one `execute_intents`, simulated first with `simulate_intents` (tested on a local node running `intents.near`'s code) | Transparency, "On NEAR Intents (mainnet)", which lists the mainnet trade's transactions once it runs |
 | 1Click quotes across 39 chains (NEAR included), as the makers' second price and for deposits from and cash-outs to other chains | Balance, Add and Cash out, "another chain" |
 | NEP-297 events read from FastNEAR's free transactions API by the indexer (or its neardata block stream) | A deal page's "On chain" list |
+
+### Check a hedge yourself
+
+Hyperliquid's public API shows each hedge order on the account it traded for, with no login.
+Ledger won deal 130, and its order (oid 65293516022) filled 598.3 NEAR on Ledger's own Hyperliquid testnet account:
+
+```bash
+curl -s https://api.hyperliquid-testnet.xyz/info -H 'content-type: application/json' -d '{"type":"orderStatus","user":"0x2b43bd1969ac858dd04b1183886228cc9209bbfc","oid":65293516022}'
+```
+
+The same query for Steady's account (`0xcfd5ba482f2be11812ded5fb5a26318eea503a3b`) or Weather's (`0x36d1429bd060eeb24cb28a07b724ecbdaaf81be7`) answers `unknownOid`.
+
+Deal 122, the hedge in the demo video, filled too (oid 65225181835, 562.7 NEAR), but on Steady's account, although Ledger won that deal.
+A readiness check had approved deal 122's address as Steady's agent on Hyperliquid before the deal existed, so Hyperliquid credited the order to Steady.
+Commit [60558ea](https://github.com/ArhamKhan117/Hushd/commit/60558ea92a468e4c4d52368d9d9bb642d47b9bf7) made the check approve a throwaway address instead, and deal 130 is the first hedge after it.
+Check deal 122 with `"user":"0xcfd5ba482f2be11812ded5fb5a26318eea503a3b","oid":65225181835`.
+The records are `deployments/testnet-hedge.json` (deal 130) and `deployments/testnet-hedge-122.json`.
 
 ## Contracts
 

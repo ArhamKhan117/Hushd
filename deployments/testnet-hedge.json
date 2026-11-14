@@ -1,13 +1,13 @@
 {
-  "dealId": 122,
+  "dealId": 130,
   "maker": "625fd4909d26f32d757a63ef9d8520291a07d4b69a369179dfcd3477a69c1f47",
   "hedge": {
     "asset": 54,
     "coin": "NEAR",
     "is_buy": false,
-    "size": "562.7",
-    "limit_px": "3.5028",
-    "deadline_ms": 1794570316199,
+    "size": "598.3",
+    "limit_px": "3.2941",
+    "deadline_ms": 1794664759963,
     "testnet": true
   },
   "receipt": {
@@ -15,18 +15,18 @@
     "evidence": [
       {
         "kind": "pool_settlement",
-        "reference": "pool.hushd.testnet#960"
+        "reference": "pool.hushd.testnet#1021"
       },
       {
         "kind": "pool_root",
-        "reference": "0x1725fe4335269fc8549ae3b3df6f5f973ef68ecd51e124eee71de26cd725d9d2"
+        "reference": "0x2661cfb57b507093a22bcda77b397a89041fdfe2d684fc7571110344c7a05c19"
       },
       {
         "kind": "hyperliquid_fill",
-        "reference": "oid 65225181835: 562.7 NEAR at 3.53726, nonce 1794569868324"
+        "reference": "oid 65293516022: 598.3 NEAR at 3.33401, nonce 1794663991473"
       }
     ],
-    "recorded_at_ms": "1794569875522"
+    "recorded_at_ms": "1794663998708"
   },
-  "checkedAt": "2026-11-13T11:38:05.660Z"
+  "checkedAt": "2026-11-14T13:46:44.052Z"
 }

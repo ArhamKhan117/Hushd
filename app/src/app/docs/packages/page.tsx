@@ -67,8 +67,8 @@ export default function PackagesPage() {
         own Hyperliquid account, so the position and its profit or loss are the maker&apos;s: the package does not
         hedge you. What it adds for you is the maker&apos;s promise, backed by its bond, to place that order in time,
         and the bond itself, paid to you privately, if the order misses. The reference makers quote a hedged package
-        only while their Hyperliquid testnet account holds the margin for it; <AppLink href="/app/deals/122">deal
-        122</AppLink> shows one end to end, its hedge filled on Hyperliquid testnet.
+        only while their Hyperliquid testnet account holds the margin for it; <AppLink href="/app/deals/130">deal
+        130</AppLink> shows one end to end, its hedge filled on the maker&apos;s own Hyperliquid testnet account.
       </Callout>
 
       <h2 id="spot">Spot</h2>
