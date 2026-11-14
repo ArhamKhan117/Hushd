@@ -40,6 +40,22 @@ Live on NEAR testnet with test tokens, and mainnet-ready: the same code runs on 
 
 Demo video (four minutes): [on X](https://x.com/TryHushd/status/2121584341893386245).
 
+## Check it in five minutes, no account
+
+1. **Every claim, live:** clone this repository, then run `pnpm install && pnpm verify` (Node 22, no keys, about 30 seconds).
+   You see one PASS or FAIL per claim in this README, checked against the testnet deployment, ending in "15 of 15 claims hold".
+2. **A proof for one reader:** open [hushd.net/verify](https://hushd.net/verify), paste `deployments/judge-proof-payment.txt` and give `judge.testnet` as the reader.
+   You see it hold, checked in your browser and again by the pool contract; give any other account and it is refused.
+3. **The desk from an agent:** `claude mcp add --transport http hushd-read https://hushd.net/mcp`, then ask it for the makers or deal 130.
+   You see live data from the desk and the pool, with no keys and no sign-up.
+4. **A hedge on Hyperliquid:**
+
+   ```bash
+   curl -s https://api.hyperliquid-testnet.xyz/info -H 'content-type: application/json' -d '{"type":"orderStatus","user":"0x2b43bd1969ac858dd04b1183886228cc9209bbfc","oid":65293516022}'
+   ```
+
+   You see `"status":"filled"` for deal 130's 598.3 NEAR order, on the account of Ledger, the maker that won it ([more](#check-a-hedge-yourself)).
+
 ## At a glance
 
 | Area | In short |
@@ -268,8 +284,8 @@ Going live takes a multi-party proving-key ceremony (`circuits/scripts/ceremony.
 
 ## Hackathon
 
-Hushd is entered in the Privacy, DeFi, AI Swarms, Agent Economy and AI Security tracks.
-For the agent tracks, what runs is a market of independent agents: three automated makers, each with its own pricing formula (a fixed, a volatility or an inventory spread on Hyperliquid mids), bond, quote key and policy wallet, compete in every sealed auction and settle their own legs, and any agent can join as a trader through MCP and pay for quotes over private x402.
+Hushd is entered in the Privacy, DeFi, Agent Economy and AI Security tracks.
+For the Agent Economy track, what runs is a market of independent agents: three automated makers, each with its own pricing formula (a fixed, a volatility or an inventory spread on Hyperliquid mids), bond, quote key and policy wallet, compete in every sealed auction and settle their own legs, and any agent can join as a trader through MCP and pay for quotes over private x402.
 No language model sets a price; the one model call in Hushd is the NEAR AI intake, which drafts a request from a person's words.
 For AI Security: an agent need never hold its NEAR key.
 It can act through an OutLayer policy wallet, whose TEE signs only calls to Hushd's contracts within caps the owner sets on chain, and the owner can freeze it in one transaction.
