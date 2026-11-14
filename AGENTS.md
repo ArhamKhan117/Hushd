@@ -23,6 +23,7 @@ This file is the map of the repository for AI coding agents and anyone new to it
 
 ```bash
 pnpm install
+pnpm --filter @hushd/circuits compile       # once, needs circom 2 (the circuit tests read build/)
 pnpm test                                   # SDK, protocol, services, MCP and circuits
 pnpm dev                                    # the app on :3000, against testnet
 pnpm verify                                 # every README claim, checked live: PASS or FAIL
